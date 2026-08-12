@@ -1213,4 +1213,769 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Action | text | Performed action |
 | Entity | text | Affected resource |
 | IP Address | text | Source |
-| Details | text | Change details |
+|| Details | text | Change details |
+
+---
+
+## 🔌 API Reference
+
+The backend exposes a RESTful API at `http://localhost:8080/api/v1`. All endpoints require authentication unless otherwise noted. Responses are JSON. The API follows standard HTTP conventions: `GET` for reads, `POST` for creates, `PUT` for full updates, `PATCH` for partial updates, `DELETE` for removals.
+
+### Authentication
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/auth/register` | Email registration |
+| `POST` | `/auth/login` | Email login |
+| `POST` | `/auth/sso/google` | Google SSO callback |
+| `POST` | `/auth/sso/microsoft` | Microsoft SSO callback |
+| `POST` | `/auth/sso/linkedin` | LinkedIn SSO callback |
+| `POST` | `/auth/2fa/enable` | Enable 2FA |
+| `POST` | `/auth/2fa/disable` | Disable 2FA |
+| `POST` | `/auth/2fa/verify` | Verify 2FA code on login |
+| `POST` | `/auth/logout` | Invalidate session |
+| `POST` | `/auth/refresh` | Refresh access token |
+
+**Request — Register / Login**
+```json
+{
+  "email": "user@example.com",
+  "password": "string",
+  "fullName": "string",
+  "jobTitle": "string",
+  "phone": "string"
+}
+```
+
+**Response — Auth Token**
+```json
+{
+  "accessToken": "jwt-string",
+  "refreshToken": "jwt-string",
+  "expiresIn": 3600,
+  "tokenType": "Bearer",
+  "requires2fa": false
+}
+```
+
+**Headers**
+```
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+---
+
+### Users & Profiles
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/users/me` | Get current user profile | All |
+| `PUT` | `/users/me` | Update current user profile | All |
+| `PATCH` | `/users/me/password` | Change password | All |
+| `GET` | `/users` | List all users (paginated) | Admin |
+| `GET` | `/users/{id}` | Get user by ID | Admin |
+| `POST` | `/users` | Create user account | Admin |
+| `PUT` | `/users/{id}` | Update user | Admin |
+| `PATCH` | `/users/{id}/status` | Activate/deactivate user | Admin |
+| `DELETE` | `/users/{id}` | Delete user | Admin |
+| `POST` | `/users/{id}/invite` | Send invitation email | Admin, Provider |
+
+**Request — Create User**
+```json
+{
+  "email": "user@example.com",
+  "password": "string",
+  "fullName": "string",
+  "role": "CLIENT|PROVIDER|ADMIN",
+  "companyId": "uuid",
+  "assignedProjectIds": ["uuid"]
+}
+```
+
+---
+
+### Companies
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/companies` | List all companies | Admin |
+| `GET` | `/companies/{id}` | Get company details | Admin, Provider (assigned), Client |
+| `POST` | `/companies` | Create company (onboarding) | All (self-registration) |
+| `PUT` | `/companies/{id}` | Update company | Admin, Client (own) |
+| `GET` | `/companies/{id}/team` | Get company team members | Admin, Provider (assigned), Client |
+| `POST` | `/companies/{id}/team` | Add team member | Admin, Client |
+| `PUT` | `/companies/{id}/team/{userId}` | Update team member | Admin, Client |
+| `DELETE` | `/companies/{id}/team/{userId}` | Remove team member | Admin, Client |
+
+**Request — Create Company (Onboarding)**
+```json
+{
+  "name": "string",
+  "location": "string",
+  "owner": "string",
+  "businessType": "string",
+  "authorizedRepresentative": {
+    "fullName": "string",
+    "jobTitle": "string",
+    "email": "string",
+    "phone": "string"
+  },
+  "projectCost": 500000.00,
+  "rawMaterials": [
+    {"name": "Steel", "quantityTons": 100, "period": "MONTHLY|YEARLY"}
+  ],
+  "productionOutput": [
+    {"productName": "Beams", "annualTons": 500}
+  ],
+  "productionBreakdown": [
+    {"productName": "Beams", "monthlyTons": 42, "annualTons": 500}
+  ],
+  "wasteManagement": {
+    "practices": "string",
+    "monthlyWaste": [
+      {"type": "Recyclable", "quantityTons": 10}
+    ]
+  },
+  "manufacturingProcedure": "string",
+  "productionFlowchart": "file (multipart)"
+}
+```
+
+---
+
+### Projects
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/projects` | List projects (paginated, filterable) | Admin (all), Provider (assigned), Client (assigned) |
+| `GET` | `/projects/{id}` | Get project detail | All (assigned) |
+| `POST` | `/projects` | Create project (wizard) | Admin, Provider |
+| `PUT` | `/projects/{id}` | Update project | Admin, Provider |
+| `PATCH` | `/projects/{id}/status` | Change project status | Admin, Provider |
+| `DELETE` | `/projects/{id}` | Delete project | Admin |
+| `GET` | `/projects/{id}/dashboard` | Project dashboard metrics | All (assigned) |
+| `POST` | `/projects/{id}/team` | Assign team members | Admin, Provider |
+| `DELETE` | `/projects/{id}/team/{userId}` | Remove team member | Admin, Provider |
+| `GET` | `/projects/{id}/client-company` | Get linked company info | All (assigned) |
+
+**Request — Create Project (Wizard)**
+```json
+{
+  "scenario": "NEW_CUSTOMER|EXISTING_CUSTOMER",
+  "existingCompanyId": "uuid",
+  "company": {
+    "name": "string",
+    "location": "string",
+    "owner": "string",
+    "businessType": "string"
+  },
+  "authorizedRepresentative": {
+    "fullName": "string",
+    "jobTitle": "string",
+    "email": "string",
+    "phone": "string"
+  },
+  "name": "string",
+  "serviceTypeId": "uuid",
+  "description": "string",
+  "estimatedStartDate": "2026-09-01",
+  "estimatedCompletionDate": "2026-12-31"
+}
+```
+
+**Response — Project**
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "scope": "string",
+  "objectives": "string",
+  "status": "NOT_STARTED|IN_PROGRESS|ON_HOLD|COMPLETED",
+  "serviceType": { "id": "uuid", "name": "string" },
+  "clientCompany": { "id": "uuid", "name": "string" },
+  "teamMembers": [{"id": "uuid", "name": "string", "role": "string"}],
+  "estimatedStartDate": "2026-09-01",
+  "estimatedCompletionDate": "2026-12-31",
+  "createdAt": "2026-08-12T10:00:00Z",
+  "updatedAt": "2026-08-12T10:00:00Z"
+}
+```
+
+**Query Parameters — List Projects**
+```
+?status=IN_PROGRESS&search=acme&page=0&size=20&sortBy=name&sortDir=asc
+```
+
+---
+
+### Tasks
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/tasks` | List tasks (paginated, filterable) | All (assigned) |
+| `GET` | `/tasks/{id}` | Get task detail | All (assigned) |
+| `POST` | `/tasks` | Create task | Admin, Provider |
+| `PUT` | `/tasks/{id}` | Update task | Admin, Provider |
+| `PATCH` | `/tasks/{id}/status` | Change task status | All (assigned) |
+| `DELETE` | `/tasks/{id}` | Delete task | Admin |
+
+**Request — Create Task**
+```json
+{
+  "projectId": "uuid",
+  "title": "string",
+  "description": "string",
+  "assigneeId": "uuid",
+  "dueDate": "2026-09-15",
+  "status": "TODO|IN_PROGRESS|DONE",
+  "priority": "LOW|MEDIUM|HIGH"
+}
+```
+
+---
+
+### Documents
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/documents` | List documents (paginated, filterable) | All (assigned) |
+| `GET` | `/documents/{id}` | Get document detail | All (assigned) |
+| `POST` | `/documents` | Upload document (multipart) | All (assigned) |
+| `PUT` | `/documents/{id}` | Update document metadata | All (assigned) |
+| `DELETE` | `/documents/{id}` | Delete document | Admin |
+| `GET` | `/documents/{id}/download` | Download file | All (assigned) |
+| `GET` | `/documents/{id}/versions` | List document versions | All (assigned) |
+| `POST` | `/documents/{id}/versions/{versionId}/restore` | Restore version | All (assigned) |
+| `POST` | `/projects/{projectId}/documents/request` | Request document from client | Admin, Provider |
+| `GET` | `/documents/{id}/comments` | Get document comments | All (assigned) |
+| `POST` | `/documents/{id}/comments` | Add comment | All (assigned) |
+
+**Query Parameters — List Documents**
+```
+?projectId=uuid&category=CLIENT_SUBMITTED|REQUESTED&search=filename&page=0&size=20
+```
+
+**Response — Document**
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "category": "CLIENT_SUBMITTED|REQUESTED|DELIVERABLE",
+  "version": "1.0",
+  "description": "string",
+  "tags": ["tag1", "tag2"],
+  "fileUrl": "/api/v1/documents/{id}/download",
+  "fileSize": 1048576,
+  "mimeType": "application/pdf",
+  "uploadedBy": { "id": "uuid", "name": "string" },
+  "projectId": "uuid",
+  "createdAt": "2026-08-12T10:00:00Z",
+  "updatedAt": "2026-08-12T10:00:00Z"
+}
+```
+
+**Request — Request Document**
+```json
+{
+  "projectId": "uuid",
+  "description": "string",
+  "requiredBy": "2026-09-01",
+  "recipientIds": ["uuid"]
+}
+```
+
+---
+
+### Messages & Conversations
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/conversations` | List project conversations | All (assigned) |
+| `GET` | `/conversations/{id}` | Get conversation messages | All (assigned) |
+| `POST` | `/conversations/{id}/messages` | Send message | All (assigned) |
+| `GET` | `/conversations/{id}/participants` | Get conversation participants | All (assigned) |
+| `DELETE` | `/conversations/{id}/messages/{messageId}` | Delete message (own) | Message author, Admin |
+| `GET` | `/conversations/{id}/unread-count` | Get unread count | All (assigned) |
+| `POST` | `/conversations/{id}/read` | Mark all as read | All (assigned) |
+
+**Request — Send Message**
+```json
+{
+  "content": "string",
+  "attachments": [{"name": "string", "file": "multipart"}]
+}
+```
+
+**Response — Message**
+```json
+{
+  "id": "uuid",
+  "content": "string",
+  "sender": { "id": "uuid", "name": "string" },
+  "timestamp": "2026-08-12T10:00:00Z",
+  "readBy": [{"id": "uuid", "name": "string", "readAt": "2026-08-12T10:05:00Z"}],
+  "attachments": [{"name": "string", "url": "string"}],
+  "replies": []
+}
+```
+
+---
+
+### Announcements
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/announcements` | List announcements (paginated) | All (assigned) |
+| `GET` | `/announcements/{id}` | Get announcement detail | All (assigned) |
+| `POST` | `/announcements` | Create announcement | Admin, Provider |
+| `PUT` | `/announcements/{id}` | Update announcement | Admin, Provider (own) |
+| `DELETE` | `/announcements/{id}` | Delete announcement | Admin |
+| `POST` | `/announcements/{id}/read` | Mark as read | All (assigned) |
+
+**Request — Create Announcement**
+```json
+{
+  "title": "string",
+  "body": "string",
+  "category": "PROJECT_UPDATE|COMPANY_NEWS|MAINTENANCE",
+  "audience": "PROJECT|COMPANY",
+  "projectId": "uuid",
+  "publishDate": "2026-08-12"
+}
+```
+
+---
+
+### Reviews & Ratings
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/reviews` | List all reviews (admin) | Admin |
+| `GET` | `/reviews/my` | List my submitted reviews | Client |
+| `GET` | `/reviews/{id}` | Get review detail | Reviewer, Admin |
+| `POST` | `/reviews` | Submit review | Client (completed project) |
+| `PUT` | `/reviews/{id}` | Update review (pending only) | Reviewer |
+| `DELETE` | `/reviews/{id}` | Delete review (pending only) | Reviewer |
+| `POST` | `/reviews/{id}/approve` | Approve review | Admin |
+| `POST` | `/reviews/{id}/reject` | Reject review | Admin |
+| `GET` | `/reviews/approved` | List approved reviews (public) | Public (landing page) |
+| `GET` | `/reviews/aggregate` | Get aggregate rating | Public (landing page) |
+
+**Request — Submit Review**
+```json
+{
+  "projectId": "uuid",
+  "rating": 5,
+  "title": "string",
+  "body": "string",
+  "wouldRecommend": true
+}
+```
+
+**Response — Review**
+```json
+{
+  "id": "uuid",
+  "customer": { "name": "string", "company": "string" },
+  "project": { "id": "uuid", "name": "string", "serviceType": "string" },
+  "rating": 5,
+  "title": "string",
+  "body": "string",
+  "wouldRecommend": true,
+  "status": "PENDING|APPROVED|REJECTED",
+  "approvedDate": "2026-08-12T10:00:00Z",
+  "createdAt": "2026-08-12T10:00:00Z"
+}
+```
+
+**Response — Aggregate Rating**
+```json
+{
+  "averageRating": 4.6,
+  "reviewCount": 12,
+  "ratingDistribution": { "1": 0, "2": 1, "3": 2, "4": 4, "5": 5 }
+}
+```
+
+---
+
+### Notifications
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/notifications` | List notifications (paginated, newest first) | All |
+| `GET` | `/notifications/unread-count` | Get unread count | All |
+| `PATCH` | `/notifications/{id}/read` | Mark single as read | Owner |
+| `POST` | `/notifications/read-all` | Mark all as read | All |
+| `GET` | `/notifications/preferences` | Get notification preferences | All |
+| `PUT` | `/notifications/preferences` | Update notification preferences | All |
+
+**Response — Notification**
+```json
+{
+  "id": "uuid",
+  "type": "MESSAGE|DOCUMENT|TASK|PROJECT|ANNOUNCEMENT",
+  "title": "string",
+  "message": "string",
+  "targetUrl": "/projects/{id}",
+  "read": false,
+  "createdAt": "2026-08-12T10:00:00Z"
+}
+```
+
+**Request — Notification Preferences**
+```json
+{
+  "email": {
+    "projectCreated": true,
+    "newMessage": true,
+    "projectUpdate": true,
+    "documentUploaded": true,
+    "documentRequested": true,
+    "taskAssigned": true,
+    "taskStatusChanged": true,
+    "projectStatusChanged": true,
+    "announcement": true,
+    "teamInvitation": true
+  },
+  "inApp": {
+    "newMessage": true,
+    "documentUploaded": true,
+    "taskAssigned": true,
+    "projectStatusChanged": true,
+    "announcement": true
+  }
+}
+```
+
+---
+
+### Service Catalog
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/services` | List all services | All |
+| `GET` | `/services/{id}` | Get service detail | All |
+| `POST` | `/services` | Create service | Admin |
+| `PUT` | `/services/{id}` | Update service | Admin |
+| `DELETE` | `/services/{id}` | Archive service | Admin |
+
+**Request — Create Service**
+```json
+{
+  "name": "string",
+  "description": "string",
+  "category": "string",
+  "status": "ACTIVE|ARCHIVED",
+  "price": 5000.00
+}
+```
+
+---
+
+### Project Configuration
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/config/templates` | List project templates | Admin |
+| `GET` | `/config/templates/{id}` | Get template detail | Admin |
+| `POST` | `/config/templates` | Create template | Admin |
+| `PUT` | `/config/templates/{id}` | Update template | Admin |
+| `DELETE` | `/config/templates/{id}` | Delete template | Admin |
+| `GET` | `/config/statuses` | List project statuses | Admin |
+| `POST` | `/config/statuses` | Create status | Admin |
+| `PUT` | `/config/statuses/{id}` | Update status | Admin |
+| `DELETE` | `/config/statuses/{id}` | Delete status | Admin |
+
+**Request — Create Status**
+```json
+{
+  "name": "string",
+  "color": "#4CAF50",
+  "description": "string",
+  "transitionRules": [
+    {"from": "NOT_STARTED", "to": "IN_PROGRESS"},
+    {"from": "IN_PROGRESS", "to": "COMPLETED"}
+  ]
+}
+```
+
+---
+
+### Dropdown Value Management
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/dropdowns` | List all dropdown categories | Admin |
+| `GET` | `/dropdowns/{category}` | Get values for category | All |
+| `POST` | `/dropdowns/{category}` | Add value | Admin |
+| `PUT` | `/dropdowns/{category}/{valueId}` | Update value | Admin |
+| `DELETE` | `/dropdowns/{category}/{valueId}` | Delete value | Admin |
+| `PATCH` | `/dropdowns/{category}/{valueId}/order` | Reorder values | Admin |
+| `PATCH` | `/dropdowns/{category}/{valueId}/active` | Toggle active | Admin |
+
+**Request — Add Dropdown Value**
+```json
+{
+  "value": "string",
+  "color": "#FF5722",
+  "description": "string",
+  "sortOrder": 1,
+  "active": true
+}
+```
+
+---
+
+### Company Settings (Consultancy)
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/company/profile` | Get consultancy profile | Admin |
+| `PUT` | `/company/profile` | Update consultancy profile | Admin |
+| `POST` | `/company/profile/logo` | Upload logo (multipart) | Admin |
+
+**Request — Update Company Profile**
+```json
+{
+  "name": "string",
+  "tagline": "string",
+  "description": "string",
+  "industrySectors": ["Manufacturing", "Energy"],
+  "address": {
+    "street": "string",
+    "city": "string",
+    "state": "string",
+    "country": "string",
+    "postalCode": "string"
+  },
+  "phone": "string",
+  "emails": {"general": "string", "support": "string", "billing": "string"},
+  "website": "string",
+  "socialMedia": {"linkedin": "string", "twitter": "string"},
+  "taxNumber": "string",
+  "brandColors": {"primary": "#1976D2", "secondary": "#FF5722"},
+  "operationalDataFields": ["rawMaterials", "productionOutput", "wasteManagement"]
+}
+```
+
+---
+
+### Team Management (Internal Staff)
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/team` | List all team members | Admin |
+| `GET` | `/team/{id}` | Get team member detail | Admin |
+| `POST` | `/team` | Create team member | Admin |
+| `PUT` | `/team/{id}` | Update team member | Admin |
+| `PATCH` | `/team/{id}/status` | Activate/deactivate | Admin |
+| `DELETE` | `/team/{id}` | Delete team member | Admin |
+
+**Request — Create Team Member**
+```json
+{
+  "email": "staff@example.com",
+  "password": "string",
+  "fullName": "string",
+  "role": "PROVIDER|ADMIN",
+  "assignedProjectIds": ["uuid"],
+  "permissions": ["manage_projects", "upload_documents", "manage_announcements"]
+}
+```
+
+---
+
+### Role & Permission Management
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/roles` | List all roles | Admin |
+| `GET` | `/roles/{id}` | Get role detail | Admin |
+| `POST` | `/roles` | Create role | Admin |
+| `PUT` | `/roles/{id}` | Update role | Admin |
+| `DELETE` | `/roles/{id}` | Delete role | Admin |
+
+**Request — Create Role**
+```json
+{
+  "name": "string",
+  "userType": "CLIENT|PROVIDER|ADMIN",
+  "description": "string",
+  "permissions": {
+    "viewOwnProjects": true,
+    "viewAllProjects": false,
+    "uploadDocuments": true,
+    "requestDocuments": true,
+    "manageUsers": false,
+    "configureRoles": false,
+    "manageServiceCatalog": false,
+    "manageAnnouncements": true,
+    "viewAnalytics": false,
+    "systemSettings": false,
+    "auditLogs": false
+  }
+}
+```
+
+---
+
+### System Settings
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/system/settings` | Get system settings | Admin |
+| `PUT` | `/system/settings` | Update system settings | Admin |
+| `GET` | `/system/email-templates` | List email templates | Admin |
+| `GET` | `/system/email-templates/{key}` | Get email template | Admin |
+| `PUT` | `/system/email-templates/{key}` | Update email template | Admin |
+| `POST` | `/system/email-templates/{key}/test` | Send test email | Admin |
+
+**Request — Update System Settings**
+```json
+{
+  "portalName": "string",
+  "maintenanceMode": false,
+  "securityPolicies": {
+    "passwordMinLength": 12,
+    "require2fa": false,
+    "sessionTimeoutMinutes": 30,
+    "maxLoginAttempts": 5
+  },
+  "integrations": {
+    "emailProvider": "smtp",
+    "videoCallProvider": "string"
+  }
+}
+```
+
+---
+
+### Audit Logs
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/audit-logs` | List audit logs (paginated, filterable) | Admin |
+| `GET` | `/audit-logs/{id}` | Get audit log entry | Admin |
+
+**Query Parameters**
+```
+?userId=uuid&action=CREATE&entity=PROJECT&startDate=2026-01-01&endDate=2026-08-12&page=0&size=50
+```
+
+**Response — Audit Log**
+```json
+{
+  "id": "uuid",
+  "timestamp": "2026-08-12T10:00:00Z",
+  "user": { "id": "uuid", "name": "string" },
+  "action": "CREATE|UPDATE|DELETE|LOGIN|LOGOUT",
+  "entity": "PROJECT|DOCUMENT|USER|REVIEW|etc.",
+  "entityId": "uuid",
+  "ipAddress": "192.168.1.1",
+  "details": "string"
+}
+```
+
+---
+
+### Dashboard & Analytics
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/dashboard/client` | Client dashboard data | Client |
+| `GET` | `/dashboard/provider` | Provider dashboard data | Provider |
+| `GET` | `/dashboard/admin` | Admin dashboard data | Admin |
+
+**Response — Admin Dashboard**
+```json
+{
+  "totalClients": 24,
+  "activeProjects": 18,
+  "revenueMetrics": {
+    "totalRevenue": 2400000.00,
+    "projectedRevenue": 3200000.00,
+    "revenueByMonth": [{"month": "2026-08", "amount": 400000}]
+  },
+  "systemHealth": {
+    "backend": "HEALTHY",
+    "database": "HEALTHY",
+    "lastBackup": "2026-08-12T02:00:00Z"
+  },
+  "recentActivity": [
+    {"action": "Project completed", "user": "John Doe", "timestamp": "2026-08-12T10:00:00Z"}
+  ]
+}
+```
+
+---
+
+### Error Responses
+
+All endpoints return standard HTTP status codes:
+
+| Code | Meaning |
+|------|---------|
+| `400` | Bad Request — invalid input |
+| `401` | Unauthorized — missing or invalid token |
+| `403` | Forbidden — insufficient permissions |
+| `404` | Not Found — resource does not exist |
+| `409` | Conflict — duplicate resource |
+| `413` | Payload Too Large — file exceeds 100 MB |
+| `422` | Unprocessable Entity — validation error |
+| `429` | Too Many Requests — rate limited |
+| `500` | Internal Server Error |
+
+**Error Response Body**
+```json
+{
+  "timestamp": "2026-08-12T10:00:00Z",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Email is already registered",
+  "path": "/api/v1/auth/register"
+}
+```
+
+---
+
+### Pagination
+
+All list endpoints support standard pagination:
+
+```
+GET /projects?page=0&size=20&sortBy=name&sortDir=asc
+```
+
+**Response — Paginated**
+```json
+{
+  "content": [...],
+  "totalElements": 150,
+  "totalPages": 8,
+  "size": 20,
+  "number": 0,
+  "first": true,
+  "last": false
+}
+```
+
+---
+
+### File Upload
+
+Document uploads use `multipart/form-data`:
+
+```
+POST /documents
+Content-Type: multipart/form-data
+
+file: <binary>
+name: "spec.pdf"
+description: "Project specification"
+tags: ["spec", "requirement"]
+projectId: "uuid"
+```
+
+Max file size: **100 MB**. Supported MIME types: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `image/png`, `image/jpeg`, `application/dwg`, `application/step`, `application/iges`.
