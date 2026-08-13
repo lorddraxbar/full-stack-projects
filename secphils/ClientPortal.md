@@ -1217,6 +1217,462 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 
 ---
 
+##  Database Schema -- PostgreSQL
+
+The backend uses PostgreSQL 17 as the relational data store. All tables follow standard naming conventions (snake_case, plural entity names). Every table includes `created_at` and `updated_at` timestamps. The `id` column is a `BIGSERIAL` primary key unless otherwise noted.
+
+### Entity Relationship Overview
+
+```
+users
+  |
+  +-- companies (authorized_rep_user_id -> users.id)
+  |
+  +-- project_team_members (user_id -> users.id)
+  |
+  +-- tasks (assignee_id -> users.id)
+  |
+  +-- messages (sender_id -> users.id)
+  |
+  +-- notifications (recipient_id -> users.id)
+  |
+  +-- reviews (customer_user_id -> users.id)
+  |
+  +-- audit_logs (user_id -> users.id)
+
+projects
+  |
+  +-- project_team_members (project_id -> projects.id)
+  +-- tasks (project_id -> projects.id)
+  +-- documents (project_id -> projects.id)
+  +-- messages (project_id -> projects.id)
+  +-- reviews (project_id -> projects.id)
+
+companies
+  |
+  +-- projects (company_id -> companies.id)
+
+services
+  |
+  +-- projects (service_id -> services.id)
+
+dropdown_categories
+  |
+  +-- dropdown_values (category_id -> dropdown_categories.id)
+```
+
+---
+
+### Core Tables
+
+#### `users`
+
+User accounts for all portal roles (Client, Provider, Admin). Supports email/password and SSO (Google, Microsoft, LinkedIn).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `email` | VARCHAR(255) | UNIQUE, NOT NULL | |
+| `password_hash` | VARCHAR(255) | | NULL for SSO-only users |
+| `first_name` | VARCHAR(100) | NOT NULL | |
+| `last_name` | VARCHAR(100) | NOT NULL | |
+| `role` | VARCHAR(20) | NOT NULL | `CLIENT`, `PROVIDER`, `ADMIN` |
+| `is_active` | BOOLEAN | DEFAULT TRUE | |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | |
+| `last_login` | TIMESTAMP | | |
+
+#### `companies`
+
+Client company profiles. Each company has one authorized representative (a user).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `name` | VARCHAR(255) | NOT NULL | |
+| `location` | VARCHAR(255) | | |
+| `owner` | VARCHAR(255) | | |
+| `description` | TEXT | | Business type / description |
+| `authorized_rep_user_id` | BIGINT | NOT NULL, REFERENCES users(id) | |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | |
+
+#### `roles`
+
+Custom role definitions for provider internal permission management.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `name` | VARCHAR(100) | UNIQUE, NOT NULL | |
+| `description` | TEXT | | |
+| `is_system` | BOOLEAN | DEFAULT FALSE | System roles cannot be deleted |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | |
+
+#### `permissions`
+
+Granular permission definitions mapped to roles.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `name` | VARCHAR(100) | UNIQUE, NOT NULL | e.g., `project.view`, `user.manage` |
+| `description` | TEXT | | |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+
+#### `role_permissions`
+
+Many-to-many between roles and permissions.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `role_id` | BIGINT | REFERENCES roles(id) | |
+| `permission_id` | BIGINT | REFERENCES permissions(id) | |
+| PRIMARY KEY | (role_id, permission_id) | | |
+
+#### `user_roles`
+
+Many-to-many between users and roles (overrides default role).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `user_id` | BIGINT | REFERENCES users(id) | |
+| `role_id` | BIGINT | REFERENCES roles(id) | |
+| `PRIMARY KEY` | (user_id, role_id) | | |
+
+---
+
+### Project Tables
+
+#### `projects`
+
+Projects link to a company and a service. Status tracked via dropdown category.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `company_id` | BIGINT | NOT NULL, REFERENCES companies(id) | |
+| `service_id` | BIGINT | REFERENCES services(id) | Service type |
+| `name` | VARCHAR(255) | NOT NULL | Project name |
+| `scope` | TEXT | | Project scope description |
+| `objectives` | TEXT | | |
+| `deliverables` | TEXT | | |
+| `status` | VARCHAR(30) | DEFAULT 'NOT_STARTED' | From dropdown: `NOT_STARTED`, `IN_PROGRESS`, `ON_HOLD`, `COMPLETED` |
+| `total_cost` | DECIMAL(15,2) | | |
+| `raw_materials` | JSONB | | Array of {name, tons} |
+| `production_output` | JSONB | Array of {product, tons} | |
+| `waste_management` | TEXT | | |
+| `waste_materials` | JSONB | Array of {type, tons} | |
+| `manufacturing_procedure` | TEXT | | |
+| `production_flowchart_url` | VARCHAR(500) | | File URL |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | |
+
+#### `project_team_members`
+
+Maps users to projects (both provider staff and client contacts).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `project_id` | BIGINT | REFERENCES projects(id) | |
+| `user_id` | BIGINT | REFERENCES users(id) | |
+| `role_on_project` | VARCHAR(50) | NOT NULL | `PROJECT_MANAGER`, `ENGINEER`, `CLIENT_REP`, etc. |
+| `assigned_at` | TIMESTAMP | DEFAULT NOW() | |
+| PRIMARY KEY | (project_id, user_id) | | |
+
+---
+
+### Task & Document Tables
+
+#### `tasks`
+
+Individual work items within a project.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `project_id` | BIGINT | NOT NULL, REFERENCES projects(id) | |
+| `assignee_id` | BIGINT | REFERENCES users(id) | |
+| `title` | VARCHAR(255) | NOT NULL | |
+| `description` | TEXT | | |
+| `status` | VARCHAR(30) | DEFAULT 'TO_DO' | From dropdown: `TO_DO`, `IN_PROGRESS`, `DONE` |
+| `priority` | VARCHAR(20) | DEFAULT 'MEDIUM' | From dropdown: `LOW`, `MEDIUM`, `HIGH` |
+| `due_date` | DATE | | |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | |
+
+#### `documents`
+
+Project documents with version tracking and category classification.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `project_id` | BIGINT | NOT NULL, REFERENCES projects(id) | |
+| `uploader_id` | BIGINT | REFERENCES users(id) | |
+| `title` | VARCHAR(255) | NOT NULL | |
+| `description` | TEXT | | |
+| `category` | VARCHAR(50) | DEFAULT 'OTHER' | From dropdown: `CLIENT_SUBMITTED`, `REQUESTED`, `DELIVERABLE`, etc. |
+| `file_url` | VARCHAR(500) | NOT NULL | |
+| `file_size` | BIGINT | | Bytes |
+| `version` | INTEGER | DEFAULT 1 | |
+| `is_latest` | BOOLEAN | DEFAULT TRUE | |
+| `uploaded_at` | TIMESTAMP | DEFAULT NOW() | |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | |
+
+#### `document_comments`
+
+Comments on documents.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `document_id` | BIGINT | NOT NULL, REFERENCES documents(id) | |
+| `user_id` | BIGINT | NOT NULL, REFERENCES users(id) | |
+| `comment` | TEXT | NOT NULL | |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+
+---
+
+### Communication Tables
+
+#### `messages`
+
+Project group conversations. One thread per project.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `project_id` | BIGINT | NOT NULL, REFERENCES projects(id) | |
+| `sender_id` | BIGINT | NOT NULL, REFERENCES users(id) | |
+| `body` | TEXT | NOT NULL | |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+
+#### `announcements`
+
+Project or company-wide announcements.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `company_id` | BIGINT | REFERENCES companies(id) | NULL = company-wide |
+| `project_id` | BIGINT | REFERENCES projects(id) | NULL = company-wide |
+| `title` | VARCHAR(255) | NOT NULL | |
+| `body` | TEXT | NOT NULL | |
+| `category` | VARCHAR(30) | DEFAULT 'PROJECT_UPDATE' | From dropdown: `PROJECT_UPDATE`, `COMPANY_NEWS`, `MAINTENANCE` |
+| `audience` | VARCHAR(20) | DEFAULT 'COMPANY' | `PROJECT` or `COMPANY` |
+| `is_published` | BOOLEAN | DEFAULT TRUE | |
+| `created_by` | BIGINT | NOT NULL, REFERENCES users(id) | |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | |
+
+---
+
+### Review & Rating Tables
+
+#### `reviews`
+
+Client reviews submitted after project completion. Require provider approval.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `customer_user_id` | BIGINT | NOT NULL, REFERENCES users(id) | |
+| `project_id` | BIGINT | NOT NULL, REFERENCES projects(id) | |
+| `rating` | INTEGER | NOT NULL, CHECK (rating >= 1 AND rating <= 5) | 1-5 stars |
+| `title` | VARCHAR(255) | NOT NULL | |
+| `body` | TEXT | NOT NULL | |
+| `status` | VARCHAR(20) | DEFAULT 'PENDING' | `PENDING`, `APPROVED`, `REJECTED` |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | |
+
+---
+
+### Service & Configuration Tables
+
+#### `services`
+
+Service catalog entries (e.g., feasibility studies, process optimization).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `name` | VARCHAR(255) | NOT NULL | |
+| `description` | TEXT | | |
+| `category` | VARCHAR(50) | DEFAULT 'ENGINEERING' | From dropdown: `FEASIBILITY`, `OPTIMIZATION`, `DESIGN`, `AUDIT`, etc. |
+| `is_active` | BOOLEAN | DEFAULT TRUE | |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | |
+
+#### `dropdown_categories`
+
+Configurable dropdown list definitions (editable by admin).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `name` | VARCHAR(100) | UNIQUE, NOT NULL | e.g., `project_status`, `task_status`, `priority` |
+| `description` | TEXT | | |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+
+#### `dropdown_values`
+
+Values within a dropdown category.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `category_id` | BIGINT | NOT NULL, REFERENCES dropdown_categories(id) | |
+| `value` | VARCHAR(100) | NOT NULL | e.g., `IN_PROGRESS` |
+| `display_label` | VARCHAR(100) | NOT NULL | e.g., `In Progress` |
+| `sort_order` | INTEGER | DEFAULT 0 | |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+
+---
+
+### System Tables
+
+#### `notifications`
+
+In-app notification center entries.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `recipient_id` | BIGINT | NOT NULL, REFERENCES users(id) | |
+| `title` | VARCHAR(255) | NOT NULL | |
+| `body` | TEXT | NOT NULL | |
+| `type` | VARCHAR(30) | NOT NULL | `TASK_ASSIGNED`, `PROJECT_CREATED`, `MESSAGE`, `DOCUMENT_REQUEST`, `REVIEW_SUBMITTED`, `ANNOUNCEMENT`, etc. |
+| `entity_type` | VARCHAR(50) | | Related entity (e.g., `project`, `task`) |
+| `entity_id` | BIGINT | | Related entity ID |
+| `is_read` | BOOLEAN | DEFAULT FALSE | |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+
+#### `notification_preferences`
+
+Per-user notification settings.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `user_id` | BIGINT | PRIMARY KEY, REFERENCES users(id) | |
+| `task_assigned` | BOOLEAN | DEFAULT TRUE | |
+| `project_created` | BOOLEAN | DEFAULT TRUE | |
+| `new_message` | BOOLEAN | DEFAULT TRUE | |
+| `document_request` | BOOLEAN | DEFAULT TRUE | |
+| `review_submitted` | BOOLEAN | DEFAULT TRUE | |
+| `announcement` | BOOLEAN | DEFAULT TRUE | |
+| `status_change` | BOOLEAN | DEFAULT TRUE | |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | |
+
+#### `audit_logs`
+
+Immutable audit trail for all significant actions.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `user_id` | BIGINT | REFERENCES users(id) | Actor |
+| `action` | VARCHAR(100) | NOT NULL | e.g., `USER_CREATED`, `PROJECT_UPDATED` |
+| `entity_type` | VARCHAR(50) | NOT NULL | e.g., `user`, `project` |
+| `entity_id` | BIGINT | | Affected resource ID |
+| `ip_address` | VARCHAR(45) | | IPv4 or IPv6 |
+| `details` | JSONB | | Change diff or context |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | |
+
+#### `system_settings`
+
+Portal-wide configuration.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY | |
+| `portal_name` | VARCHAR(255) | DEFAULT 'Client Portal' | |
+| `email_templates` | JSONB | | Custom email template overrides |
+| `integrations` | JSONB | | Third-party integration config |
+| `security_policies` | JSONB | | Password policy, session timeout, etc. |
+| `maintenance_mode` | BOOLEAN | DEFAULT FALSE | |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | |
+
+---
+
+### Indexes
+
+Standard indexes for query performance:
+
+| Table | Index | Column(s) |
+|-------|-------|-----------|
+| `users` | idx_users_email | `email` (also UNIQUE constraint) |
+| `users` | idx_users_role | `role` |
+| `projects` | idx_projects_company | `company_id` |
+| `projects` | idx_projects_status | `status` |
+| `projects` | idx_projects_service | `service_id` |
+| `tasks` | idx_tasks_project | `project_id` |
+| `tasks` | idx_tasks_assignee | `assignee_id` |
+| `tasks` | idx_tasks_status | `status` |
+| `documents` | idx_documents_project | `project_id` |
+| `messages` | idx_messages_project | `project_id` |
+| `messages` | idx_messages_created | `created_at` |
+| `notifications` | idx_notifications_recipient | `recipient_id` |
+| `notifications` | idx_notifications_unread | `recipient_id`, `is_read` |
+| `audit_logs` | idx_audit_user | `user_id` |
+| `audit_logs` | idx_audit_created | `created_at` |
+| `reviews` | idx_reviews_project | `project_id` |
+| `reviews` | idx_reviews_status | `status` |
+| `dropdown_values` | idx_dropdown_values_category | `category_id` |
+
+---
+
+### Default Data
+
+#### `dropdown_categories` and `dropdown_values` (seed data)
+
+| Category | Value | Display Label | Sort |
+|----------|-------|---------------|------|
+| `project_status` | `NOT_STARTED` | Not Started | 1 |
+| `project_status` | `IN_PROGRESS` | In Progress | 2 |
+| `project_status` | `ON_HOLD` | On Hold | 3 |
+| `project_status` | `COMPLETED` | Completed | 4 |
+| `task_status` | `TO_DO` | To Do | 1 |
+| `task_status` | `IN_PROGRESS` | In Progress | 2 |
+| `task_status` | `DONE` | Done | 3 |
+| `priority` | `LOW` | Low | 1 |
+| `priority` | `MEDIUM` | Medium | 2 |
+| `priority` | `HIGH` | High | 3 |
+| `document_category` | `CLIENT_SUBMITTED` | Client-Submitted | 1 |
+| `document_category` | `REQUESTED` | Requested | 2 |
+| `document_category` | `DELIVERABLE` | Deliverable | 3 |
+| `announcement_category` | `PROJECT_UPDATE` | Project Update | 1 |
+| `announcement_category` | `COMPANY_NEWS` | Company News | 2 |
+| `announcement_category` | `MAINTENANCE` | Maintenance | 3 |
+| `audience` | `PROJECT` | Project | 1 |
+| `audience` | `COMPANY` | Company | 2 |
+| `service_category` | `FEASIBILITY` | Feasibility Study | 1 |
+| `service_category` | `OPTIMIZATION` | Process Optimization | 2 |
+| `service_category` | `DESIGN` | Engineering Design | 3 |
+| `service_category` | `AUDIT` | Compliance Audit | 4 |
+| `user_role` | `CLIENT` | Client | 1 |
+| `user_role` | `PROVIDER` | Provider | 2 |
+| `user_role` | `ADMIN` | Admin | 3 |
+| `report_type` | `PERFORMANCE` | Performance | 1 |
+| `report_type` | `SATISFACTION` | Satisfaction | 2 |
+| `report_type` | `RESOURCES` | Resources | 3 |
+| `report_type` | `REVENUE` | Revenue | 4 |
+| `status` (general) | `ACTIVE` | Active | 1 |
+| `status` (general) | `DEACTIVATED` | Deactivated | 2 |
+| `status` (general) | `ARCHIVED` | Archived | 3 |
+
+---
+
+### Docker Volume Mapping
+
+| Volume | Mount Path | Purpose |
+|--------|-----------|---------|
+| `uploads` | `/app/uploads` | File uploads (documents, flowcharts) |
+| `postgres-data` | `/var/lib/postgresql/data` | PostgreSQL data directory |
+
+---
+
 ##  API Reference
 
 The backend exposes a RESTful API at `http://localhost:8080/api/v1`. All endpoints require authentication unless otherwise noted. Responses are JSON. The API follows standard HTTP conventions: `GET` for reads, `POST` for creates, `PUT` for full updates, `PATCH` for partial updates, `DELETE` for removals.
