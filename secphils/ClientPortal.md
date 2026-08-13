@@ -1,41 +1,41 @@
 # Client Portal
 
-Welcome to the **Strategic Engineering Consultancy Client Portal** — your centralized hub for managing projects, communicating with our team, tracking updates, and accessing all project-related documents.
+Welcome to the **Strategic Engineering Consultancy Client Portal** -- your centralized hub for managing projects, communicating with our team, tracking updates, and accessing all project-related documents.
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 
 The Client Portal is built using a containerized, microservices-based architecture. Each component is independently deployable via Docker, enabling scalability, isolation, and streamlined CI/CD pipelines.
 
 ### System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Load Balancer / Reverse Proxy            │
-│                      (Nginx / Traefik / Caddy)                  │
-└──────┬──────────────────────────────┬───────────────────────────┘
-       │                              │
-       ▼                              ▼
-┌──────────────────┐          ┌──────────────────┐
-│   Frontend       │          │   Backend API    │
-│   Vue 3          │─────────▶│   Spring Boot    │
-│   TypeScript     │  HTTPS   │   Java 21        │
-│   Tailwind CSS   │          │   REST API       │
-└──────────────────┘          └──────┬───────────┘
-                                     │
-                                     ▼
-                              ┌──────────────────┐
-                              │   PostgreSQL     │
-                              │   Database       │
-                              └──────────────────┘
++-----------------------------------------------------------------+
+|                        Load Balancer / Reverse Proxy            |
+|                      (Nginx / Traefik / Caddy)                  |
++------+------------------------------+---------------------------+
+       |                              |
+       v                              v
++------------------+          +------------------+
+|   Frontend       |          |   Backend API    |
+|   Vue 3          |--------->|   Spring Boot    |
+|   TypeScript     |  HTTPS   |   Java 21        |
+|   Tailwind CSS   |          |   REST API       |
++------------------+          +------+-----------+
+                                     |
+                                     v
+                              +------------------+
+                              |   PostgreSQL     |
+                              |   Database       |
+                              +------------------+
 
-┌──────────────────┐
-│   Landing Page   │
-│   Vue 3          │─────────▶│   Backend API    │
-│   TypeScript     │  HTTPS   │   (Reviews API)  │
-│   Tailwind CSS   │          └──────────────────┘
-└──────────────────┘
++------------------+
+|   Landing Page   |
+|   Vue 3          |--------->|   Backend API    |
+|   TypeScript     |  HTTPS   |   (Reviews API)  |
+|   Tailwind CSS   |          +------------------+
++------------------+
 ```
 
 ### Deployable Components
@@ -49,35 +49,35 @@ The Client Portal is built using a containerized, microservices-based architectu
 
 ### Project Structure
 
-> **IMPORTANT:** Keep the front-end and API (backend) code in **separate folders**. The frontend code lives in a `web/` directory and the backend/API code lives in an `api/` directory (all inside the `secphils` project root). Do not mix them — each has its own independent package/dependency management and Docker build.
+> **IMPORTANT:** Keep the front-end and API (backend) code in **separate folders**. The frontend code lives in a `web/` directory and the backend/API code lives in an `api/` directory (all inside the `secphils` project root). Do not mix them -- each has its own independent package/dependency management and Docker build.
 
 ```
 secphils/
-├── web/               # Vue 3 + TypeScript + Tailwind CSS + shadcn-vue (Portal SPA)
-│   ├── src/
-│   ├── package.json
-│   └── Dockerfile
-├── landing/           # Vue 3 + TypeScript + Tailwind CSS (Marketing Landing Page)
-│   ├── src/
-│   ├── package.json
-│   └── Dockerfile
-├── api/               # Spring Boot + Java 21 (REST API)
-│   ├── src/
-│   ├── pom.xml
-│   └── Dockerfile
-└── docker-compose.yml # Orchestrates all 4 services
++-- web/               # Vue 3 + TypeScript + Tailwind CSS + shadcn-vue (Portal SPA)
+|   +-- src/
+|   +-- package.json
+|   +-- Dockerfile
++-- landing/           # Vue 3 + TypeScript + Tailwind CSS (Marketing Landing Page)
+|   +-- src/
+|   +-- package.json
+|   +-- Dockerfile
++-- api/               # Spring Boot + Java 21 (REST API)
+|   +-- src/
+|   +-- pom.xml
+|   +-- Dockerfile
++-- docker-compose.yml # Orchestrates all 4 services
 ```
 
 ### UI/UX Requirements
 
 All interfaces must be:
-- **Fully Responsive** — Optimized for desktop, tablet, and mobile viewports using Tailwind CSS's responsive utilities
-- **Theme Support** — Three theme modes with seamless switching:
-  - **Light Mode** — Default light theme
-  - **Dark Mode** — Dark theme for low-light environments
-  - **System Mode** — Automatically follows the user's OS preference
-- **Accessibility** — WCAG 2.1 AA compliant — proper contrast ratios, keyboard navigation, ARIA labels
-- **Consistent Design System** — Built on shadcn-vue components with Tailwind CSS for a cohesive look across all views
+- **Fully Responsive** -- Optimized for desktop, tablet, and mobile viewports using Tailwind CSS's responsive utilities
+- **Theme Support** -- Three theme modes with seamless switching:
+  - **Light Mode** -- Default light theme
+  - **Dark Mode** -- Dark theme for low-light environments
+  - **System Mode** -- Automatically follows the user's OS preference
+- **Accessibility** -- WCAG 2.1 AA compliant -- proper contrast ratios, keyboard navigation, ARIA labels
+- **Consistent Design System** -- Built on shadcn-vue components with Tailwind CSS for a cohesive look across all views
 
 ### Docker Compose Setup
 
@@ -235,17 +235,17 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 ### Network Architecture
 
 ```
-┌─────────────┐     ┌──────────────────────┐     ┌─────────────────┐
-│   Frontend   │────▶│   Internal Network   │────▶│   PostgreSQL    │
-│  Vue 3 +     │     │   (Docker Compose    │     │   + Data        │
-│  Tailwind    │     │    bridge)           │     │   Volumes       │
-└─────────────┘     └──────────────────────┘     └─────────────────┘
-                          │
-                          ▼
-                    ┌──────────────┐
-                    │  File Uploads│
-                    │  (Volume)    │
-                    └──────────────┘
++-------------+     +----------------------+     +-----------------+
+|   Frontend   |---->|   Internal Network   |---->|   PostgreSQL    |
+|  Vue 3 +     |     |   (Docker Compose    |     |   + Data        |
+|  Tailwind    |     |    bridge)           |     |   Volumes       |
++-------------+     +----------------------+     +-----------------+
+                          |
+                          v
+                    +--------------+
+                    |  File Uploads|
+                    |  (Volume)    |
+                    +--------------+
 ```
 
 - **Frontend** communicates with **Backend** via internal Docker network (no external exposure)
@@ -267,7 +267,7 @@ docker compose logs -f database
 # Stop all services
 docker compose down
 
-# Stop and remove volumes (⚠️ deletes all data)
+# Stop and remove volumes (-- deletes all data)
 docker compose down -v
 
 # Backup database
@@ -279,9 +279,9 @@ docker compose exec -T database psql -U cronflow clientportal < backup.sql
 
 ---
 
-## 📌 Get Started: Create Your Account
+##  Get Started: Create Your Account
 
-To access the portal, create your account using your email or sign up with one of the social SSO providers below. The person creating the account automatically serves as the company's **Authorized Representative** — the primary contact for all portal communications, project correspondence, and approvals.
+To access the portal, create your account using your email or sign up with one of the social SSO providers below. The person creating the account automatically serves as the company's **Authorized Representative** -- the primary contact for all portal communications, project correspondence, and approvals.
 
 ### Sign Up Options
 
@@ -305,37 +305,37 @@ Please provide the following details to complete your company profile:
 - **Company Name**
 - **Location** (Headquarters / Primary Facility)
 - **Company Owner**
-- **Business Type / Description** — Brief description of your business operations and industry
+- **Business Type / Description** -- Brief description of your business operations and industry
 
 #### Project & Production Details
-- **Total Project Cost** — Estimated or actual project investment amount
+- **Total Project Cost** -- Estimated or actual project investment amount
 
 #### Raw Materials
-- **Raw Materials (in Tons)** — List each raw material with:
+- **Raw Materials (in Tons)** -- List each raw material with:
   - Material name
   - Total quantity used or purchased per month or year (in tons)
 
 #### Production Output
-- **Output in Tons per Year** — List each finished product with:
+- **Output in Tons per Year** -- List each finished product with:
   - Product name
   - Annual production volume (in tons)
 
-- **Amount of Product/Output per Year in Tons** — Breakdown by:
+- **Amount of Product/Output per Year in Tons** -- Breakdown by:
   - Total quantity per month
   - Total quantity per year
 
 #### Waste Management
-- **Waste Management Practices** — How do you manage your wastes?
+- **Waste Management Practices** -- How do you manage your wastes?
   - Recyclable materials: describe processes and quantities
   - Non-recyclable materials: describe disposal methods and quantities
-- **Amount of Waste Material per Month** — Total waste generated monthly (in tons), categorized by type
+- **Amount of Waste Material per Month** -- Total waste generated monthly (in tons), categorized by type
 
 #### Manufacturing Process
-- **Manufacturing Procedure** — Step-by-step process for how you manufacture your products/output:
+- **Manufacturing Procedure** -- Step-by-step process for how you manufacture your products/output:
   - Describe each production stage in detail
   - Include processing methods, equipment used, and quality control measures
 
-- **Production Flowchart** — Upload or submit a visual flowchart of your production process:
+- **Production Flowchart** -- Upload or submit a visual flowchart of your production process:
   - Supported formats: PDF, PNG, JPG, SVG, or image files
   - This helps us understand your workflow and identify optimization opportunities
 
@@ -343,7 +343,7 @@ Once your account is created, you will receive a confirmation email with your lo
 
 ---
 
-## 🔄 New Project Creation Wizard
+##  New Project Creation Wizard
 
 When a provider clicks **New Project** from the All Projects page, a wizard opens with two scenarios determined by the first screen.
 
@@ -353,8 +353,8 @@ The provider is presented with a dropdown of existing customer companies with **
 
 | Option | Behavior |
 |--------|----------|
-| **New** | Triggers **Scenario A** — New Customer + Project Onboarding |
-| **Existing Company** | Triggers **Scenario B** — New Project for Existing Customer |
+| **New** | Triggers **Scenario A** -- New Customer + Project Onboarding |
+| **Existing Company** | Triggers **Scenario B** -- New Project for Existing Customer |
 
 ### Scenario A: New Customer + Project Onboarding
 
@@ -377,7 +377,7 @@ The provider selects an existing customer from the dropdown and fills in only th
 | Step | Section | Fields |
 |------|---------|--------|
 | **Step 1** | **Customer Selection** | Dropdown of existing companies |
-| **Step 2** | **Authorized Representative** | Auto-filled from company profile (editable — can select different rep or invite new person) |
+| **Step 2** | **Authorized Representative** | Auto-filled from company profile (editable -- can select different rep or invite new person) |
 | **Step 3** | **Project Overview** | Project Name, Service Type, Description, Estimated Start Date, Estimated Completion Date |
 | **Step 4** | **Finish** | Submit wizard |
 
@@ -406,52 +406,52 @@ Notifications are sent for all key events to keep the right people informed. Cha
 
 ---
 
-## 🚀 Project & Service Management
+##  Project & Service Management
 
 ### My Projects
 View and manage all active and past projects assigned to you.
 
-- **Project Dashboard** — Overview of all projects with status indicators (Not Started, In Progress, On Hold, Completed)
-- **Project Details** — Scope, objectives, deliverables, and assigned team members
-- **Service Catalog** — Browse and request additional services (e.g., feasibility studies, process optimization, engineering design, compliance audits)
-- **Task Tracking** — View assigned tasks and dependencies
+- **Project Dashboard** -- Overview of all projects with status indicators (Not Started, In Progress, On Hold, Completed)
+- **Project Details** -- Scope, objectives, deliverables, and assigned team members
+- **Service Catalog** -- Browse and request additional services (e.g., feasibility studies, process optimization, engineering design, compliance audits)
+- **Task Tracking** -- View assigned tasks and dependencies
 
 ### Project Status
 Each project displays real-time status:
 | Status | Description |
 |---|---|
-| 🟡 **Not Started** | Project is planned but has not commenced |
-| 🔵 **In Progress** | Active work is underway |
-| 🟠 **On Hold** | Temporarily paused — awaiting client input or external dependencies |
-| 🟢 **Completed** | All deliverables have been delivered |
+|  **Not Started** | Project is planned but has not commenced |
+|  **In Progress** | Active work is underway |
+|  **On Hold** | Temporarily paused -- awaiting client input or external dependencies |
+|  **Completed** | All deliverables have been delivered |
 
 ---
 
-## 💬 Communication Center
+##  Communication Center
 
 Stay connected with our team through the portal's built-in communication tools.
 
 ### Project Group Conversations
 Each project has its own dedicated group conversation, keeping all communication in one place.
-- **One Thread per Project** — Every project has a single shared conversation
-- **Project Team & Client** — Any provider team member assigned to the project and any customer company member for the project can participate
-- **Shared Context** — All participants see the same messages, keeping everyone aligned
-- **Reply Notifications** — All conversation participants are notified (in-app and email) when a new message is posted, so no one misses a reply
-- **Read Receipts** — Know when your messages have been seen
+- **One Thread per Project** -- Every project has a single shared conversation
+- **Project Team & Client** -- Any provider team member assigned to the project and any customer company member for the project can participate
+- **Shared Context** -- All participants see the same messages, keeping everyone aligned
+- **Reply Notifications** -- All conversation participants are notified (in-app and email) when a new message is posted, so no one misses a reply
+- **Read Receipts** -- Know when your messages have been seen
 
 ### Announcements
-- **Project Updates** — Official announcements from the consultancy team
-- **Company News** — Important updates about services, policies, or events
-- **Scheduled Maintenance** — Notifications about portal downtime or upgrades
+- **Project Updates** -- Official announcements from the consultancy team
+- **Company News** -- Important updates about services, policies, or events
+- **Scheduled Maintenance** -- Notifications about portal downtime or upgrades
 
 ### Video & Audio Calls
-- **Schedule Meetings** — Book calls directly from the portal
-- **Meeting Notes** — Access shared notes and action items from past meetings
-- **Call Recordings** — Replay important discussions (with consent)
+- **Schedule Meetings** -- Book calls directly from the portal
+- **Meeting Notes** -- Access shared notes and action items from past meetings
+- **Call Recordings** -- Replay important discussions (with consent)
 
 ---
 
-## 📤 Document Upload & Management
+##  Document Upload & Management
 
 ### Upload Documents
 Clients can securely upload requested or required documents:
@@ -466,8 +466,8 @@ Clients can securely upload requested or required documents:
 **Maximum File Size:** 100 MB per file
 
 ### Document Categories
-- **Client-Submitted** — Documents you have uploaded
-- **Requested by Consultant** — Documents our team has requested from you
+- **Client-Submitted** -- Documents you have uploaded
+- **Requested by Consultant** -- Documents our team has requested from you
 
 ### Version Control
 - Track document versions and changes over time
@@ -476,15 +476,15 @@ Clients can securely upload requested or required documents:
 
 ---
 
-## 📋 Project Updates & Activity Feed
+##  Project Updates & Activity Feed
 
-Providers can add dated comments and updates to keep you informed. This creates a living history of your project — a clear, chronological record of what's been done, what's happening, and what's next.
+Providers can add dated comments and updates to keep you informed. This creates a living history of your project -- a clear, chronological record of what's been done, what's happening, and what's next.
 
 ### How It Works
-- **Add Updates** — Providers can post dated comments with progress notes, decisions made, next steps, or any relevant information
-- **View History** — See a complete chronological timeline of all project activity
-- **Stay Informed** — Know exactly where things stand without needing to ask
-- **Historical Record** — Access past updates to understand the full story of your project
+- **Add Updates** -- Providers can post dated comments with progress notes, decisions made, next steps, or any relevant information
+- **View History** -- See a complete chronological timeline of all project activity
+- **Stay Informed** -- Know exactly where things stand without needing to ask
+- **Historical Record** -- Access past updates to understand the full story of your project
 
 ### What Gets Logged
 - Progress updates from the provider
@@ -495,39 +495,39 @@ Providers can add dated comments and updates to keep you informed. This creates 
 
 ---
 
-## 📎 Shared Documents & Resources
+##  Shared Documents & Resources
 
 Access all documents that are due or relevant to you.
 
 ### Deliverables
-- **Drafts** — Work-in-progress documents for your review
-- **Final Versions** — Finalized deliverables
-- **Templates** — Standardized forms and templates used in your project
-- **Contracts & Agreements** — Signed agreements, NDAs, and SOWs
+- **Drafts** -- Work-in-progress documents for your review
+- **Final Versions** -- Finalized deliverables
+- **Templates** -- Standardized forms and templates used in your project
+- **Contracts & Agreements** -- Signed agreements, NDAs, and SOWs
 
 ### Resource Library
-- **Industry Reports** — Research and benchmarking documents
-- **Best Practice Guides** — Engineering and operational best practices
-- **Training Materials** — Educational content related to your project
-- **Regulatory References** — Applicable standards and compliance documents
+- **Industry Reports** -- Research and benchmarking documents
+- **Best Practice Guides** -- Engineering and operational best practices
+- **Training Materials** -- Educational content related to your project
+- **Regulatory References** -- Applicable standards and compliance documents
 
 ### Document Sharing
-- **Share with Team** — Grant access to specific documents with individual clients or internal team members
-- **Download & Export** — Download documents in multiple formats
-- **Comments & Annotations** — Leave feedback directly on shared documents
+- **Share with Team** -- Grant access to specific documents with individual clients or internal team members
+- **Download & Export** -- Download documents in multiple formats
+- **Comments & Annotations** -- Leave feedback directly on shared documents
 
 ---
 
-## ⭐ Customer Reviews & Ratings
+## Customer Reviews & Ratings
 
 After project completion, clients can leave reviews and ratings for the consultancy. These reviews are submitted for provider approval before appearing on the public marketing landing page.
 
 ### How It Works
-- **Post-Project Review** — Once a project status changes to **Completed**, the client receives an invitation to leave a review
-- **Rating Scale** — 1 to 5 stars based on overall satisfaction
-- **Written Feedback** — Optional detailed comments about the experience
-- **Provider Approval** — All reviews are reviewed and approved/rejected by the provider before going live
-- **Landing Page Display** — Approved reviews appear on the public marketing landing page to showcase client satisfaction
+- **Post-Project Review** -- Once a project status changes to **Completed**, the client receives an invitation to leave a review
+- **Rating Scale** -- 1 to 5 stars based on overall satisfaction
+- **Written Feedback** -- Optional detailed comments about the experience
+- **Provider Approval** -- All reviews are reviewed and approved/rejected by the provider before going live
+- **Landing Page Display** -- Approved reviews appear on the public marketing landing page to showcase client satisfaction
 
 ### Review Submission (Customer View)
 
@@ -567,52 +567,52 @@ After project completion, clients can leave reviews and ratings for the consulta
 
 ---
 
-## 🔒 Security & Privacy
+##  Security & Privacy
 
 Your data is protected with enterprise-grade security:
 
-- **Encrypted Transmissions** — All data is encrypted in transit (TLS 1.3)
-- **Encrypted Storage** — Files and data are encrypted at rest (AES-256)
-- **Role-Based Access Control** — Only authorized personnel can access specific information
-- **Two-Factor Authentication (2FA)** — Optional additional layer of security
-- **Audit Logs** — Full history of access and modifications
-- **GDPR & Data Protection Compliance** — Your data privacy is our priority
+- **Encrypted Transmissions** -- All data is encrypted in transit (TLS 1.3)
+- **Encrypted Storage** -- Files and data are encrypted at rest (AES-256)
+- **Role-Based Access Control** -- Only authorized personnel can access specific information
+- **Two-Factor Authentication (2FA)** -- Optional additional layer of security
+- **Audit Logs** -- Full history of access and modifications
+- **GDPR & Data Protection Compliance** -- Your data privacy is our priority
 
 ---
 
-## 🗺️ Sitemap
+##  Sitemap
 
 The portal is structured into **three distinct views** based on user roles. Each view provides access to specific features and pages tailored to the user's responsibilities.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           CLIENT PORTAL SITEMAP                             │
-├──────────────────┬──────────────────────────┬───────────────────────────────┤
-│   CUSTOMER       │   SERVICE PROVIDER       │        ADMIN                  │
-│   (Client View)  │   (Non-Admin View)       │     (Provider Admin View)     │
-├──────────────────┼──────────────────────────┼───────────────────────────────┤
-│ • Dashboard      │ • Dashboard              │ • Dashboard                   │
-│ • My Projects    │ • All Projects           │ • All Projects                │
-│   └─ Drill-down  │   └─ Drill-down          │   └─ Drill-down               │
-│ • Documents      │ • My Tasks               │ • Documents                   │
-│ • Messages       │ • Documents              │ • Communication Center        │
-│ • Announcements  │ • Messages               │ • Announcements               │
-│ • Settings       │ • Announcements          │ • User Management             │
-│                  │ • Settings               │ • Company Settings            │
-│                  │                          │   └─ Company Profile          │
-│                  │                          │   └─ Team Management        │
-│                  │                          │   └─ Role & Permission Management │
-│                  │                          │ • Service Catalog Management        │
-│                  │                          │ • Project Configuration       │
-│                  │                          │   └─ Dropdown Value Management│
-│                  │                          │ • System Settings             │
-│                  │                          │ • Audit Logs                  │
-├──────────────────┴──────────────────────────┴───────────────────────────────┤
-│ Global: 🔔 Notification Center (bell icon in header, available in all views) │
-└─────────────────────────────────────────────────────────────────────────────┘
++-----------------------------------------------------------------------------+
+|                           CLIENT PORTAL SITEMAP                             |
++------------------+--------------------------+-------------------------------+
+|   CUSTOMER       |   SERVICE PROVIDER       |        ADMIN                  |
+|   (Client View)  |   (Non-Admin View)       |     (Provider Admin View)     |
++------------------+--------------------------+-------------------------------+
+| * Dashboard      | * Dashboard              | * Dashboard                   |
+| * My Projects    | * All Projects           | * All Projects                |
+|   +- Drill-down  |   +- Drill-down          |   +- Drill-down               |
+| * Documents      | * My Tasks               | * Documents                   |
+| * Messages       | * Documents              | * Communication Center        |
+| * Announcements  | * Messages               | * Announcements               |
+| * Settings       | * Announcements          | * User Management             |
+|                  | * Settings               | * Company Settings            |
+|                  |                          |   +- Company Profile          |
+|                  |                          |   +- Team Management        |
+|                  |                          |   +- Role & Permission Management |
+|                  |                          | * Service Catalog Management        |
+|                  |                          | * Project Configuration       |
+|                  |                          |   +- Dropdown Value Management|
+|                  |                          | * System Settings             |
+|                  |                          | * Audit Logs                  |
++------------------+--------------------------+-------------------------------+
+| Global:  Notification Center (bell icon in header, available in all views) |
++-----------------------------------------------------------------------------+
 ```
 
-#### 🔔 Notification Center (Global)
+####  Notification Center (Global)
 
 *Available to all users across all views via the bell icon in the header.*
 
@@ -632,19 +632,19 @@ The portal is structured into **three distinct views** based on user roles. Each
 |------|-------------|
 | **Dashboard** | Overview of all assigned projects, recent activity, key metrics, and latest project updates from your consultants |
 | **My Projects** | List of all projects assigned to the client with status indicators. Clicking a project drills down into the **Project Detail** page (see below) |
-| **Documents** | View, upload, and manage project documents — shared files and requested documents |
+| **Documents** | View, upload, and manage project documents -- shared files and requested documents |
 | **Messages** | Participate in the project group conversation with your company's team and the consultancy team |
 | **Announcements** | View official updates from the consultancy team |
 | **Settings** | Account settings, personal information, password, 2FA configuration, notification preferences, team member invitations, **company profile** (company name, address, contact details, business type, client team members) |
 
-#### Project Detail — Drill-down (from My Projects)
+#### Project Detail -- Drill-down (from My Projects)
 
 *Accessible by clicking on any project from the My Projects list.*
 
 | Section | Description |
 |---------|-------------|
 | **Overview** | Project scope, objectives, status, service type, dated updates & activity feed (chronological record of what's been done and what's next) |
-| **Documents** | Project-specific documents — shared files and requested documents |
+| **Documents** | Project-specific documents -- shared files and requested documents |
 | **Messages** | Project-specific group conversation with your company's team and the consultancy team |
 
 ### 2. Service Provider View (Non-Admin)
@@ -655,13 +655,13 @@ The portal is structured into **three distinct views** based on user roles. Each
 |------|-------------|
 | **Dashboard** | Overview of recent tasks, active projects, pending messages, and latest project updates |
 | **All Projects** | Complete list of all projects the provider has access to, with filtering and search. Clicking a project drills down into the **Project Detail** page (see below). **New Project** button to open the project creation wizard |
-| **My Tasks** | View and manage individual tasks assigned to the provider across all projects — due dates, status, priority |
-| **Documents** | View, upload, comment on, and manage project documents — deliverables, client submissions, version control |
+| **My Tasks** | View and manage individual tasks assigned to the provider across all projects -- due dates, status, priority |
+| **Documents** | View, upload, comment on, and manage project documents -- deliverables, client submissions, version control |
 | **Messages** | Participate in project group conversations with clients and team members |
 | **Announcements** | Create and publish project/company announcements |
 | **Settings** | Personal information, notification preferences, communication settings |
 
-#### Project Detail — Drill-down (from All Projects)
+#### Project Detail -- Drill-down (from All Projects)
 
 *Accessible by clicking on any project from the All Projects list.*
 
@@ -669,7 +669,7 @@ The portal is structured into **three distinct views** based on user roles. Each
 |---------|-------------|
 | **Overview** | Project scope, objectives, status, assigned team members, service type, dated updates & activity feed (chronological record of what's been done and what's next) |
 | **Client Company & Team** | Client company information, authorized representative details, and assigned team members |
-| **Documents** | Project-specific documents — deliverables, client submissions, version control |
+| **Documents** | Project-specific documents -- deliverables, client submissions, version control |
 | **Messages** | Project-specific group conversation with clients and team members |
 
 ### 3. Admin View (Provider Administrator)
@@ -678,34 +678,34 @@ The portal is structured into **three distinct views** based on user roles. Each
 
 | Page | Description |
 |------|-------------|
-| **Dashboard** | System-wide overview — total clients, active projects, revenue metrics, system health |
+| **Dashboard** | System-wide overview -- total clients, active projects, revenue metrics, system health |
 | **All Projects** | Complete list of all projects across all clients with filtering and search. Clicking a project drills down into the **Project Detail** page (see below). **New Project** button to open the project creation wizard |
 | **Documents** | Centralized document repository with advanced search, version control, and compliance tracking |
-| **User Management** | Manage client accounts — create, edit, deactivate client users; assign to projects |
+| **User Management** | Manage client accounts -- create, edit, deactivate client users; assign to projects |
 | **Company Settings** | Parent section for all company-related configuration (see sub-pages below) |
-| ↳ **Company Profile** | Configure consultancy/company profile — business details, branding, contact information, operational data fields |
-| ↳ **Team Management** | Manage internal provider/staff accounts — create, edit, deactivate team members; assign roles, projects, and permissions |
-| ↳ **Role & Permission Management** | Configure custom roles and permission sets for all user types — clients, service providers (staff), and administrators; define granular access controls per role |
+| | **Company Profile** | Configure consultancy/company profile -- business details, branding, contact information, operational data fields |
+| | **Team Management** | Manage internal provider/staff accounts -- create, edit, deactivate team members; assign roles, projects, and permissions |
+| | **Role & Permission Management** | Configure custom roles and permission sets for all user types -- clients, service providers (staff), and administrators; define granular access controls per role |
 | **Service Catalog Management** | Create, update, and archive services offered to clients |
 | **Project Configuration** | Set up project templates, define standard workflows, manage project statuses (add/edit/delete statuses, colors, descriptions, transition rules) |
-| **Reviews & Ratings** | Manage customer reviews — approve/reject submitted reviews, manage approved reviews on landing page |
+| **Reviews & Ratings** | Manage customer reviews -- approve/reject submitted reviews, manage approved reviews on landing page |
 | **Communication Center** | System-wide announcements, communication logs |
 | **System Settings** | General portal configuration, email templates, integrations, security policies |
 | **Audit Logs** | Track all user actions, system changes, and access events |
 
-#### Project Detail — Drill-down (from All Projects)
+#### Project Detail -- Drill-down (from All Projects)
 
 *Accessible by clicking on any project from the All Projects list.*
 
 | Section | Description |
 |---------|-------------|
-| **Overview** | Full project view — scope, objectives, status, assigned team members, client company information, service type, dated updates & activity feed (chronological record of what's been done and what's next) |
+| **Overview** | Full project view -- scope, objectives, status, assigned team members, client company information, service type, dated updates & activity feed (chronological record of what's been done and what's next) |
 | **Client Company & Team** | Client company information, authorized representative details, assigned consultant team |
-| **Documents** | Project-specific documents — centralized repository with version control |
+| **Documents** | Project-specific documents -- centralized repository with version control |
 | **Messages** | Project-specific group conversation with clients and team members |
-| **Admin Controls** | Full administrative control — reassign team, modify scope, adjust timelines, change status |
+| **Admin Controls** | Full administrative control -- reassign team, modify scope, adjust timelines, change status |
 
-#### Company Settings — Sub-pages
+#### Company Settings -- Sub-pages
 
 ##### Company Profile
 
@@ -733,21 +733,21 @@ The portal is structured into **three distinct views** based on user roles. Each
 
 | Feature | Customer | Service Provider | Admin |
 |---------|:--------:|:----------------:|:-----:|
-| View own projects | ✅ | ✅ (assigned only) | ✅ (all) |
-| View all projects | ❌ | ❌ | ✅ |
-| Upload documents | ✅ | ✅ | ✅ |
-| Request documents from clients | ❌ | ✅ | ✅ |
-| Manage users | ❌ | ❌ | ✅ |
-| Configure roles/permissions | ❌ | ❌ | ✅ |
-| Manage service catalog | ❌ | ❌ | ✅ |
-| View assigned service type | ✅ | ✅ | ✅ |
-| System settings | ❌ | ❌ | ✅ |
+| View own projects |  |  (assigned only) |  (all) |
+| View all projects |  |  |  |
+| Upload documents |  |  |  |
+| Request documents from clients |  |  |  |
+| Manage users |  |  |  |
+| Configure roles/permissions |  |  |  |
+| Manage service catalog |  |  |  |
+| View assigned service type |  |  |  |
+| System settings |  |  |  |
 | View analytics | Limited | Project-level | System-wide |
-| Manage announcements | ❌ | ✅ | ✅ |
-| Audit logs | ❌ | ❌ | ✅ |
+| Manage announcements |  |  |  |
+| Audit logs |  |  |  |
 
 ---
-## 🗂️ Field Mapping — All Pages
+##  Field Mapping -- All Pages
 
 Detailed field-by-field mapping for every page in the portal, organized by view.
 
@@ -757,22 +757,22 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 
 | Field | Section | Type | Required | Source |
 |-------|---------|------|----------|--------|
-| Full Name | Authorized Representative | text | ✅ | User input |
-| Job Title | Authorized Representative | text | ✅ | User input |
-| Email Address | Authorized Representative | email | ✅ | User input |
-| Phone Number | Authorized Representative | tel | ✅ | User input |
-| Company Name | Company Overview | text | ✅ | User input |
-| Location | Company Overview | text | ✅ | User input |
-| Company Owner | Company Overview | text | ✅ | User input |
-| Business Type / Description | Company Overview | textarea | ✅ | User input |
-| Total Project Cost | Project & Production Details | currency | ✅ | User input |
-| Raw Materials | Raw Materials | table (name, tons) | ✅ | User input |
-| Output in Tons per Year | Production Output | table (product, tons) | ✅ | User input |
-| Amount of Product/Output per Year | Production Output | table (monthly, yearly) | ✅ | User input |
-| Waste Management Practices | Waste Management | textarea | ✅ | User input |
-| Amount of Waste Material per Month | Waste Management | table (type, tons) | ✅ | User input |
-| Manufacturing Procedure | Manufacturing Process | textarea | ✅ | User input |
-| Production Flowchart | Manufacturing Process | file upload | ✅ | User upload (PDF, PNG, JPG, SVG) |
+| Full Name | Authorized Representative | text |  | User input |
+| Job Title | Authorized Representative | text |  | User input |
+| Email Address | Authorized Representative | email |  | User input |
+| Phone Number | Authorized Representative | tel |  | User input |
+| Company Name | Company Overview | text |  | User input |
+| Location | Company Overview | text |  | User input |
+| Company Owner | Company Overview | text |  | User input |
+| Business Type / Description | Company Overview | textarea |  | User input |
+| Total Project Cost | Project & Production Details | currency |  | User input |
+| Raw Materials | Raw Materials | table (name, tons) |  | User input |
+| Output in Tons per Year | Production Output | table (product, tons) |  | User input |
+| Amount of Product/Output per Year | Production Output | table (monthly, yearly) |  | User input |
+| Waste Management Practices | Waste Management | textarea |  | User input |
+| Amount of Waste Material per Month | Waste Management | table (type, tons) |  | User input |
+| Manufacturing Procedure | Manufacturing Process | textarea |  | User input |
+| Production Flowchart | Manufacturing Process | file upload |  | User upload (PDF, PNG, JPG, SVG) |
 
 ---
 
@@ -797,7 +797,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Client Company | text | Company name |
 | Authorized Representative | text | Project rep |
 
-#### Project Detail — Overview
+#### Project Detail -- Overview
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -809,7 +809,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Recent Updates | timeline | Latest dated comments from the provider |
 | Update History | timeline | Full chronological record of all updates |
 
-#### Project Detail — Documents
+#### Project Detail -- Documents
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -819,7 +819,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Version | text | Current version |
 | Description | textarea | Optional notes |
 
-#### Project Detail — Messages
+#### Project Detail -- Messages
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -874,7 +874,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Business Type | text | Company business type |
 | Client Team Members | table | Company team list |
 
-#### 🔔 Notification Center (all views)
+####  Notification Center (all views)
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -920,7 +920,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Priority | badge | Low / Medium / High |
 | Assignee | text | Assigned person |
 
-#### Project Detail — Overview
+#### Project Detail -- Overview
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -933,7 +933,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Add Update | textarea | Post a dated progress comment |
 | Update History | timeline | Full chronological record of all updates |
 
-#### Project Detail — Client Company & Team
+#### Project Detail -- Client Company & Team
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -943,7 +943,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Authorized Representative | text | Project rep |
 | Assigned Team | table | Provider team members |
 
-#### Project Detail — Documents
+#### Project Detail -- Documents
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -953,7 +953,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Version | text | Version number |
 | Comments | textarea | Document feedback |
 
-#### Project Detail — Messages
+#### Project Detail -- Messages
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1008,7 +1008,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Assigned Team | text | Team members |
 | New Project | button | Open the project creation wizard |
 
-#### Project Detail — Overview
+#### Project Detail -- Overview
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1022,7 +1022,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Add Update | textarea | Post a dated progress comment |
 | Update History | timeline | Full chronological record of all updates |
 
-#### Project Detail — Client Company & Team
+#### Project Detail -- Client Company & Team
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1032,7 +1032,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Authorized Representative | text | Project rep |
 | Assigned Consultant Team | table | Provider team |
 
-#### Project Detail — Documents
+#### Project Detail -- Documents
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1041,7 +1041,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | File | file | Attached file |
 | Version | text | Version number |
 
-#### Project Detail — Messages
+#### Project Detail -- Messages
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1050,7 +1050,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Timestamp | date/time | Message time |
 | Reply Box | textarea | Compose message |
 
-#### Project Detail — Admin Controls
+#### Project Detail -- Admin Controls
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1080,7 +1080,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Assigned Projects | multi-select (dynamic, projects) | Project assignments |
 | Actions | buttons | Edit / Deactivate |
 
-#### Company Settings — Company Profile
+#### Company Settings -- Company Profile
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1099,7 +1099,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Banking / Payment Details | text | Invoicing (encrypted) |
 | Operational Data Fields | config | Custom onboarding fields |
 
-#### Company Settings — Team Management
+#### Company Settings -- Team Management
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1110,7 +1110,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 | Permissions | checkboxes | Granular perms |
 | Status | **dropdown** (static, managed) | Active / Deactivated |
 
-#### Company Settings — Role & Permission Management
+#### Company Settings -- Role & Permission Management
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1159,17 +1159,17 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 
 | Category | Values (default) | Editable |
 |----------|------------------|----------|
-| Project Status | Not Started / In Progress / On Hold / Completed | ✅ |
-| Document Category | Client-Submitted / Requested | ✅ |
-| Announcement Category | Project Update / Company News / Maintenance | ✅ |
-| Task Status | To Do / In Progress / Done | ✅ |
-| Priority | Low / Medium / High | ✅ |
-| User Role | Client / Provider / Admin | ✅ |
-| Service Category | (from Service Catalog) | ✅ |
-| Audience | Project / Company | ✅ |
-| Industry Sector | (custom, populated by admin) | ✅ |
-| Report Type | Performance / Satisfaction / Resources / Revenue | ✅ |
-| Status | Active / Deactivated / Archived | ✅ |
+| Project Status | Not Started / In Progress / On Hold / Completed |  |
+| Document Category | Client-Submitted / Requested |  |
+| Announcement Category | Project Update / Company News / Maintenance |  |
+| Task Status | To Do / In Progress / Done |  |
+| Priority | Low / Medium / High |  |
+| User Role | Client / Provider / Admin |  |
+| Service Category | (from Service Catalog) |  |
+| Audience | Project / Company |  |
+| Industry Sector | (custom, populated by admin) |  |
+| Report Type | Performance / Satisfaction / Resources / Revenue |  |
+| Status | Active / Deactivated / Archived |  |
 
 #### Reviews & Ratings
 
@@ -1217,7 +1217,7 @@ Detailed field-by-field mapping for every page in the portal, organized by view.
 
 ---
 
-## 🔌 API Reference
+##  API Reference
 
 The backend exposes a RESTful API at `http://localhost:8080/api/v1`. All endpoints require authentication unless otherwise noted. Responses are JSON. The API follows standard HTTP conventions: `GET` for reads, `POST` for creates, `PUT` for full updates, `PATCH` for partial updates, `DELETE` for removals.
 
@@ -1236,7 +1236,7 @@ The backend exposes a RESTful API at `http://localhost:8080/api/v1`. All endpoin
 | `POST` | `/auth/logout` | Invalidate session |
 | `POST` | `/auth/refresh` | Refresh access token |
 
-**Request — Register / Login**
+**Request -- Register / Login**
 ```json
 {
   "email": "user@example.com",
@@ -1247,7 +1247,7 @@ The backend exposes a RESTful API at `http://localhost:8080/api/v1`. All endpoin
 }
 ```
 
-**Response — Auth Token**
+**Response -- Auth Token**
 ```json
 {
   "accessToken": "jwt-string",
@@ -1281,7 +1281,7 @@ Content-Type: application/json
 | `DELETE` | `/users/{id}` | Delete user | Admin |
 | `POST` | `/users/{id}/invite` | Send invitation email | Admin, Provider |
 
-**Request — Create User**
+**Request -- Create User**
 ```json
 {
   "email": "user@example.com",
@@ -1308,7 +1308,7 @@ Content-Type: application/json
 | `PUT` | `/companies/{id}/team/{userId}` | Update team member | Admin, Client |
 | `DELETE` | `/companies/{id}/team/{userId}` | Remove team member | Admin, Client |
 
-**Request — Create Company (Onboarding)**
+**Request -- Create Company (Onboarding)**
 ```json
 {
   "name": "string",
@@ -1359,7 +1359,7 @@ Content-Type: application/json
 | `DELETE` | `/projects/{id}/team/{userId}` | Remove team member | Admin, Provider |
 | `GET` | `/projects/{id}/client-company` | Get linked company info | All (assigned) |
 
-**Request — Create Project (Wizard)**
+**Request -- Create Project (Wizard)**
 ```json
 {
   "scenario": "NEW_CUSTOMER|EXISTING_CUSTOMER",
@@ -1384,7 +1384,7 @@ Content-Type: application/json
 }
 ```
 
-**Response — Project**
+**Response -- Project**
 ```json
 {
   "id": "uuid",
@@ -1402,7 +1402,7 @@ Content-Type: application/json
 }
 ```
 
-**Query Parameters — List Projects**
+**Query Parameters -- List Projects**
 ```
 ?status=IN_PROGRESS&search=acme&page=0&size=20&sortBy=name&sortDir=asc
 ```
@@ -1420,7 +1420,7 @@ Content-Type: application/json
 | `PATCH` | `/tasks/{id}/status` | Change task status | All (assigned) |
 | `DELETE` | `/tasks/{id}` | Delete task | Admin |
 
-**Request — Create Task**
+**Request -- Create Task**
 ```json
 {
   "projectId": "uuid",
@@ -1451,12 +1451,12 @@ Content-Type: application/json
 | `GET` | `/documents/{id}/comments` | Get document comments | All (assigned) |
 | `POST` | `/documents/{id}/comments` | Add comment | All (assigned) |
 
-**Query Parameters — List Documents**
+**Query Parameters -- List Documents**
 ```
 ?projectId=uuid&category=CLIENT_SUBMITTED|REQUESTED&search=filename&page=0&size=20
 ```
 
-**Response — Document**
+**Response -- Document**
 ```json
 {
   "id": "uuid",
@@ -1475,7 +1475,7 @@ Content-Type: application/json
 }
 ```
 
-**Request — Request Document**
+**Request -- Request Document**
 ```json
 {
   "projectId": "uuid",
@@ -1499,7 +1499,7 @@ Content-Type: application/json
 | `GET` | `/conversations/{id}/unread-count` | Get unread count | All (assigned) |
 | `POST` | `/conversations/{id}/read` | Mark all as read | All (assigned) |
 
-**Request — Send Message**
+**Request -- Send Message**
 ```json
 {
   "content": "string",
@@ -1507,7 +1507,7 @@ Content-Type: application/json
 }
 ```
 
-**Response — Message**
+**Response -- Message**
 ```json
 {
   "id": "uuid",
@@ -1533,7 +1533,7 @@ Content-Type: application/json
 | `DELETE` | `/announcements/{id}` | Delete announcement | Admin |
 | `POST` | `/announcements/{id}/read` | Mark as read | All (assigned) |
 
-**Request — Create Announcement**
+**Request -- Create Announcement**
 ```json
 {
   "title": "string",
@@ -1562,7 +1562,7 @@ Content-Type: application/json
 | `GET` | `/reviews/approved` | List approved reviews (public) | Public (landing page) |
 | `GET` | `/reviews/aggregate` | Get aggregate rating | Public (landing page) |
 
-**Request — Submit Review**
+**Request -- Submit Review**
 ```json
 {
   "projectId": "uuid",
@@ -1573,7 +1573,7 @@ Content-Type: application/json
 }
 ```
 
-**Response — Review**
+**Response -- Review**
 ```json
 {
   "id": "uuid",
@@ -1589,7 +1589,7 @@ Content-Type: application/json
 }
 ```
 
-**Response — Aggregate Rating**
+**Response -- Aggregate Rating**
 ```json
 {
   "averageRating": 4.6,
@@ -1611,7 +1611,7 @@ Content-Type: application/json
 | `GET` | `/notifications/preferences` | Get notification preferences | All |
 | `PUT` | `/notifications/preferences` | Update notification preferences | All |
 
-**Response — Notification**
+**Response -- Notification**
 ```json
 {
   "id": "uuid",
@@ -1624,7 +1624,7 @@ Content-Type: application/json
 }
 ```
 
-**Request — Notification Preferences**
+**Request -- Notification Preferences**
 ```json
 {
   "email": {
@@ -1661,7 +1661,7 @@ Content-Type: application/json
 | `PUT` | `/services/{id}` | Update service | Admin |
 | `DELETE` | `/services/{id}` | Archive service | Admin |
 
-**Request — Create Service**
+**Request -- Create Service**
 ```json
 {
   "name": "string",
@@ -1688,7 +1688,7 @@ Content-Type: application/json
 | `PUT` | `/config/statuses/{id}` | Update status | Admin |
 | `DELETE` | `/config/statuses/{id}` | Delete status | Admin |
 
-**Request — Create Status**
+**Request -- Create Status**
 ```json
 {
   "name": "string",
@@ -1715,7 +1715,7 @@ Content-Type: application/json
 | `PATCH` | `/dropdowns/{category}/{valueId}/order` | Reorder values | Admin |
 | `PATCH` | `/dropdowns/{category}/{valueId}/active` | Toggle active | Admin |
 
-**Request — Add Dropdown Value**
+**Request -- Add Dropdown Value**
 ```json
 {
   "value": "string",
@@ -1736,7 +1736,7 @@ Content-Type: application/json
 | `PUT` | `/company/profile` | Update consultancy profile | Admin |
 | `POST` | `/company/profile/logo` | Upload logo (multipart) | Admin |
 
-**Request — Update Company Profile**
+**Request -- Update Company Profile**
 ```json
 {
   "name": "string",
@@ -1773,7 +1773,7 @@ Content-Type: application/json
 | `PATCH` | `/team/{id}/status` | Activate/deactivate | Admin |
 | `DELETE` | `/team/{id}` | Delete team member | Admin |
 
-**Request — Create Team Member**
+**Request -- Create Team Member**
 ```json
 {
   "email": "staff@example.com",
@@ -1797,7 +1797,7 @@ Content-Type: application/json
 | `PUT` | `/roles/{id}` | Update role | Admin |
 | `DELETE` | `/roles/{id}` | Delete role | Admin |
 
-**Request — Create Role**
+**Request -- Create Role**
 ```json
 {
   "name": "string",
@@ -1832,7 +1832,7 @@ Content-Type: application/json
 | `PUT` | `/system/email-templates/{key}` | Update email template | Admin |
 | `POST` | `/system/email-templates/{key}/test` | Send test email | Admin |
 
-**Request — Update System Settings**
+**Request -- Update System Settings**
 ```json
 {
   "portalName": "string",
@@ -1864,7 +1864,7 @@ Content-Type: application/json
 ?userId=uuid&action=CREATE&entity=PROJECT&startDate=2026-01-01&endDate=2026-08-12&page=0&size=50
 ```
 
-**Response — Audit Log**
+**Response -- Audit Log**
 ```json
 {
   "id": "uuid",
@@ -1888,7 +1888,7 @@ Content-Type: application/json
 | `GET` | `/dashboard/provider` | Provider dashboard data | Provider |
 | `GET` | `/dashboard/admin` | Admin dashboard data | Admin |
 
-**Response — Admin Dashboard**
+**Response -- Admin Dashboard**
 ```json
 {
   "totalClients": 24,
@@ -1917,14 +1917,14 @@ All endpoints return standard HTTP status codes:
 
 | Code | Meaning |
 |------|---------|
-| `400` | Bad Request — invalid input |
-| `401` | Unauthorized — missing or invalid token |
-| `403` | Forbidden — insufficient permissions |
-| `404` | Not Found — resource does not exist |
-| `409` | Conflict — duplicate resource |
-| `413` | Payload Too Large — file exceeds 100 MB |
-| `422` | Unprocessable Entity — validation error |
-| `429` | Too Many Requests — rate limited |
+| `400` | Bad Request -- invalid input |
+| `401` | Unauthorized -- missing or invalid token |
+| `403` | Forbidden -- insufficient permissions |
+| `404` | Not Found -- resource does not exist |
+| `409` | Conflict -- duplicate resource |
+| `413` | Payload Too Large -- file exceeds 100 MB |
+| `422` | Unprocessable Entity -- validation error |
+| `429` | Too Many Requests -- rate limited |
 | `500` | Internal Server Error |
 
 **Error Response Body**
@@ -1948,7 +1948,7 @@ All list endpoints support standard pagination:
 GET /projects?page=0&size=20&sortBy=name&sortDir=asc
 ```
 
-**Response — Paginated**
+**Response -- Paginated**
 ```json
 {
   "content": [...],
