@@ -2454,6 +2454,112 @@ projectId: "uuid"
 ```
 
 Max file size: **100 MB**. Supported MIME types: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `image/png`, `image/jpeg`, `application/dwg`, `application/step`, `application/iges`.
+
+---
+
+##  Scaffolding Scope
+
+This section documents the project scaffolding structure and setup plan for all three deployable components. It serves as a reference for the initial project creation before implementation begins.
+
+### 1. `web/` -- Portal SPA (Frontend)
+
+**Tech stack:** Vue 3 + TypeScript + Vite + Tailwind CSS + shadcn-vue + Vue Router + Pinia
+
+**Directory structure:**
+
+```
+web/
+├── src/
+│   ├── components/           # Reusable shadcn-vue components
+│   ├── composables/          # Vue composables (auth, notifications, etc.)
+│   ├── layouts/              # DefaultLayout (sidebar+header), AuthLayout (centered card)
+│   ├── router/               # Vue Router with role-based guards
+│   ├── stores/               # Pinia stores (auth, projects, notifications)
+│   ├── views/                # Page components:
+│   │   ├── auth/             # Login, Register, SSO callback
+│   │   ├── dashboard/        # Client, Provider, Admin dashboards
+│   │   ├── projects/         # All Projects, Project Detail
+│   │   ├── tasks/            # My Tasks
+│   │   ├── documents/        # Documents list & detail
+│   │   ├── messages/         # Project conversations
+│   │   ├── announcements/    # Announcements list
+│   │   ├── reviews/          # Submit review, review management
+│   │   ├── settings/         # Profile, notification preferences
+│   │   └── admin/            # Team, roles, settings, audit logs, dropdowns
+│   ├── services/             # API client (Axios/fetch wrappers)
+│   ├── utils/                # Helpers, formatters, validators
+│   ├── App.vue
+│   └── main.ts
+├── index.html
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── tailwind.config.ts
+├── components.json           # shadcn-vue config
+├── Dockerfile
+└── nginx.conf
+```
+
+**Initial setup tasks:**
+
+- [ ] **S1.1** Create Vite project: `npm create vite@latest web -- --template vue-ts`
+- [ ] **S1.2** Install and configure Tailwind CSS v4
+- [ ] **S1.3** Initialize shadcn-vue: `npx shadcn-vue@latest init`
+- [ ] **S1.4** Install dependencies: Vue Router, Pinia, Axios
+- [ ] **S1.5** Configure Vue Router with placeholder routes for all pages (role-based guards)
+- [ ] **S1.6** Set up Pinia with auth store (dummy data initially)
+- [ ] **S1.7** Create base layout components (sidebar, header, auth card)
+- [ ] **S1.8** Configure Tailwind theme (light/dark/system mode)
+- [ ] **S1.9** Add Dockerfile and nginx.conf
+- [ ] **S1.10** Verify build: `npm run build`
+
+### 2. `landing/` -- Marketing Landing Page
+
+**Tech stack:** Vue 3 + TypeScript + Vite + Tailwind CSS (no shadcn-vue needed)
+
+**Directory structure:**
+
+```
+landing/
+├── src/
+│   ├── components/           # Hero, Features, Reviews, Footer
+│   ├── views/
+│   │   └── LandingPage.vue
+│   ├── App.vue
+│   └── main.ts
+├── index.html
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── tailwind.config.ts
+├── Dockerfile
+└── nginx.conf
+```
+
+**Initial setup tasks:**
+
+- [ ] **S2.1** Create Vite project: `npm create vite@latest landing -- --template vue-ts`
+- [ ] **S2.2** Install and configure Tailwind CSS
+- [ ] **S2.3** Create static landing page (hero, features, dummy reviews, footer)
+- [ ] **S2.4** Add Dockerfile and nginx.conf
+- [ ] **S2.5** Verify build: `npm run build`
+
+### 3. Project Root Configuration
+
+- [ ] **S3.1** Place `docker-compose.yml` at project root (as defined in Architecture section)
+- [ ] **S3.2** Create `.env` file with documented environment variables
+- [ ] **S3.3** Verify full stack builds: `docker compose build`
+
+### Execution Order
+
+```
+S1 (web/ scaffold) --> S2 (landing/ scaffold) --> S3 (root config) --> Verify
+```
+
+The `web/` component is the larger piece and takes priority. Once scaffolding is complete, development can begin immediately on Phase 1 task **1.1.1 (Login Page)** using the established project structure.
+
+---
+
 ##  Roadmap -- Implementation Plan
 
 This section tracks all implementation tasks organized by layer. Tasks use checkboxes `[ ]` for pending and `[x]` for completed. **Frontend tasks are prioritized first** so the UI can be reviewed and validated early. Changes to the UI may cascade into API and database adjustments — those updates are noted in the relevant task descriptions.
