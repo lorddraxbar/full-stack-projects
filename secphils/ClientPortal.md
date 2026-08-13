@@ -1677,6 +1677,25 @@ Standard indexes for query performance:
 
 The backend exposes a RESTful API at `http://localhost:8080/api/v1`. All endpoints require authentication unless otherwise noted. Responses are JSON. The API follows standard HTTP conventions: `GET` for reads, `POST` for creates, `PUT` for full updates, `PATCH` for partial updates, `DELETE` for removals.
 
+### Swagger / OpenAPI Documentation
+
+The API includes a Swagger UI interface powered by SpringDoc OpenAPI 2. Accessible at `http://localhost:8080/swagger-ui.html` when the backend is running locally. The OpenAPI 3.0 specification is served at `http://localhost:8080/v3/api-docs` for code generation, client SDKs, and API testing tools.
+
+Swagger UI provides:
+
+- Interactive API documentation with per-endpoint "Try it out" functionality
+- Request/response schema visualization mapped to the database schema
+- Authentication via the `Authorization` header (Bearer token)
+- Filterable endpoint list grouped by domain (Auth, Users, Companies, Projects, Tasks, Documents, Messages, Reviews, Services, Admin, System)
+- JSON request/response examples for every endpoint
+- Error response schemas (400, 401, 403, 404, 409, 422, 500)
+
+To enable Swagger in production, set the environment variable:
+
+```
+SWAGGER_ENABLED=true
+```
+
 ### Authentication
 
 | Method | Endpoint | Description |
