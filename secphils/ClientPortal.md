@@ -2454,3 +2454,438 @@ projectId: "uuid"
 ```
 
 Max file size: **100 MB**. Supported MIME types: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `image/png`, `image/jpeg`, `application/dwg`, `application/step`, `application/iges`.
+##  Roadmap -- Implementation Plan
+
+This section tracks all implementation tasks organized by layer. Tasks use checkboxes `[ ]` for pending and `[x]` for completed. **Frontend tasks are prioritized first** so the UI can be reviewed and validated early. Changes to the UI may cascade into API and database adjustments — those updates are noted in the relevant task descriptions.
+
+### Phase 1: Frontend (UI First)
+
+All frontend components use dummy/static data initially. Replace with API calls once the backend is ready.
+
+#### 1.1 Authentication & Onboarding
+
+- [ ] **1.1.1** Login page (email/password + SSO buttons)
+  - Layout: centered card, logo, email input, password input, "Remember me", "Forgot password?", login button
+  - SSO buttons: Google, Microsoft, LinkedIn (dummy handlers for now)
+  - 2FA verification modal (dummy)
+  - Route: `/login`
+  - *API impact:* None — frontend-only for now
+
+- [ ] **1.1.2** Registration page (email/password)
+  - Fields: email, password, confirm password, first name, last name
+  - Password strength indicator
+  - Route: `/register`
+  - *API impact:* None — frontend-only for now
+
+- [ ] **1.1.3** SSO callback pages (Google, Microsoft, LinkedIn)
+  - Dummy redirect to dashboard after "authentication"
+  - Route: `/auth/sso/:provider/callback`
+  - *API impact:* None — frontend-only for now
+
+- [ ] **1.1.4** New Customer Onboarding Wizard
+  - Step 1: Customer Company information (name, location, owner, description)
+  - Step 2: Authorized Representative details (user creation form)
+  - Step 3: Project Overview (name, scope, objectives, deliverables, service type dropdown)
+  - Step 4: Finish (review summary, submit)
+  - Route: `/wizard/new-customer`
+  - *API impact:* Creates `POST /api/v1/companies`, `POST /api/v1/users`, `POST /api/v1/projects` endpoints
+
+#### 1.2 Navigation & Layout
+
+- [ ] **1.2.1** Main layout shell (sidebar + header + content area)
+  - Sidebar: collapsible, role-based menu items
+  - Header: user avatar, notifications bell, search bar
+  - Route: `/` (base layout)
+  - *API impact:* None — frontend-only for now
+
+- [ ] **1.2.2** Sidebar menu by role
+  - Client: Dashboard, My Projects, Messages, Documents, Reviews, Settings
+  - Provider: Dashboard, All Projects, Team Management, Service Catalog, Announcements, Reviews, Settings
+  - Admin: Dashboard, All Projects, Team Management, Role & Permission Management, System Settings, Audit Logs
+  - *API impact:* None — frontend-only for now
+
+#### 1.3 Dashboard Views
+
+- [ ] **1.3.1** Client Dashboard
+  - Cards: Active Projects, Pending Tasks, Recent Messages, Upcoming Deadlines
+  - Project status chart (dummy bar chart)
+  - Recent activity feed (dummy timeline)
+  - Route: `/dashboard/client`
+  - *API impact:* Creates `GET /api/v1/dashboard/client` endpoint
+
+- [ ] **1.3.2** Provider Dashboard
+  - Cards: Total Projects, In Progress, Pending Reviews, Team Members
+  - Project pipeline chart (dummy)
+  - Recent announcements
+  - Route: `/dashboard/provider`
+  - *API impact:* Creates `GET /api/v1/dashboard/provider` endpoint
+
+- [ ] **1.3.3** Admin Dashboard
+  - Cards: Total Clients, Active Projects, Revenue Metrics, System Health
+  - User growth chart (dummy)
+  - System status indicators
+  - Route: `/dashboard/admin`
+  - *API impact:* Creates `GET /api/v1/dashboard/admin` endpoint
+
+#### 1.4 Project Management
+
+- [ ] **1.4.1** All Projects list page
+  - Table: project name, company, status, service type, team members, due date
+  - Filters: status, service type, company
+  - Search: by project name
+  - Route: `/projects`
+  - *API impact:* Creates `GET /api/v1/projects` with pagination and filters
+
+- [ ] **1.4.2** Project Detail page
+  - Tabs: Overview, Tasks, Documents, Messages, Reviews, Team
+  - Overview tab: project info cards, activity feed (dummy timeline)
+  - *API impact:* Creates `GET /api/v1/projects/:id` endpoint
+
+- [ ] **1.4.3** Project Overview tab
+  - Fields: scope, objectives, status, service type, team members
+  - JSON fields display: raw_materials, production_output, waste_materials
+  - Production flowchart image placeholder
+  - Activity feed (dummy)
+  - *API impact:* None — part of project detail
+
+- [ ] **1.4.4** My Tasks page
+  - Table: task title, project, assignee, status, priority, due date
+  - Filters: status, priority, project
+  - Route: `/tasks`
+  - *API impact:* Creates `GET /api/v1/tasks` with filters
+
+- [ ] **1.4.5** Task detail/edit modal
+  - Fields: title, description, status, priority, due date, assignee
+  - Route: `/tasks/:id`
+  - *API impact:* Creates `PUT /api/v1/tasks/:id` endpoint
+
+#### 1.5 Communication Center
+
+- [ ] **1.5.1** Messages page (project conversations)
+  - Chat interface: message list, input box, send button
+  - Messages grouped by date
+  - Online status indicator (dummy)
+  - Route: `/projects/:id/messages`
+  - *API impact:* Creates `GET /api/v1/projects/:id/messages`, `POST /api/v1/projects/:id/messages`
+
+- [ ] **1.5.2** Announcements page
+  - List: announcement title, category, audience, date, published status
+  - Create announcement form (admin/provider only): title, body, category, audience
+  - Route: `/announcements`
+  - *API impact:* Creates `GET /api/v1/announcements`, `POST /api/v1/announcements`
+
+#### 1.6 Document Management
+
+- [ ] **1.6.1** Documents page
+  - Table: document title, category, uploader, date, version, file size
+  - Filters: category, date range
+  - Upload button (dummy file picker)
+  - Route: `/projects/:id/documents`
+  - *API impact:* Creates `GET /api/v1/documents`, `POST /api/v1/documents` (multipart)
+
+- [ ] **1.6.2** Document detail view
+  - File preview area (placeholder for PDF/image)
+  - Comments section (dummy)
+  - Version history table (dummy)
+  - Route: `/projects/:id/documents/:id`
+  - *API impact:* Creates `GET /api/v1/documents/:id`, `POST /api/v1/documents/:id/comments`
+
+#### 1.7 Reviews & Ratings
+
+- [ ] **1.7.1** Reviews page (provider view)
+  - Table: customer, project, rating, title, status, date
+  - Actions: Approve, Reject, Edit
+  - Route: `/reviews`
+  - *API impact:* Creates `GET /api/v1/reviews`, `PUT /api/v1/reviews/:id`
+
+- [ ] **1.7.2** Submit review form (client view)
+  - Fields: project (dropdown), rating (star selector), title, body
+  - Route: `/projects/:id/reviews/new`
+  - *API impact:* Creates `POST /api/v1/reviews`
+
+- [ ] **1.7.3** Public reviews display (marketing landing page)
+  - Approved reviews grid: customer, project, rating, title, body
+  - Route: `/reviews` (public)
+  - *API impact:* Creates `GET /api/v1/reviews?status=APPROVED`
+
+#### 1.8 Admin Features
+
+- [ ] **1.8.1** Team Management page
+  - Table: user, email, role, projects, status
+  - Create user form: email, password, role, project assignments
+  - Deactivate/reactivate toggle
+  - Route: `/admin/team`
+  - *API impact:* Creates `POST /api/v1/users`, `PUT /api/v1/users/:id`
+
+- [ ] **1.8.2** Role & Permission Management page
+  - Role list: name, description, permissions
+  - Permission matrix table (checkboxes)
+  - Create/edit role form
+  - Route: `/admin/roles`
+  - *API impact:* Creates `GET/POST/PUT /api/v1/roles`, `GET/POST/PUT /api/v1/permissions`
+
+- [ ] **1.8.3** System Settings page
+  - Fields: portal name, email templates (JSON editor), integrations (config form), security policies (form), maintenance mode toggle
+  - Route: `/admin/settings`
+  - *API impact:* Creates `GET/PUT /api/v1/settings`
+
+- [ ] **1.8.4** Audit Logs page
+  - Table: timestamp, user, action, entity, IP address, details
+  - Filters: user, action, date range
+  - Route: `/admin/audit-logs`
+  - *API impact:* Creates `GET /api/v1/audit-logs`
+
+- [ ] **1.8.5** Dropdown Configuration page
+  - Category list: name, values
+  - Edit category: add/remove values, reorder
+  - Route: `/admin/dropdowns`
+  - *API impact:* Creates `GET/POST/PUT/DELETE /api/v1/dropdowns/*`
+
+#### 1.9 Settings & Profile
+
+- [ ] **1.9.1** User Profile page
+  - Fields: first name, last name, email, avatar upload
+  - Password change form
+  - Route: `/settings/profile`
+  - *API impact:* Creates `GET/PUT /api/v1/users/me`
+
+- [ ] **1.9.2** Notification Preferences page
+  - Toggle switches: task assigned, project created, new message, document request, review submitted, announcement, status change
+  - Route: `/settings/notifications`
+  - *API impact:* Creates `GET/PUT /api/v1/users/me/notifications`
+
+#### 1.10 Landing Page (Marketing)
+
+- [ ] **1.10.1** Marketing landing page (public)
+  - Hero section: portal name, tagline, CTA buttons (Login, Register)
+  - Features section: project management, communication, document sharing, reviews
+  - Approved reviews section (dummy)
+  - Footer: links, contact info
+  - Route: `/` (public)
+  - *API impact:* Creates `GET /api/v1/landing` (public, no auth)
+
+---
+
+### Phase 2: Database
+
+All database work uses the schema defined in the **Database Schema** section. Migrations are managed via Flyway (Java) or Liquibase.
+
+- [ ] **2.1** PostgreSQL 17 Docker container setup
+  - Docker Compose service definition
+  - Environment variables: DB_USERNAME, DB_PASSWORD, DB_NAME
+  - Volume: `postgres-data`
+  - *Dependencies:* None
+
+- [ ] **2.2** Initial schema migration (V1)
+  - Create all tables: users, companies, roles, permissions, role_permissions, user_roles, projects, project_team_members, tasks, documents, document_comments, messages, announcements, reviews, services, dropdown_categories, dropdown_values, notifications, notification_preferences, audit_logs, system_settings
+  - Create all indexes
+  - *Dependencies:* PostgreSQL running
+
+- [ ] **2.3** Seed data migration (V2)
+  - Insert default dropdown categories and values (see Default Data table in Database Schema)
+  - Insert default system roles (CLIENT, PROVIDER, ADMIN)
+  - Insert default permissions
+  - *Dependencies:* V1
+
+- [ ] **2.4** Entity classes (JPA/Hibernate)
+  - Create `@Entity` classes for all tables
+  - Define relationships: `@OneToMany`, `@ManyToOne`, `@ManyToMany`
+  - Configure `@Column`, `@Table`, `@Index` annotations
+  - *Dependencies:* V1
+
+- [ ] **2.5** Repository interfaces (Spring Data JPA)
+  - Create `JpaRepository` interfaces for all entities
+  - Define custom query methods where needed
+  - *Dependencies:* Entity classes
+
+---
+
+### Phase 3: API (Backend)
+
+Backend uses Spring Boot 3.x with Java 21. All endpoints follow REST conventions. Authentication uses JWT (access + refresh tokens).
+
+- [ ] **3.1** Project setup and configuration
+  - Spring Boot 3.x project with Java 21
+  - Dependencies: Spring Web, Spring Data JPA, Spring Security, SpringDoc OpenAPI, Flyway, PostgreSQL driver, JWT library
+  - `application.yml` configuration: database, JPA/Hibernate, JWT, Swagger
+  - Dockerfile for backend
+  - *Dependencies:* None
+
+- [ ] **3.2** Authentication endpoints
+  - `POST /auth/register` — email registration
+  - `POST /auth/login` — email login (returns JWT)
+  - `POST /auth/sso/google` — Google SSO callback
+  - `POST /auth/sso/microsoft` — Microsoft SSO callback
+  - `POST /auth/sso/linkedin` — LinkedIn SSO callback
+  - `POST /auth/2fa/enable`, `POST /auth/2fa/disable`, `POST /auth/2fa/verify`
+  - `POST /auth/logout` — invalidate session
+  - `POST /auth/refresh` — refresh access token
+  - *Dependencies:* Entity classes, Repository interfaces
+
+- [ ] **3.3** User management endpoints
+  - `GET /api/v1/users/me` — get current user
+  - `PUT /api/v1/users/me` — update current user
+  - `GET /api/v1/users` — list users (admin/provider)
+  - `POST /api/v1/users` — create user (admin/provider)
+  - `PUT /api/v1/users/:id` — update user (admin/provider)
+  - `DELETE /api/v1/users/:id` — deactivate user (admin/provider)
+  - *Dependencies:* Authentication
+
+- [ ] **3.4** Company endpoints
+  - `GET /api/v1/companies` — list companies (admin/provider)
+  - `POST /api/v1/companies` — create company
+  - `GET /api/v1/companies/:id` — get company detail
+  - `PUT /api/v1/companies/:id` — update company
+  - *Dependencies:* Entity classes, Repository interfaces
+
+- [ ] **3.5** Project endpoints
+  - `GET /api/v1/projects` — list projects (with pagination, filters)
+  - `POST /api/v1/projects` — create project
+  - `GET /api/v1/projects/:id` — get project detail
+  - `PUT /api/v1/projects/:id` — update project
+  - `DELETE /api/v1/projects/:id` — archive project
+  - *Dependencies:* Company endpoints, Service endpoints
+
+- [ ] **3.6** Team member endpoints
+  - `GET /api/v1/projects/:id/team` — list team members
+  - `POST /api/v1/projects/:id/team` — add team member
+  - `DELETE /api/v1/projects/:id/team/:userId` — remove team member
+  - *Dependencies:* Project endpoints, User endpoints
+
+- [ ] **3.7** Task endpoints
+  - `GET /api/v1/tasks` — list tasks (with filters)
+  - `POST /api/v1/tasks` — create task
+  - `GET /api/v1/tasks/:id` — get task detail
+  - `PUT /api/v1/tasks/:id` — update task
+  - `DELETE /api/v1/tasks/:id` — delete task
+  - *Dependencies:* Project endpoints
+
+- [ ] **3.8** Document endpoints
+  - `GET /api/v1/documents` — list documents (with filters)
+  - `POST /api/v1/documents` — upload document (multipart)
+  - `GET /api/v1/documents/:id` — get document detail
+  - `PUT /api/v1/documents/:id` — update document
+  - `DELETE /api/v1/documents/:id` — delete document
+  - `POST /api/v1/documents/:id/comments` — add comment
+  - `GET /api/v1/documents/:id/comments` — list comments
+  - *Dependencies:* Project endpoints, File upload service
+
+- [ ] **3.9** Message endpoints
+  - `GET /api/v1/projects/:id/messages` — list messages
+  - `POST /api/v1/projects/:id/messages` — send message
+  - *Dependencies:* Project endpoints
+
+- [ ] **3.10** Announcement endpoints
+  - `GET /api/v1/announcements` — list announcements
+  - `POST /api/v1/announcements` — create announcement
+  - `PUT /api/v1/announcements/:id` — update announcement
+  - `DELETE /api/v1/announcements/:id` — delete announcement
+  - *Dependencies:* None
+
+- [ ] **3.11** Review endpoints
+  - `GET /api/v1/reviews` — list reviews (with filters)
+  - `POST /api/v1/reviews` — submit review
+  - `GET /api/v1/reviews/:id` — get review detail
+  - `PUT /api/v1/reviews/:id` — update review (approve/reject)
+  - `GET /api/v1/reviews?status=APPROVED` — public approved reviews
+  - *Dependencies:* Project endpoints, User endpoints
+
+- [ ] **3.12** Service endpoints
+  - `GET /api/v1/services` — list services
+  - `POST /api/v1/services` — create service (admin)
+  - `PUT /api/v1/services/:id` — update service (admin)
+  - `DELETE /api/v1/services/:id` — deactivate service (admin)
+  - *Dependencies:* None
+
+- [ ] **3.13** Admin endpoints
+  - `GET /api/v1/dashboard/admin` — admin dashboard data
+  - `GET /api/v1/audit-logs` — audit log list
+  - `GET /api/v1/settings` — system settings
+  - `PUT /api/v1/settings` — update system settings
+  - `GET /api/v1/roles` — list roles
+  - `POST /api/v1/roles` — create role
+  - `PUT /api/v1/roles/:id` — update role
+  - `GET /api/v1/permissions` — list permissions
+  - `POST /api/v1/permissions` — create permission
+  - *Dependencies:* All entity classes
+
+- [ ] **3.14** Dropdown endpoints
+  - `GET /api/v1/dropdowns` — list all categories
+  - `GET /api/v1/dropdowns/:category` — get category values
+  - `POST /api/v1/dropdowns` — create category
+  - `PUT /api/v1/dropdowns/:id` — update category
+  - `DELETE /api/v1/dropdowns/:id` — delete category
+  - `POST /api/v1/dropdowns/:category/values` — add value
+  - `PUT /api/v1/dropdowns/values/:id` — update value
+  - `DELETE /api/v1/dropdowns/values/:id` — delete value
+  - *Dependencies:* None
+
+- [ ] **3.15** Notification endpoints
+  - `GET /api/v1/notifications` — list notifications for current user
+  - `PUT /api/v1/notifications/:id/read` — mark as read
+  - `PUT /api/v1/users/me/notifications` — update notification preferences
+  - *Dependencies:* User endpoints
+
+- [ ] **3.16** Landing page endpoint
+  - `GET /api/v1/landing` — public landing page data (approved reviews, features)
+  - *Dependencies:* Review endpoints
+
+- [ ] **3.17** Swagger/OpenAPI integration
+  - SpringDoc OpenAPI 2 dependency
+  - `@Operation`, `@ApiResponses` annotations on all endpoints
+  - Swagger UI at `/swagger-ui.html`
+  - OpenAPI 3.0 spec at `/v3/api-docs`
+  - *Dependencies:* All endpoints complete
+
+- [ ] **3.18** Docker Compose integration
+  - Backend service definition
+  - Network: `portal-network`
+  - Depends on: PostgreSQL
+  - Health check: `/actuator/health`
+  - *Dependencies:* Dockerfile, all endpoints
+
+---
+
+### Phase 4: Integration & Testing
+
+- [ ] **4.1** Frontend-Backend integration
+  - Replace all dummy data with API calls
+  - Configure API base URL (`http://localhost:8080/api/v1`)
+  - Implement HTTP interceptors (auth token, error handling)
+  - *Dependencies:* All frontend components, all API endpoints
+
+- [ ] **4.2** End-to-end testing
+  - User registration and login flow
+  - Project creation wizard
+  - Task assignment and status updates
+  - Document upload and comments
+  - Message sending and notification
+  - Review submission and approval
+  - *Dependencies:* All frontend and backend complete
+
+- [ ] **4.3** Docker Compose full stack
+  - Services: frontend, landing, api, postgres
+  - Volumes: `uploads`, `postgres-data`
+  - Network: `portal-network`
+  - Health checks and restart policies
+  - *Dependencies:* All Dockerfiles, all services
+
+- [ ] **4.4** User Acceptance Testing (UAT)
+  - Client workflow: register, login, view dashboard, create project, assign tasks, upload documents, send messages, submit review
+  - Provider workflow: login, view all projects, manage team, approve reviews, create announcements
+  - Admin workflow: login, manage users, configure roles, view audit logs, update system settings
+  - *Dependencies:* Full stack running
+
+---
+
+### Execution Order Summary
+
+```
+Phase 1 (Frontend) → Phase 2 (Database) → Phase 3 (API) → Phase 4 (Integration & UAT)
+      |                       |                      |
+  Dummy data              Schema +              All endpoints
+  UI validation           Entity classes        Swagger + Docker
+  Early feedback          Seed data             Integration
+```
+
+**Key principle:** Frontend first with dummy data allows rapid UI iteration. Changes to the UI may require adjustments to the API and database — those are tracked in the "API impact" notes above. Once the UI is approved, the API and database are built to match.
