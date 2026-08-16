@@ -2502,16 +2502,15 @@ web/
 
 **Initial setup tasks:**
 
-- [ ] **S1.1** Create Vite project: `npm create vite@latest web -- --template vue-ts`
+- [ ] **S1.1** Create Vite project: `npx shadcn-vue@latest init --preset a2S74vUB --template vite --pointer`
 - [ ] **S1.2** Install and configure Tailwind CSS v4
-- [ ] **S1.3** Initialize shadcn-vue: `npx shadcn-vue@latest init`
-- [ ] **S1.4** Install dependencies: Vue Router, Pinia, Axios
-- [ ] **S1.5** Configure Vue Router with placeholder routes for all pages (role-based guards)
-- [ ] **S1.6** Set up Pinia with auth store (dummy data initially)
-- [ ] **S1.7** Create base layout components (sidebar, header, auth card)
-- [ ] **S1.8** Configure Tailwind theme (light/dark/system mode)
-- [ ] **S1.9** Add Dockerfile and nginx.conf
-- [ ] **S1.10** Verify build: `npm run build`
+- [ ] **S1.3** Install dependencies: Vue Router, Pinia, Axios
+- [ ] **S1.4** Configure Vue Router with placeholder routes for all pages (role-based guards)
+- [ ] **S1.5** Set up Pinia with auth store (dummy data initially)
+- [ ] **S1.6** Create base layout components (sidebar, header, auth card)
+- [ ] **S1.7** Configure Tailwind theme (light/dark/system mode)
+- [ ] **S1.8** Add Dockerfile and nginx.conf
+- [ ] **S1.9** Verify build: `npm run build`
 
 ### 2. `landing/` -- Marketing Landing Page
 
@@ -2538,7 +2537,7 @@ landing/
 
 **Initial setup tasks:**
 
-- [ ] **S2.1** Create Vite project: `npm create vite@latest landing -- --template vue-ts`
+- [ ] **S2.1** Create Vite project: `npx shadcn-vue@latest init --preset a2S74vUB --template vite --pointer`
 - [ ] **S2.2** Install and configure Tailwind CSS
 - [ ] **S2.3** Create static landing page (hero, features, dummy reviews, footer)
 - [ ] **S2.4** Add Dockerfile and nginx.conf
@@ -2570,39 +2569,44 @@ All frontend components use dummy/static data initially. Replace with API calls 
 
 #### 1.1 Authentication & Onboarding
 
-- [ ] **1.1.1** Login page (email/password + SSO buttons)
+- [x] **1.1.1** Login page (email/password + SSO buttons)
   - Layout: centered card, logo, email input, password input, "Remember me", "Forgot password?", login button
   - SSO buttons: Google, Microsoft, LinkedIn (dummy handlers for now)
   - 2FA verification modal (dummy)
   - Route: `/login`
   - *API impact:* None — frontend-only for now
+  - **Status:** Scaffolded (`LoginView.vue`)
 
-- [ ] **1.1.2** Registration page (email/password)
+- [x] **1.1.2** Registration page (email/password)
   - Fields: email, password, confirm password, first name, last name
   - Password strength indicator
   - Route: `/register`
   - *API impact:* None — frontend-only for now
+  - **Status:** Scaffolded (`RegisterView.vue`)
 
-- [ ] **1.1.3** SSO callback pages (Google, Microsoft, LinkedIn)
+- [x] **1.1.3** SSO callback pages (Google, Microsoft, LinkedIn)
   - Dummy redirect to dashboard after "authentication"
   - Route: `/auth/sso/:provider/callback`
   - *API impact:* None — frontend-only for now
+  - **Status:** Scaffolded (`SSOCallbackView.vue`)
 
-- [ ] **1.1.4** New Customer Onboarding Wizard
+- [x] **1.1.4** New Customer Onboarding Wizard
   - Step 1: Customer Company information (name, location, owner, description)
   - Step 2: Authorized Representative details (user creation form)
   - Step 3: Project Overview (name, scope, objectives, deliverables, service type dropdown)
   - Step 4: Finish (review summary, submit)
   - Route: `/wizard/new-customer`
   - *API impact:* Creates `POST /api/v1/companies`, `POST /api/v1/users`, `POST /api/v1/projects` endpoints
+  - **Status:** Built (`NewProjectWizard.vue`, 533 lines, 4-step wizard with scenario selection)
 
 #### 1.2 Navigation & Layout
 
-- [ ] **1.2.1** Main layout shell (sidebar + header + content area)
+- [x] **1.2.1** Main layout shell (sidebar + header + content area)
   - Sidebar: collapsible, role-based menu items
   - Header: user avatar, notifications bell, search bar
   - Route: `/` (base layout)
   - *API impact:* None — frontend-only for now
+  - **Status:** Scaffolded (`MainLayout.vue`)
 
 - [ ] **1.2.2** Sidebar menu by role
   - Client: Dashboard, My Projects, Messages, Documents, Reviews, Settings
@@ -2612,12 +2616,13 @@ All frontend components use dummy/static data initially. Replace with API calls 
 
 #### 1.3 Dashboard Views
 
-- [ ] **1.3.1** Client Dashboard
+- [x] **1.3.1** Client Dashboard
   - Cards: Active Projects, Pending Tasks, Recent Messages, Upcoming Deadlines
   - Project status chart (dummy bar chart)
   - Recent activity feed (dummy timeline)
   - Route: `/dashboard/client`
   - *API impact:* Creates `GET /api/v1/dashboard/client` endpoint
+  - **Status:** Scaffolded (`DashboardView.vue`)
 
 - [ ] **1.3.2** Provider Dashboard
   - Cards: Total Projects, In Progress, Pending Reviews, Team Members
@@ -2635,12 +2640,13 @@ All frontend components use dummy/static data initially. Replace with API calls 
 
 #### 1.4 Project Management
 
-- [ ] **1.4.1** All Projects list page
+- [x] **1.4.1** All Projects list page
   - Table: project name, company, status, service type, team members, due date
   - Filters: status, service type, company
   - Search: by project name
   - Route: `/projects`
   - *API impact:* Creates `GET /api/v1/projects` with pagination and filters
+  - **Status:** Scaffolded (`ProjectsView.vue`, 151 lines with wizard integration)
 
 - [ ] **1.4.2** Project Detail page
   - Tabs: Overview, Tasks, Documents, Messages, Reviews, Team
@@ -2654,74 +2660,84 @@ All frontend components use dummy/static data initially. Replace with API calls 
   - Activity feed (dummy)
   - *API impact:* None — part of project detail
 
-- [ ] **1.4.4** My Tasks page
+- [x] **1.4.4** My Tasks page
   - Table: task title, project, assignee, status, priority, due date
   - Filters: status, priority, project
   - Route: `/tasks`
   - *API impact:* Creates `GET /api/v1/tasks` with filters
+  - **Status:** Scaffolded (`TasksView.vue`)
 
-- [ ] **1.4.5** Task detail/edit modal
+- [x] **1.4.5** Task detail/edit modal
   - Fields: title, description, status, priority, due date, assignee
   - Route: `/tasks/:id`
   - *API impact:* Creates `PUT /api/v1/tasks/:id` endpoint
+  - **Status:** Built (`TaskDetailModal.vue`, 286 lines)
 
 #### 1.5 Communication Center
 
-- [ ] **1.5.1** Messages page (project conversations)
+- [x] **1.5.1** Messages page (project conversations)
   - Chat interface: message list, input box, send button
   - Messages grouped by date
   - Online status indicator (dummy)
   - Route: `/projects/:id/messages`
   - *API impact:* Creates `GET /api/v1/projects/:id/messages`, `POST /api/v1/projects/:id/messages`
+  - **Status:** Scaffolded (`MessagesView.vue`)
 
-- [ ] **1.5.2** Announcements page
+- [x] **1.5.2** Announcements page
   - List: announcement title, category, audience, date, published status
   - Create announcement form (admin/provider only): title, body, category, audience
   - Route: `/announcements`
   - *API impact:* Creates `GET /api/v1/announcements`, `POST /api/v1/announcements`
+  - **Status:** Scaffolded (`AnnouncementsView.vue`)
 
 #### 1.6 Document Management
 
-- [ ] **1.6.1** Documents page
+- [x] **1.6.1** Documents page
   - Table: document title, category, uploader, date, version, file size
   - Filters: category, date range
   - Upload button (dummy file picker)
   - Route: `/projects/:id/documents`
   - *API impact:* Creates `GET /api/v1/documents`, `POST /api/v1/documents` (multipart)
+  - **Status:** Scaffolded (`DocumentsView.vue`)
 
-- [ ] **1.6.2** Document detail view
+- [x] **1.6.2** Document detail view
   - File preview area (placeholder for PDF/image)
   - Comments section (dummy)
   - Version history table (dummy)
   - Route: `/projects/:id/documents/:id`
   - *API impact:* Creates `GET /api/v1/documents/:id`, `POST /api/v1/documents/:id/comments`
+  - **Status:** Built (`DocumentDetailModal.vue`, 272 lines)
 
 #### 1.7 Reviews & Ratings
 
-- [ ] **1.7.1** Reviews page (provider view)
+- [x] **1.7.1** Reviews page (provider view)
   - Table: customer, project, rating, title, status, date
   - Actions: Approve, Reject, Edit
   - Route: `/reviews`
   - *API impact:* Creates `GET /api/v1/reviews`, `PUT /api/v1/reviews/:id`
+  - **Status:** Scaffolded (`ReviewsView.vue`, 9.48 kB compiled)
 
-- [ ] **1.7.2** Submit review form (client view)
+- [x] **1.7.2** Submit review form (client view)
   - Fields: project (dropdown), rating (star selector), title, body
   - Route: `/projects/:id/reviews/new`
   - *API impact:* Creates `POST /api/v1/reviews`
+  - **Status:** Built (`SubmitReviewForm.vue`, 235 lines)
 
-- [ ] **1.7.3** Public reviews display (marketing landing page)
+- [x] **1.7.3** Public reviews display (marketing landing page)
   - Approved reviews grid: customer, project, rating, title, body
   - Route: `/reviews` (public)
   - *API impact:* Creates `GET /api/v1/reviews?status=APPROVED`
+  - **Status:** Built (`ReviewsView.vue` public route)
 
 #### 1.8 Admin Features
 
-- [ ] **1.8.1** Team Management page
+- [x] **1.8.1** Team Management page
   - Table: user, email, role, projects, status
   - Create user form: email, password, role, project assignments
   - Deactivate/reactivate toggle
   - Route: `/admin/team`
   - *API impact:* Creates `POST /api/v1/users`, `PUT /api/v1/users/:id`
+  - **Status:** Scaffolded (`AdminView.vue`, 14.36 kB compiled)
 
 - [ ] **1.8.2** Role & Permission Management page
   - Role list: name, description, permissions
@@ -2749,11 +2765,12 @@ All frontend components use dummy/static data initially. Replace with API calls 
 
 #### 1.9 Settings & Profile
 
-- [ ] **1.9.1** User Profile page
+- [x] **1.9.1** User Profile page
   - Fields: first name, last name, email, avatar upload
   - Password change form
   - Route: `/settings/profile`
   - *API impact:* Creates `GET/PUT /api/v1/users/me`
+  - **Status:** Scaffolded (`SettingsView.vue`, 8.24 kB compiled)
 
 - [ ] **1.9.2** Notification Preferences page
   - Toggle switches: task assigned, project created, new message, document request, review submitted, announcement, status change
@@ -2762,13 +2779,14 @@ All frontend components use dummy/static data initially. Replace with API calls 
 
 #### 1.10 Landing Page (Marketing)
 
-- [ ] **1.10.1** Marketing landing page (public)
+- [x] **1.10.1** Marketing landing page (public)
   - Hero section: portal name, tagline, CTA buttons (Login, Register)
   - Features section: project management, communication, document sharing, reviews
   - Approved reviews section (dummy)
   - Footer: links, contact info
   - Route: `/` (public)
   - *API impact:* Creates `GET /api/v1/landing` (public, no auth)
+  - **Status:** Built (`MarketingLandingPage.vue`, 277 lines, deployed and live at http://10.0.1.78:3000)
 
 ---
 
