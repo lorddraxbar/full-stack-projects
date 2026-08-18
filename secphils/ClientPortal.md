@@ -2608,7 +2608,7 @@ All frontend components use dummy/static data initially. Replace with API calls 
   - *API impact:* None — frontend-only for now
   - **Status:** Scaffolded (`MainLayout.vue`)
 
-- [ ] **1.2.2** Sidebar menu by role
+- [x] **1.2.2** Sidebar menu by role
   - Client: Dashboard, My Projects, Messages, Documents, Reviews, Settings
   - Provider: Dashboard, All Projects, Team Management, Service Catalog, Announcements, Reviews, Settings
   - Admin: Dashboard, All Projects, Team Management, Role & Permission Management, System Settings, Audit Logs
@@ -2623,20 +2623,20 @@ All frontend components use dummy/static data initially. Replace with API calls 
   - Route: `/dashboard/client`
   - *API impact:* Creates `GET /api/v1/dashboard/client` endpoint
   - **Status:** Scaffolded (`DashboardView.vue`)
-
-- [ ] **1.3.2** Provider Dashboard
+- [x] **1.3.2** Provider Dashboard
   - Cards: Total Projects, In Progress, Pending Reviews, Team Members
   - Project pipeline chart (dummy)
   - Recent announcements
   - Route: `/dashboard/provider`
   - *API impact:* Creates `GET /api/v1/dashboard/provider` endpoint
-
-- [ ] **1.3.3** Admin Dashboard
+  - **Status:** Built (`DashboardView.vue` provider section)
+- [x] **1.3.3** Admin Dashboard
   - Cards: Total Clients, Active Projects, Revenue Metrics, System Health
   - User growth chart (dummy)
   - System status indicators
   - Route: `/dashboard/admin`
   - *API impact:* Creates `GET /api/v1/dashboard/admin` endpoint
+  - **Status:** Built (`DashboardView.vue` admin section)
 
 #### 1.4 Project Management
 
@@ -2647,18 +2647,18 @@ All frontend components use dummy/static data initially. Replace with API calls 
   - Route: `/projects`
   - *API impact:* Creates `GET /api/v1/projects` with pagination and filters
   - **Status:** Scaffolded (`ProjectsView.vue`, 151 lines with wizard integration)
-
-- [ ] **1.4.2** Project Detail page
+- [x] **1.4.2** Project Detail page
   - Tabs: Overview, Tasks, Documents, Messages, Reviews, Team
   - Overview tab: project info cards, activity feed (dummy timeline)
   - *API impact:* Creates `GET /api/v1/projects/:id` endpoint
-
-- [ ] **1.4.3** Project Overview tab
+  - **Status:** Built (`ProjectDetailView.vue` with role-based tabs)
+- [x] **1.4.3** Project Overview tab
   - Fields: scope, objectives, status, service type, team members
   - JSON fields display: raw_materials, production_output, waste_materials
   - Production flowchart image placeholder
   - Activity feed (dummy)
   - *API impact:* None — part of project detail
+  - **Status:** Built (`ProjectDetailView.vue` Overview tab)
 
 - [x] **1.4.4** My Tasks page
   - Table: task title, project, assignee, status, priority, due date
@@ -2738,30 +2738,30 @@ All frontend components use dummy/static data initially. Replace with API calls 
   - Route: `/admin/team`
   - *API impact:* Creates `POST /api/v1/users`, `PUT /api/v1/users/:id`
   - **Status:** Scaffolded (`AdminView.vue`, 14.36 kB compiled)
-
-- [ ] **1.8.2** Role & Permission Management page
+- [x] **1.8.2** Role & Permission Management page
   - Role list: name, description, permissions
   - Permission matrix table (checkboxes)
   - Create/edit role form
   - Route: `/admin/roles`
   - *API impact:* Creates `GET/POST/PUT /api/v1/roles`, `GET/POST/PUT /api/v1/permissions`
-
-- [ ] **1.8.3** System Settings page
+  - **Status:** Built (`AdminView.vue` Company Settings section)
+- [x] **1.8.3** System Settings page
   - Fields: portal name, email templates (JSON editor), integrations (config form), security policies (form), maintenance mode toggle
   - Route: `/admin/settings`
   - *API impact:* Creates `GET/PUT /api/v1/settings`
-
-- [ ] **1.8.4** Audit Logs page
+  - **Status:** Built (`AdminView.vue` System section)
+- [x] **1.8.4** Audit Logs page
   - Table: timestamp, user, action, entity, IP address, details
   - Filters: user, action, date range
   - Route: `/admin/audit-logs`
   - *API impact:* Creates `GET /api/v1/audit-logs`
-
-- [ ] **1.8.5** Dropdown Configuration page
+  - **Status:** Built (`AdminView.vue` Audit Logs section)
+- [x] **1.8.5** Dropdown Configuration page
   - Category list: name, values
   - Edit category: add/remove values, reorder
   - Route: `/admin/dropdowns`
   - *API impact:* Creates `GET/POST/PUT/DELETE /api/v1/dropdowns/*`
+  - **Status:** Built (`AdminView.vue` dropdown categories)
 
 #### 1.9 Settings & Profile
 
@@ -2771,11 +2771,11 @@ All frontend components use dummy/static data initially. Replace with API calls 
   - Route: `/settings/profile`
   - *API impact:* Creates `GET/PUT /api/v1/users/me`
   - **Status:** Scaffolded (`SettingsView.vue`, 8.24 kB compiled)
-
-- [ ] **1.9.2** Notification Preferences page
+- [x] **1.9.2** Notification Preferences page
   - Toggle switches: task assigned, project created, new message, document request, review submitted, announcement, status change
   - Route: `/settings/notifications`
   - *API impact:* Creates `GET/PUT /api/v1/users/me/notifications`
+  - **Status:** Built (`SettingsView.vue` notification prefs)
 
 #### 1.10 Landing Page (Marketing)
 

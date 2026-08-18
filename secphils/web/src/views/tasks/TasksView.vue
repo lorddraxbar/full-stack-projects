@@ -93,10 +93,14 @@ const priorityColors: Record<string, string> = {
 }
 
 const filterStatus = ref('ALL')
+const filterPriority = ref('ALL')
+const filterProject = ref('ALL')
 const filteredTasks = computed(() =>
-  filterStatus.value === 'ALL'
-    ? tasks.value
-    : tasks.value.filter(t => t.status === filterStatus.value)
+  tasks.value.filter(t =>
+    (filterStatus.value === 'ALL' || t.status === filterStatus.value) &&
+    (filterPriority.value === 'ALL' || t.priority === filterPriority.value) &&
+    (filterProject.value === 'ALL' || String(t.projectId) === filterProject.value)
+  )
 )
 
 // Modal state
@@ -150,18 +154,40 @@ const subtaskProgress = (task: Task) => {
 
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow p-4 mb-6">
-      <div class="flex flex-wrap gap-2">
-        <button
-          v-for="option in ['ALL', 'todo', 'in-progress', 'review', 'done']"
-          :key="option"
-          @click="filterStatus = option"
-          :class="[
-            'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-            filterStatus === option ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-          ]"
-        >
-          {{ option === 'ALL' ? 'All' : STATUS_LABELS[option as Task['status']] }}
-        </button>
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="option in ['ALL', 'todo', 'in-progress', 'review', 'done']"
+            :key="option"
+            @click="filterStatus = option"
+            :class="[
+              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+              filterStatus === option ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+            ]"
+          >
+            {{ option === 'ALL' ? 'All' : STATUS_LABELS[option as Task['status']] }}
+          </button>
+        </div>
+        <div class="flex flex-wrap gap-2 ml-auto">
+          <select
+            v-model="filterPriority"
+            class="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="ALL">All Priorities</option>
+            <option v-for="(label, key) in PRIORITY_LABELS" :key="key" :value="key">
+              {{ label }}
+            </option>
+          </select>
+          <select
+            v-model="filterProject"
+            class="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="ALL">All Projects</option>
+            <option v-for="project in projectsStore.projects" :key="project.id" :value="String(project.id)">
+              {{ project.name }}
+            </option>
+          </select>
+        </div>
       </div>
     </div>
 
