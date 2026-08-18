@@ -40,7 +40,7 @@ const filterTasks = () => {
 
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow p-4 mb-6">
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button
           @click="filterStatus = 'ALL'; filterTasks()"
           :class="[

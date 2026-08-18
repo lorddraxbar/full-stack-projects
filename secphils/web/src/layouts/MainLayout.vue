@@ -7,7 +7,7 @@ import { useRole, type UserRole } from '../composables/useRole'
 const { role, isPreview, setRole } = useRole()
 
 const allNavItems = [
-  { name: 'Dashboard', path: '/', icon: 'fas fa-chart-bar', roles: ['CLIENT', 'PROVIDER', 'ADMIN'] },
+  { name: 'Dashboard', path: '/dashboard', icon: 'fas fa-chart-bar', roles: ['CLIENT', 'PROVIDER', 'ADMIN'] },
   { name: 'Projects', path: '/projects', icon: 'fas fa-folder', roles: ['CLIENT', 'PROVIDER', 'ADMIN'] },
   { name: 'Tasks', path: '/tasks', icon: 'fas fa-check-square', roles: ['PROVIDER', 'ADMIN'] },
   { name: 'Documents', path: '/documents', icon: 'fas fa-file-alt', roles: ['CLIENT', 'PROVIDER', 'ADMIN'] },
@@ -69,7 +69,7 @@ const roleLabel = computed(() =>
 
 const switchPreviewRole = (newRole: UserRole) => {
   setRole(newRole)
-  router.push('/')
+  router.push('/dashboard')
 }
 </script>
 

@@ -37,7 +37,7 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
     children: [
       {
-        path: '',
+        path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/DashboardView.vue'),
       },
@@ -101,7 +101,9 @@ router.beforeEach((to, _from, next) => {
   const userRole = localStorage.getItem('userRole')
   const isPreview = localStorage.getItem('previewMode') === 'true'
 
-  if (to.meta.requiresAuth && !token && !isPreview) {
+  if (to.name === 'MarketingLanding' && (token || isPreview)) {
+    next({ name: 'Dashboard' })
+  } else if (to.meta.requiresAuth && !token && !isPreview) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
   } else if (to.meta.guest && token && !isPreview) {
     next({ name: 'Dashboard' })

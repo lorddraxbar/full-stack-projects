@@ -30,7 +30,7 @@ const markAsRead = (id: number) => {
     </div>
 
     <!-- Announcements List -->
-    <div class="space-y-4">
+    <div class="space-y-6">
       <div
         v-for="announcement in announcements"
         :key="announcement.id"
