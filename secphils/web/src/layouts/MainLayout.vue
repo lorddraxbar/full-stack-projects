@@ -78,7 +78,7 @@ const switchPreviewRole = (newRole: UserRole) => {
     <!-- Mobile overlay -->
     <div
       v-if="isMobile && isSidebarOpen"
-      class="fixed inset-0 bg-black/20 z-20"
+      class="fixed inset-0 bg-black/35 z-20"
       @click="isSidebarOpen = false"
     />
 

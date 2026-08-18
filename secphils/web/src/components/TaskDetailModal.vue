@@ -7,10 +7,19 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import type { AcceptableValue } from 'reka-ui'
+import type { Task, Subtask } from '@/types/task'
+import { STATUS_LABELS, PRIORITY_LABELS } from '@/types/task'
+
+interface ProjectOption {
+  id: number
+  name: string
+}
 
 const props = defineProps<{
   open: boolean
   task?: Task | null
+  projects?: ProjectOption[]
 }>()
 
 const emit = defineEmits<{
@@ -19,33 +28,35 @@ const emit = defineEmits<{
   delete: [id: number]
 }>()
 
-export interface Task {
-  id: number
-  title: string
-  description: string
-  status: 'todo' | 'in-progress' | 'review' | 'done'
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  assignee: string
-  dueDate: string
-  projectId: number
-  projectTitle: string
-  tags: string[]
-  subtasks: Subtask[]
-}
-
-export interface Subtask {
-  id: number
-  title: string
-  completed: boolean
-}
-
 const dialogOpen = ref(props.open)
 const editingTask = ref<Task | null>(null)
+const isCreateMode = ref(false)
+const saveError = ref('')
+
+const newTask = (): Task => ({
+  id: Date.now(),
+  title: '',
+  description: '',
+  status: 'todo',
+  priority: 'medium',
+  assignee: '',
+  dueDate: '',
+  projectId: props.projects?.[0]?.id ?? 0,
+  projectTitle: props.projects?.[0]?.name ?? '',
+  subtasks: [],
+})
 
 watch(() => props.open, (val) => {
   dialogOpen.value = val
-  if (val && props.task) {
-    editingTask.value = JSON.parse(JSON.stringify(props.task)) // Deep copy
+  if (val) {
+    saveError.value = ''
+    if (props.task) {
+      isCreateMode.value = false
+      editingTask.value = JSON.parse(JSON.stringify(props.task)) // Deep copy
+    } else {
+      isCreateMode.value = true
+      editingTask.value = newTask()
+    }
   }
 })
 
@@ -53,18 +64,17 @@ watch(dialogOpen, (val) => {
   emit('update:open', val)
 })
 
-const statusLabels: Record<string, string> = {
-  'todo': 'To Do',
-  'in-progress': 'In Progress',
-  'review': 'Review',
-  'done': 'Done',
-}
+const statusLabels = STATUS_LABELS
 
-const priorityLabels: Record<string, string> = {
-  'low': 'Low',
-  'medium': 'Medium',
-  'high': 'High',
-  'urgent': 'Urgent',
+const priorityLabels = PRIORITY_LABELS
+
+const onProjectChange = (value: AcceptableValue) => {
+  if (!editingTask.value || value === null || value === undefined) return
+  const project = props.projects?.find(p => p.id === Number(value))
+  if (project) {
+    editingTask.value.projectId = project.id
+    editingTask.value.projectTitle = project.name
+  }
 }
 
 const addSubtask = () => {
@@ -91,10 +101,21 @@ const toggleSubtask = (subtaskId: number) => {
 }
 
 const handleSave = () => {
-  if (editingTask.value) {
-    emit('save', editingTask.value)
-    dialogOpen.value = false
+  if (!editingTask.value) return
+  if (!editingTask.value.title.trim()) {
+    saveError.value = 'Task title is required.'
+    return
   }
+  if (!editingTask.value.assignee.trim()) {
+    saveError.value = 'Assignee is required.'
+    return
+  }
+  if (!editingTask.value.dueDate) {
+    saveError.value = 'Due date is required.'
+    return
+  }
+  emit('save', editingTask.value)
+  dialogOpen.value = false
 }
 
 const handleClose = () => {
@@ -121,9 +142,9 @@ const totalSubtasks = (task: Task) => {
   <Dialog v-model:open="dialogOpen">
     <DialogContent class="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
       <DialogHeader>
-        <DialogTitle>{{ editingTask ? 'Edit Task' : 'New Task' }}</DialogTitle>
+        <DialogTitle>{{ isCreateMode ? 'New Task' : 'Edit Task' }}</DialogTitle>
         <DialogDescription>
-          {{ editingTask ? 'Update task details' : 'Create a new task' }}
+          {{ isCreateMode ? 'Create a new task' : 'Update task details' }}
         </DialogDescription>
       </DialogHeader>
 
@@ -147,6 +168,22 @@ const totalSubtasks = (task: Task) => {
               placeholder="Describe the task"
               rows="3"
             />
+          </div>
+
+          <div class="space-y-2">
+            <Label>Project</Label>
+            <Select :model-value="String(editingTask.projectId)" @update:model-value="onProjectChange">
+              <SelectTrigger>
+                <SelectValue placeholder="Select a project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem v-for="project in projects" :key="project.id" :value="String(project.id)">
+                    {{ project.name }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -252,17 +289,21 @@ const totalSubtasks = (task: Task) => {
 
       <!-- Footer -->
       <DialogFooter class="flex flex-col sm:flex-row gap-2 sm:justify-between">
-        <Button variant="destructive" @click="handleDelete">
+        <Button v-if="!isCreateMode" variant="destructive" @click="handleDelete">
           Delete
         </Button>
+        <span v-else />
 
-        <div class="flex gap-2">
-          <Button variant="outline" @click="handleClose">
-            Cancel
-          </Button>
-          <Button @click="handleSave">
-            Save Task
-          </Button>
+        <div class="flex flex-col items-stretch gap-2 sm:items-end">
+          <p v-if="saveError" class="text-sm text-red-600 sm:text-right">{{ saveError }}</p>
+          <div class="flex gap-2">
+            <Button variant="outline" @click="handleClose">
+              Cancel
+            </Button>
+            <Button @click="handleSave">
+              {{ isCreateMode ? 'Create Task' : 'Save Task' }}
+            </Button>
+          </div>
         </div>
       </DialogFooter>
     </DialogContent>
