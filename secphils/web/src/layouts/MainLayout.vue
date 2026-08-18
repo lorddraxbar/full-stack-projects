@@ -85,14 +85,14 @@ const switchPreviewRole = (newRole: UserRole) => {
     <!-- Sidebar -->
     <aside
       :class="[
-        'fixed left-0 top-0 h-full bg-white border-r border-gray-200 transition-all duration-300 z-30',
+        'fixed left-0 top-0 h-full bg-white border-r border-gray-200 transition-all duration-300 z-30 overflow-hidden',
         isSidebarOpen ? 'w-64' : 'w-16',
         isMobile && !isSidebarOpen ? '-translate-x-full' : '',
       ]"
     >
       <!-- Logo -->
       <div class="h-16 flex items-center justify-center border-b border-gray-200">
-        <h1 class="text-lg font-bold text-blue-600" :class="{ 'hidden': !isSidebarOpen && !isMobile }">
+        <h1 class="text-lg font-bold text-blue-600" :class="{ 'hidden': !isSidebarOpen }">
           SecPhils
         </h1>
       </div>
@@ -110,7 +110,7 @@ const switchPreviewRole = (newRole: UserRole) => {
           ]"
         >
           <i :class="item.icon" class="text-xl w-6 text-center" />
-          <span v-if="isSidebarOpen || isMobile" class="ml-3 text-sm font-medium">{{ item.name }}</span>
+          <span v-if="isSidebarOpen" class="ml-3 text-sm font-medium">{{ item.name }}</span>
         </RouterLink>
       </nav>
     </aside>
