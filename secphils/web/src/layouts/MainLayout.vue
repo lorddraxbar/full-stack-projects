@@ -108,6 +108,7 @@ const switchPreviewRole = (newRole: UserRole) => {
             isActive(item.path) ? 'bg-blue-50 text-blue-600 border-r-2 border-blue-600' : '',
             !isSidebarOpen && !isMobile ? 'justify-center' : '',
           ]"
+          @click="isMobile && (isSidebarOpen = false)"
         >
           <i :class="item.icon" class="text-xl w-6 text-center" />
           <span v-if="isSidebarOpen" class="ml-3 text-sm font-medium">{{ item.name }}</span>
