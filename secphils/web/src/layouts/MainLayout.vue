@@ -1,20 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import router from '../router'
-import { useRole, type UserRole } from '../composables/useRole'
+import { useRole } from '../composables/useRole'
 
-const { role, isPreview, setRole } = useRole()
+const { role } = useRole()
 
 const allNavItems = [
-  { name: 'Dashboard', path: '/dashboard', icon: 'fas fa-chart-bar', roles: ['CLIENT', 'PROVIDER', 'ADMIN'] },
-  { name: 'Projects', path: '/projects', icon: 'fas fa-folder', roles: ['CLIENT', 'PROVIDER', 'ADMIN'] },
-  { name: 'Tasks', path: '/tasks', icon: 'fas fa-check-square', roles: ['PROVIDER', 'ADMIN'] },
-  { name: 'Documents', path: '/documents', icon: 'fas fa-file-alt', roles: ['CLIENT', 'PROVIDER', 'ADMIN'] },
-  { name: 'Messages', path: '/messages', icon: 'fas fa-comment-dots', roles: ['CLIENT', 'PROVIDER', 'ADMIN'] },
-  { name: 'Announcements', path: '/announcements', icon: 'fas fa-bullhorn', roles: ['CLIENT', 'PROVIDER', 'ADMIN'] },
+  { name: 'Dashboard', path: '/dashboard', icon: 'fas fa-chart-bar', roles: ['CLIENT', 'USER', 'ADMIN'] },
+  { name: 'Projects', path: '/projects', icon: 'fas fa-folder', roles: ['CLIENT', 'USER', 'ADMIN'] },
+  { name: 'Tasks', path: '/tasks', icon: 'fas fa-check-square', roles: ['USER', 'ADMIN'] },
+  { name: 'Documents', path: '/documents', icon: 'fas fa-file-alt', roles: ['CLIENT', 'USER', 'ADMIN'] },
+  { name: 'Messages', path: '/messages', icon: 'fas fa-comment-dots', roles: ['CLIENT', 'USER', 'ADMIN'] },
+  { name: 'Announcements', path: '/announcements', icon: 'fas fa-bullhorn', roles: ['CLIENT', 'USER', 'ADMIN'] },
   { name: 'Reviews', path: '/reviews', icon: 'fas fa-star', roles: ['ADMIN'] },
-  { name: 'Settings', path: '/settings', icon: 'fas fa-cog', roles: ['CLIENT', 'PROVIDER', 'ADMIN'] },
+  { name: 'Settings', path: '/settings', icon: 'fas fa-cog', roles: ['CLIENT', 'USER', 'ADMIN'] },
   { name: 'Admin', path: '/admin', icon: 'fas fa-tools', roles: ['ADMIN'] },
 ]
 
@@ -56,21 +55,9 @@ const isActive = (path: string) => {
   return route.path === path || route.path.startsWith(path + '/')
 }
 
-const exitPreview = () => {
-  localStorage.removeItem('previewMode')
-  localStorage.removeItem('userName')
-  localStorage.removeItem('userRole')
-  router.push('/auth/login')
-}
-
 const roleLabel = computed(() =>
-  role.value === 'CLIENT' ? 'Client' : role.value === 'PROVIDER' ? 'Provider' : 'Admin'
+  role.value === 'CLIENT' ? 'Client' : role.value === 'USER' ? 'User' : 'Admin'
 )
-
-const switchPreviewRole = (newRole: UserRole) => {
-  setRole(newRole)
-  router.push('/dashboard')
-}
 </script>
 
 <template>
@@ -133,26 +120,6 @@ const switchPreviewRole = (newRole: UserRole) => {
 
         <!-- Right side -->
         <div class="flex items-center gap-4">
-          <!-- Preview role switcher -->
-          <div v-if="isPreview" class="flex items-center gap-2">
-            <span class="text-xs text-gray-500 hidden sm:block">Preview as</span>
-            <select
-              :value="role"
-              @change="switchPreviewRole(($event.target as HTMLSelectElement).value as UserRole)"
-              class="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="CLIENT">Client</option>
-              <option value="PROVIDER">Provider</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-            <button
-              @click="exitPreview"
-              class="px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
-            >
-              <i class="fas fa-times mr-1" /> Exit Preview
-            </button>
-          </div>
-
           <!-- Notification bell -->
           <button class="p-2 rounded-lg hover:bg-gray-100 transition-colors relative">
             <i class="fas fa-bell text-lg" />

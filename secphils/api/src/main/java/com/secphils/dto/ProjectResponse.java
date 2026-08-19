@@ -3,6 +3,7 @@ package com.secphils.dto;
 import com.secphils.entity.Project;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public record ProjectResponse(
@@ -23,6 +24,8 @@ public record ProjectResponse(
         String wasteMaterials,
         String manufacturingProcedure,
         String productionFlowchartUrl,
+        LocalDate dueDate,
+        Integer progress,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -36,6 +39,7 @@ public record ProjectResponse(
                 p.getName(), p.getScope(), p.getObjectives(), p.getDeliverables(),
                 p.getStatus(), p.getTotalCost(), p.getRawMaterials(), p.getProductionOutput(),
                 p.getWasteManagement(), p.getWasteMaterials(), p.getManufacturingProcedure(),
-                p.getProductionFlowchartUrl(), p.getCreatedAt(), p.getUpdatedAt());
+                p.getProductionFlowchartUrl(), p.getDueDate(), p.getProgress(),
+                p.getCreatedAt(), p.getUpdatedAt());
     }
 }

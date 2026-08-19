@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRole } from '@/composables/useRole'
 
-const { isClient, isProvider } = useRole()
+const { isClient, isUser } = useRole()
 
 const activeTab = ref('profile')
 
@@ -41,7 +41,7 @@ const inviteMember = () => {
   alert('Invitation sent. The team member will receive an email with an account setup link.')
 }
 
-// ---------- Provider: Communication Settings ----------
+// ---------- user: Communication Settings ----------
 const communication = ref({
   emailSignature: true,
   autoReply: true,
@@ -91,7 +91,7 @@ const tabs = computed(() => {
       { id: 'security', label: 'Security' },
     ]
   }
-  if (isProvider.value) {
+  if (isUser.value) {
     return [
       { id: 'profile', label: 'Profile' },
       { id: 'communication', label: 'Communication' },
@@ -108,12 +108,12 @@ const tabs = computed(() => {
 })
 
 const heading = computed(() =>
-  isClient.value ? 'Client Settings' : isProvider.value ? 'Provider Settings' : 'Admin Settings'
+  isClient.value ? 'Client Settings' : isUser.value ? 'User Settings' : 'Admin Settings'
 )
 const subheading = computed(() =>
   isClient.value
     ? 'Manage your profile, company information, and team.'
-    : isProvider.value
+    : isUser.value
       ? 'Manage your profile and communication preferences.'
       : 'Manage your personal account settings.'
 )
@@ -355,7 +355,7 @@ const formatKey = (key: string) =>
       </div>
     </div>
 
-    <!-- Communication Tab (provider only) -->
+    <!-- Communication Tab (user only) -->
     <div v-if="activeTab === 'communication'" class="bg-white rounded-lg shadow p-6">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Communication Settings</h2>
       <div class="space-y-4 max-w-xl">

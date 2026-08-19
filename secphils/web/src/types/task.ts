@@ -11,6 +11,7 @@ export interface Task {
   status: 'todo' | 'in-progress' | 'review' | 'done'
   priority: 'low' | 'medium' | 'high' | 'urgent'
   assignee: string
+  assigneeId: number | null
   dueDate: string
   projectId: number
   projectTitle: string

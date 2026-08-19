@@ -8,13 +8,6 @@ const password = ref('')
 const error = ref('')
 const loading = ref(false)
 
-const enterPreviewMode = () => {
-  localStorage.setItem('previewMode', 'true')
-  localStorage.setItem('userName', 'Preview User')
-  localStorage.setItem('userRole', 'ADMIN')
-  router.push('/dashboard')
-}
-
 const handleLogin = async () => {
   if (!email.value || !password.value) {
     error.value = 'Please enter email and password'
@@ -115,15 +108,6 @@ const handleLogin = async () => {
           Create one
         </RouterLink>
       </p>
-    </div>
-
-    <div class="mt-4">
-      <button
-        @click="enterPreviewMode"
-        class="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium border border-gray-300"
-      >
-        <i class="fas fa-eye mr-1"></i> Preview Mode — Explore all screens without login
-      </button>
     </div>
 
     <div class="mt-6">

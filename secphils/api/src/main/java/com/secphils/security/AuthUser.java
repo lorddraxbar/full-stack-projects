@@ -16,7 +16,7 @@ public record AuthUser(Long id, String email, String role) implements Serializab
         return "ADMIN".equals(role);
     }
 
-    public boolean isProviderOrAdmin() {
-        return "ADMIN".equals(role) || "PROVIDER".equals(role);
+    public boolean isUserOrAdmin() {
+        return "ADMIN".equals(role) || "USER".equals(role);
     }
 }

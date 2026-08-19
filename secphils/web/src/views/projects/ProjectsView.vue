@@ -8,27 +8,63 @@ import { Badge } from '@/components/ui/badge'
 import NewProjectWizard from '@/components/NewProjectWizard.vue'
 import type { WizardData } from '@/components/NewProjectWizard.vue'
 import { useRole } from '@/composables/useRole'
+import { useGetProjects, useCreateProject } from '@/services/api'
+import { projectStatusLabel, PROJECT_STATUS_COLORS, formatDate } from '@/lib/labels'
 
-const { isClient, isProvider, isAdmin } = useRole()
+const { isClient, isUser, isAdmin } = useRole()
 const router = useRouter()
 const searchQuery = ref('')
 const selectedStatus = ref('ALL')
 const showWizard = ref(false)
+const loading = ref(false)
+const loadError = ref('')
 
-const projects = ref([
-  { id: 1, name: 'Manufacturing Process Optimization', client: 'ABC Manufacturing', serviceType: 'Process Consulting', status: 'In Progress', progress: 65, dueDate: '2026-09-15', team: 4, assignee: 'John Doe', rep: 'Maria Santos' },
-  { id: 2, name: 'Energy Sector Compliance Audit', client: 'XYZ Energy Corp', serviceType: 'Compliance Audit', status: 'Planning', progress: 20, dueDate: '2026-10-01', team: 3, assignee: 'Bob Wilson', rep: 'R. Dela Cruz' },
-  { id: 3, name: 'Supply Chain Feasibility Study', client: 'Global Logistics Inc', serviceType: 'Feasibility Study', status: 'Completed', progress: 100, dueDate: '2026-08-01', team: 5, assignee: 'Jane Smith', rep: 'T. Reyes' },
-  { id: 4, name: 'Water Treatment Plant Design', client: 'Municipal Water Authority', serviceType: 'Engineering Design', status: 'In Progress', progress: 45, dueDate: '2026-11-30', team: 6, assignee: 'Jane Smith', rep: 'City Engineer R. Lim' },
-  { id: 5, name: 'Renewable Energy Assessment', client: 'Green Power Solutions', serviceType: 'Energy Assessment', status: 'On Hold', progress: 10, dueDate: '2026-12-15', team: 2, assignee: 'Unassigned', rep: 'K. Tan' },
-])
-
-const statusColors: Record<string, string> = {
-  'In Progress': 'bg-blue-100 text-blue-800',
-  'Planning': 'bg-yellow-100 text-yellow-800',
-  'Completed': 'bg-green-100 text-green-800',
-  'On Hold': 'bg-red-100 text-red-800',
+// Backend ProjectResponse -> display shape
+interface ProjectRow {
+  id: number
+  name: string
+  client: string
+  serviceType: string
+  status: string
+  progress: number
+  dueDate: string
+  rep: string
+  assignee: string
+  team: number
 }
+
+const projects = ref<ProjectRow[]>([])
+
+function mapProject(p: any): ProjectRow {
+  return {
+    id: p.id,
+    name: p.name,
+    client: p.companyName || '—',
+    serviceType: p.serviceName || '—',
+    status: projectStatusLabel(p.status),
+    progress: p.progress ?? 0,
+    dueDate: formatDate(p.dueDate),
+    rep: p.authorizedRepName || '—',
+    assignee: p.assigneeName || 'Unassigned',
+    team: p.teamSize ?? 0,
+  }
+}
+
+async function loadProjects() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const data = await useGetProjects()
+    const content = Array.isArray(data) ? data : data?.content ?? []
+    projects.value = content.map(mapProject)
+  } catch (e: any) {
+    loadError.value = e?.response?.data?.message || 'Failed to load projects'
+  } finally {
+    loading.value = false
+  }
+}
+
+const statusColors: Record<string, string> = PROJECT_STATUS_COLORS
 
 const heading = computed(() =>
   isClient.value ? 'My Projects' : 'All Projects'
@@ -61,17 +97,18 @@ const goToProject = (id: number) => {
   router.push(`/projects/${id}`)
 }
 
-const handleWizardSubmit = (data: WizardData) => {
-  console.log('Wizard submitted:', data)
-  // TODO: Call API to submit wizard
-  // useCreateProject(data).then(() => {
-  //   // Refresh projects list
-  // })
+const handleWizardSubmit = async (data: WizardData) => {
+  try {
+    await useCreateProject(data as unknown as Record<string, unknown>)
+    showWizard.value = false
+    await loadProjects()
+  } catch (e: any) {
+    loadError.value = e?.response?.data?.message || 'Failed to create project'
+  }
 }
 
 onMounted(() => {
-  // TODO: Fetch projects from API
-  // useGetProjects().then(data => { projects.value = data })
+  loadProjects()
 })
 </script>
 
@@ -103,10 +140,10 @@ onMounted(() => {
             class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="ALL">All Status</option>
+            <option value="Not Started">Not Started</option>
             <option value="In Progress">In Progress</option>
-            <option value="Planning">Planning</option>
-            <option value="Completed">Completed</option>
             <option value="On Hold">On Hold</option>
+            <option value="Completed">Completed</option>
           </select>
         </div>
       </CardContent>
@@ -138,7 +175,7 @@ onMounted(() => {
               <span v-if="isClient">
                 <i class="fas fa-user text-xs mr-1 text-gray-400" />Rep: {{ project.rep }}
               </span>
-              <span v-if="isProvider">
+              <span v-if="isUser">
                 <i class="fas fa-user text-xs mr-1 text-gray-400" />Assignee: {{ project.assignee }}
               </span>
               <span v-if="isAdmin">

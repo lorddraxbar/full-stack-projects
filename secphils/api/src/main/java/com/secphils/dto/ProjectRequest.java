@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record ProjectRequest(
         @NotNull Long companyId,
@@ -19,5 +20,7 @@ public record ProjectRequest(
         String wasteManagement,
         String wasteMaterials,
         String manufacturingProcedure,
-        String productionFlowchartUrl
+        String productionFlowchartUrl,
+        LocalDate dueDate,
+        Integer progress
 ) {}

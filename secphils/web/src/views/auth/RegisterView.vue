@@ -34,7 +34,9 @@ const handleRegister = async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fullName: fullName.value,
+        // Backend RegisterRequest expects firstName + lastName, not fullName.
+        firstName: fullName.value.trim().split(/\s+/)[0] || 'User',
+        lastName: fullName.value.trim().split(/\s+/).slice(1).join(' ') || 'User',
         email: email.value,
         password: password.value,
       }),
@@ -45,7 +47,18 @@ const handleRegister = async () => {
       throw new Error(data.message || 'Registration failed')
     }
 
-    const data = await response.json()
+    // Register returns a UserResponse (no tokens) — auto-login to get the JWT pair.
+    const loginRes = await fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.value, password: password.value }),
+    })
+    if (!loginRes.ok) {
+      const data = await loginRes.json()
+      throw new Error(data.message || 'Account created, but auto-login failed. Please sign in.')
+    }
+
+    const data = await loginRes.json()
     localStorage.setItem('accessToken', data.accessToken)
     localStorage.setItem('refreshToken', data.refreshToken)
     localStorage.setItem('userRole', data.user?.role || 'CLIENT')

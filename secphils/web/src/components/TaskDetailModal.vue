@@ -16,10 +16,16 @@ interface ProjectOption {
   name: string
 }
 
+interface UserOption {
+  id: number
+  name: string
+}
+
 const props = defineProps<{
   open: boolean
   task?: Task | null
   projects?: ProjectOption[]
+  users?: UserOption[]
 }>()
 
 const emit = defineEmits<{
@@ -40,6 +46,7 @@ const newTask = (): Task => ({
   status: 'todo',
   priority: 'medium',
   assignee: '',
+  assigneeId: null,
   dueDate: '',
   projectId: props.projects?.[0]?.id ?? 0,
   projectTitle: props.projects?.[0]?.name ?? '',
@@ -77,6 +84,14 @@ const onProjectChange = (value: AcceptableValue) => {
   }
 }
 
+const onAssigneeChange = (value: AcceptableValue) => {
+  if (!editingTask.value || value === null || value === undefined) return
+  const userId = Number(value)
+  const user = props.users?.find(u => u.id === userId)
+  editingTask.value.assigneeId = userId
+  editingTask.value.assignee = user?.name ?? ''
+}
+
 const addSubtask = () => {
   if (!editingTask.value) return
   const newSubtask: Subtask = {
@@ -106,7 +121,7 @@ const handleSave = () => {
     saveError.value = 'Task title is required.'
     return
   }
-  if (!editingTask.value.assignee.trim()) {
+  if (!editingTask.value.assigneeId) {
     saveError.value = 'Assignee is required.'
     return
   }
@@ -230,11 +245,18 @@ const totalSubtasks = (task: Task) => {
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label for="assignee">Assignee *</Label>
-            <Input
-              id="assignee"
-              v-model="editingTask.assignee"
-              placeholder="Assigned to"
-            />
+            <Select :model-value="editingTask.assigneeId ? String(editingTask.assigneeId) : ''" @update:model-value="onAssigneeChange">
+              <SelectTrigger>
+                <SelectValue placeholder="Select an assignee" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem v-for="user in users" :key="user.id" :value="String(user.id)">
+                    {{ user.name }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
 
           <div class="space-y-2">

@@ -97,17 +97,16 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
-  const token = localStorage.getItem('token')
+  const token = localStorage.getItem('accessToken')
   const userRole = localStorage.getItem('userRole')
-  const isPreview = localStorage.getItem('previewMode') === 'true'
 
-  if (to.name === 'MarketingLanding' && (token || isPreview)) {
+  if (to.name === 'MarketingLanding' && token) {
     next({ name: 'Dashboard' })
-  } else if (to.meta.requiresAuth && !token && !isPreview) {
+  } else if (to.meta.requiresAuth && !token) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
-  } else if (to.meta.guest && token && !isPreview) {
+  } else if (to.meta.guest && token) {
     next({ name: 'Dashboard' })
-  } else if (to.meta.requiresAdmin && userRole !== 'ADMIN' && !isPreview) {
+  } else if (to.meta.requiresAdmin && userRole !== 'ADMIN') {
     next({ name: 'Dashboard' })
   } else {
     next()

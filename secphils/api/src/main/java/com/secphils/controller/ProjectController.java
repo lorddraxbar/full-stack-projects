@@ -130,5 +130,7 @@ public class ProjectController {
         project.setWasteMaterials(req.wasteMaterials());
         project.setManufacturingProcedure(req.manufacturingProcedure());
         project.setProductionFlowchartUrl(req.productionFlowchartUrl());
+        project.setDueDate(req.dueDate());
+        project.setProgress(req.progress() != null ? req.progress() : 0);
     }
 }

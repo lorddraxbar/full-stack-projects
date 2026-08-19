@@ -71,7 +71,7 @@ public class AuthController {
         String access = jwtService.generate(user.getId(), user.getEmail(), user.getRole(), JwtService.TokenType.ACCESS);
         String refresh = jwtService.generate(user.getId(), user.getEmail(), user.getRole(), JwtService.TokenType.REFRESH);
         auditService.audit(null, "USER_LOGIN", "User", user.getId(), "Email: " + user.getEmail(), http);
-        return ResponseEntity.ok(TokenResponse.of(access, refresh, 900));
+        return ResponseEntity.ok(TokenResponse.of(access, refresh, 900, UserResponse.from(user)));
     }
 
     @PostMapping("/refresh")
@@ -92,7 +92,7 @@ public class AuthController {
                 .orElseThrow(() -> ApiException.badRequest("User no longer active"));
         String access = jwtService.generate(user.getId(), user.getEmail(), user.getRole(), JwtService.TokenType.ACCESS);
         String newRefresh = jwtService.generate(user.getId(), user.getEmail(), user.getRole(), JwtService.TokenType.REFRESH);
-        return ResponseEntity.ok(TokenResponse.of(access, newRefresh, 900));
+        return ResponseEntity.ok(TokenResponse.of(access, newRefresh, 900, UserResponse.from(user)));
     }
 
     @PostMapping("/logout")
@@ -138,7 +138,7 @@ public class AuthController {
         auditService.audit(null, "USER_SSO_LOGIN", "User", user.getId(), "Provider: " + provider, http);
         String access = jwtService.generate(user.getId(), user.getEmail(), user.getRole(), JwtService.TokenType.ACCESS);
         String refresh = jwtService.generate(user.getId(), user.getEmail(), user.getRole(), JwtService.TokenType.REFRESH);
-        return ResponseEntity.ok(TokenResponse.of(access, refresh, 900));
+        return ResponseEntity.ok(TokenResponse.of(access, refresh, 900, UserResponse.from(user)));
     }
 
     @PostMapping("/2fa/enable")

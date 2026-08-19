@@ -1,82 +1,55 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import TaskDetailModal from '@/components/TaskDetailModal.vue'
 import { useProjectsStore } from '@/stores/projects'
+import { useGetTasks, useCreateTask, useUpdateTask, useDeleteTask, useGetUsers } from '@/services/api'
 import type { Task } from '@/types/task'
 import { STATUS_LABELS, PRIORITY_LABELS } from '@/types/task'
+import { formatDate } from '@/lib/labels'
 
 const projectsStore = useProjectsStore()
 
-const tasks = ref<Task[]>([
-  {
-    id: 1,
-    title: 'Review process flow diagrams',
-    description: 'Validate the optimized process flow diagrams against the current production baseline before sign-off.',
-    status: 'todo',
-    priority: 'high',
-    assignee: 'Jay Barroga',
-    dueDate: '2026-08-20',
-    projectId: 1,
-    projectTitle: 'Manufacturing Process Optimization',
-    subtasks: [
-      { id: 1, title: 'Collect latest flow diagrams', completed: true },
-      { id: 2, title: 'Cross-check with production data', completed: false },
-    ],
-  },
-  {
-    id: 2,
-    title: 'Submit compliance documentation',
-    description: 'Compile and submit the energy sector compliance package to the regulatory authority.',
-    status: 'in-progress',
-    priority: 'medium',
-    assignee: 'Miguel Santos',
-    dueDate: '2026-08-25',
-    projectId: 2,
-    projectTitle: 'Energy Sector Compliance Audit',
-    subtasks: [],
-  },
-  {
-    id: 3,
-    title: 'Approve final report',
-    description: 'Final review and approval of the supply chain feasibility study report.',
-    status: 'review',
-    priority: 'low',
-    assignee: 'Ana Reyes',
-    dueDate: '2026-08-18',
-    projectId: 3,
-    projectTitle: 'Supply Chain Feasibility Study',
-    subtasks: [],
-  },
-  {
-    id: 4,
-    title: 'Conduct site inspection',
-    description: 'On-site inspection of the water treatment plant design implementation.',
-    status: 'done',
-    priority: 'high',
-    assignee: 'Jay Barroga',
-    dueDate: '2026-08-22',
-    projectId: 1,
-    projectTitle: 'Manufacturing Process Optimization',
-    subtasks: [
-      { id: 1, title: 'Prepare inspection checklist', completed: true },
-      { id: 2, title: 'Photograph key installations', completed: true },
-      { id: 3, title: 'File inspection report', completed: true },
-    ],
-  },
-  {
-    id: 5,
-    title: 'Prepare renewable energy proposal',
-    description: 'Draft the renewable energy assessment proposal for client review.',
-    status: 'todo',
-    priority: 'medium',
-    assignee: 'Liza Cruz',
-    dueDate: '2026-08-28',
-    projectId: 2,
-    projectTitle: 'Energy Sector Compliance Audit',
-    subtasks: [],
-  },
-])
+// ---- DB code <-> frontend key mapping ----
+const STATUS_TO_KEY: Record<string, Task['status']> = {
+  TO_DO: 'todo', IN_PROGRESS: 'in-progress', IN_REVIEW: 'review', COMPLETED: 'done',
+}
+const KEY_TO_STATUS: Record<string, string> = {
+  todo: 'TO_DO', 'in-progress': 'IN_PROGRESS', review: 'IN_REVIEW', done: 'COMPLETED',
+}
+const PRIORITY_TO_KEY: Record<string, Task['priority']> = {
+  HIGH: 'high', MEDIUM: 'medium', LOW: 'low', URGENT: 'urgent',
+}
+const KEY_TO_PRIORITY: Record<string, string> = {
+  low: 'LOW', medium: 'MEDIUM', high: 'HIGH', urgent: 'URGENT',
+}
+
+const projectName = (id: number) =>
+  projectsStore.projects.find(p => p.id === id)?.name ?? `Project #${id}`
+
+const mapTask = (t: any): Task => ({
+  id: t.id,
+  title: t.title,
+  description: t.description ?? '',
+  status: STATUS_TO_KEY[t.status] ?? 'todo',
+  priority: PRIORITY_TO_KEY[t.priority] ?? 'medium',
+  assignee: t.assigneeName ?? 'Unassigned',
+  assigneeId: t.assigneeId ?? null,
+  dueDate: t.dueDate ?? '',
+  projectId: t.projectId,
+  projectTitle: projectName(t.projectId),
+  subtasks: [],
+})
+
+// ---- State ----
+const tasks = ref<Task[]>([])
+const loading = ref(false)
+const users = ref<{ id: number; name: string }[]>([])
+const filterStatus = ref('ALL')
+const filterPriority = ref('ALL')
+const filterProject = ref('ALL')
+const modalOpen = ref(false)
+const editingTask = ref<Task | null>(null)
 
 const statusColors: Record<string, string> = {
   'todo': 'bg-yellow-100 text-yellow-800',
@@ -92,9 +65,6 @@ const priorityColors: Record<string, string> = {
   'urgent': 'bg-red-600 text-white',
 }
 
-const filterStatus = ref('ALL')
-const filterPriority = ref('ALL')
-const filterProject = ref('ALL')
 const filteredTasks = computed(() =>
   tasks.value.filter(t =>
     (filterStatus.value === 'ALL' || t.status === filterStatus.value) &&
@@ -103,10 +73,36 @@ const filteredTasks = computed(() =>
   )
 )
 
-// Modal state
-const modalOpen = ref(false)
-const editingTask = ref<Task | null>(null)
+// ---- Data loading ----
+const loadTasks = async () => {
+  loading.value = true
+  try {
+    const data = await useGetTasks()
+    tasks.value = (data as any[]).map(mapTask)
+  } catch (e) {
+    console.error('Failed to load tasks', e)
+  } finally {
+    loading.value = false
+  }
+}
 
+const loadUsers = async () => {
+  try {
+    const data = await useGetUsers()
+    users.value = (data as any[])
+      .filter(u => u.isActive !== false)
+      .map(u => ({ id: u.id, name: u.fullName }))
+  } catch (e) {
+    console.error('Failed to load users', e)
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([projectsStore.loadProjects(), loadUsers()])
+  await loadTasks()
+})
+
+// ---- Modal ----
 const openCreate = () => {
   editingTask.value = null
   modalOpen.value = true
@@ -117,23 +113,56 @@ const openEdit = (task: Task) => {
   modalOpen.value = true
 }
 
-const handleSave = (task: Task) => {
-  const index = tasks.value.findIndex(t => t.id === task.id)
-  if (index !== -1) {
-    tasks.value[index] = task
-  } else {
-    tasks.value.push(task)
+const buildPayload = (task: Task) => ({
+  projectId: task.projectId,
+  assigneeId: task.assigneeId,
+  title: task.title,
+  description: task.description,
+  status: KEY_TO_STATUS[task.status],
+  priority: KEY_TO_PRIORITY[task.priority],
+  dueDate: task.dueDate,
+})
+
+const handleSave = async (task: Task) => {
+  const payload = buildPayload(task)
+  try {
+    if (task.id && tasks.value.some(t => t.id === task.id)) {
+      const updated = await useUpdateTask(task.id, payload)
+      const idx = tasks.value.findIndex(t => t.id === task.id)
+      if (idx !== -1) tasks.value[idx] = mapTask(updated)
+    } else {
+      const created = await useCreateTask(payload)
+      tasks.value.push(mapTask(created))
+    }
+  } catch (e) {
+    console.error('Failed to save task', e)
   }
 }
 
-const handleDelete = (id: number) => {
-  if (confirm('Delete this task? This cannot be undone.')) {
+const handleDelete = async (id: number) => {
+  if (!confirm('Delete this task? This cannot be undone.')) return
+  try {
+    await useDeleteTask(id)
     tasks.value = tasks.value.filter(t => t.id !== id)
+  } catch (e) {
+    console.error('Failed to delete task', e)
   }
 }
 
-const toggleComplete = (task: Task) => {
-  task.status = task.status === 'done' ? 'todo' : 'done'
+const toggleComplete = async (task: Task) => {
+  const newStatus: Task['status'] = task.status === 'done' ? 'todo' : 'done'
+  task.status = newStatus
+  try {
+    const updated = await useUpdateTask(task.id, {
+      ...buildPayload(task),
+      status: KEY_TO_STATUS[newStatus],
+    })
+    const idx = tasks.value.findIndex(t => t.id === task.id)
+    if (idx !== -1) tasks.value[idx] = mapTask(updated)
+  } catch (e) {
+    console.error('Failed to update task status', e)
+    task.status = newStatus === 'done' ? 'todo' : 'done'
+  }
 }
 
 const subtaskProgress = (task: Task) => {
@@ -233,13 +262,13 @@ const subtaskProgress = (task: Task) => {
             </div>
           </div>
           <div class="ml-7 text-sm text-gray-500 mt-2">
-            Due: {{ task.dueDate }}
+            Due: {{ task.dueDate ? formatDate(task.dueDate) : '—' }}
           </div>
         </div>
       </div>
 
       <div v-if="filteredTasks.length === 0" class="p-12 text-center">
-        <p class="text-gray-600">No tasks found.</p>
+        <p class="text-gray-600">{{ loading ? 'Loading tasks…' : 'No tasks found.' }}</p>
       </div>
     </div>
 
@@ -248,6 +277,7 @@ const subtaskProgress = (task: Task) => {
       v-model:open="modalOpen"
       :task="editingTask"
       :projects="projectsStore.projects"
+      :users="users"
       @save="handleSave"
       @delete="handleDelete"
     />

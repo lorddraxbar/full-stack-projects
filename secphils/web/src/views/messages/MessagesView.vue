@@ -1,35 +1,116 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import {
+  useGetMe, useGetProjects, useGetMessages, useSendMessage,
+} from '@/services/api'
+import { formatDateTime, timeAgo } from '@/lib/labels'
 
-const conversations = ref([
-  { id: 1, project: 'Manufacturing Process Optimization', lastMessage: 'Please review the updated process flow diagrams', lastMessageBy: 'John Doe', lastMessageTime: '10:30 AM', unread: 3 },
-  { id: 2, project: 'Energy Sector Compliance Audit', lastMessage: 'Compliance documentation has been submitted', lastMessageBy: 'Jane Smith', lastMessageTime: 'Yesterday', unread: 0 },
-  { id: 3, project: 'Supply Chain Feasibility Study', lastMessage: 'Final report approved by client', lastMessageBy: 'Bob Wilson', lastMessageTime: 'Aug 12', unread: 1 },
-])
+interface Conversation {
+  id: number
+  project: string
+  lastMessage: string
+  lastMessageBy: string
+  lastMessageTime: string
+  messageCount: number
+}
 
-const messages = ref([
-  { id: 1, sender: 'John Doe', senderAvatar: 'JD', content: 'Hi team, I have updated the process flow diagrams. Please review and provide feedback.', timestamp: '10:15 AM', isOwn: false },
-  { id: 2, sender: 'Jane Smith', senderAvatar: 'JS', content: 'Thanks John. I will review them this afternoon.', timestamp: '10:20 AM', isOwn: false },
-  { id: 3, sender: 'You', senderAvatar: 'YO', content: 'Great, let me know if you need any clarification on the methodology.', timestamp: '10:25 AM', isOwn: true },
-  { id: 4, sender: 'John Doe', senderAvatar: 'JD', content: 'Please review the updated process flow diagrams', timestamp: '10:30 AM', isOwn: false },
-])
-
+const me = ref<{ id: number; fullName: string } | null>(null)
+const conversations = ref<Conversation[]>([])
+const selectedId = ref<number | null>(null)
+const messages = ref<any[]>([])
+const loading = ref(true)
+const loadError = ref('')
 const newMessage = ref('')
-const selectedConversation = ref(conversations.value[0])
+const sending = ref(false)
+const sendError = ref('')
 
-const sendMessage = () => {
-  if (newMessage.value.trim()) {
-    messages.value.push({
-      id: messages.value.length + 1,
-      sender: 'You',
-      senderAvatar: 'YO',
-      content: newMessage.value,
-      timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-      isOwn: true,
-    })
-    newMessage.value = ''
+const selectedConversation = computed(() =>
+  conversations.value.find(c => c.id === selectedId.value) || null
+)
+
+function initials(name: string): string {
+  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+}
+
+function isOwn(msg: any): boolean {
+  return me.value != null && msg.senderId === me.value.id
+}
+
+async function loadConversations() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const meRes = await useGetMe()
+    me.value = meRes.user ?? null
+
+    const page = await useGetProjects()
+    const projects = Array.isArray(page) ? page : (page?.content ?? [])
+
+    const convs: Conversation[] = []
+    for (const p of projects) {
+      try {
+        const msgs = await useGetMessages(p.id)
+        const list = Array.isArray(msgs) ? msgs : []
+        const last = list[list.length - 1]
+        convs.push({
+          id: p.id,
+          project: p.name,
+          lastMessage: last ? last.body : 'No messages yet',
+          lastMessageBy: last ? (last.senderName || '—') : '',
+          lastMessageTime: last ? timeAgo(last.createdAt) : '',
+          messageCount: list.length,
+        })
+      } catch {
+        convs.push({
+          id: p.id,
+          project: p.name,
+          lastMessage: 'No messages yet',
+          lastMessageBy: '',
+          lastMessageTime: '',
+          messageCount: 0,
+        })
+      }
+    }
+    conversations.value = convs
+    if (convs.length > 0 && selectedId.value == null) {
+      await selectConversation(convs[0].id)
+    }
+  } catch (err: any) {
+    loadError.value = err?.response?.data?.message || err?.message || 'Failed to load conversations'
+  } finally {
+    loading.value = false
   }
 }
+
+async function selectConversation(id: number) {
+  selectedId.value = id
+  sendError.value = ''
+  try {
+    const msgs = await useGetMessages(id)
+    messages.value = Array.isArray(msgs) ? msgs : []
+  } catch (err: any) {
+    loadError.value = err?.response?.data?.message || 'Failed to load messages'
+    messages.value = []
+  }
+}
+
+async function sendMessage() {
+  if (!newMessage.value.trim() || selectedId.value == null || sending.value) return
+  sending.value = true
+  sendError.value = ''
+  try {
+    await useSendMessage(selectedId.value, newMessage.value.trim())
+    newMessage.value = ''
+    await selectConversation(selectedId.value)
+    await loadConversations()
+  } catch (err: any) {
+    sendError.value = err?.response?.data?.message || 'Failed to send message'
+  } finally {
+    sending.value = false
+  }
+}
+
+onMounted(loadConversations)
 </script>
 
 <template>
@@ -39,34 +120,46 @@ const sendMessage = () => {
       <p class="text-gray-600 mt-1">Project conversations with team members</p>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-12rem)]">
+    <div v-if="loading" class="flex items-center justify-center py-20">
+      <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+    </div>
+
+    <div v-else-if="loadError" class="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+      {{ loadError }}
+    </div>
+
+    <div v-else-if="conversations.length === 0" class="bg-white rounded-lg shadow p-10 text-center text-gray-500">
+      You are not part of any projects yet. Once a project is assigned to you, conversations will appear here.
+    </div>
+
+    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-12rem)]">
       <!-- Conversations List -->
-      <div class="bg-white rounded-lg shadow overflow-hidden">
+      <div class="bg-white rounded-lg shadow overflow-hidden flex flex-col">
         <div class="p-4 border-b border-gray-200">
           <h2 class="font-semibold text-gray-900">Conversations</h2>
         </div>
-        <div class="divide-y divide-gray-200 overflow-y-auto">
+        <div class="divide-y divide-gray-200 overflow-y-auto flex-1">
           <div
             v-for="conv in conversations"
             :key="conv.id"
-            @click="selectedConversation = conv"
+            @click="selectConversation(conv.id)"
             :class="[
               'p-4 cursor-pointer hover:bg-gray-50 transition-colors',
-              selectedConversation?.id === conv.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+              selectedId === conv.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
             ]"
           >
             <div class="flex items-start justify-between mb-1">
               <h3 class="font-medium text-gray-900 text-sm">{{ conv.project }}</h3>
-              <span class="text-xs text-gray-500">{{ conv.lastMessageTime }}</span>
+              <span class="text-xs text-gray-500 whitespace-nowrap ml-2">{{ conv.lastMessageTime }}</span>
             </div>
             <p class="text-sm text-gray-600 truncate">{{ conv.lastMessage }}</p>
             <div class="flex items-center justify-between mt-2">
               <span class="text-xs text-gray-500">{{ conv.lastMessageBy }}</span>
-              <span
-                v-if="conv.unread > 0"
-                class="px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full"
-              >
-                {{ conv.unread }}
+              <span v-if="conv.messageCount > 0" class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                {{ conv.messageCount }}
               </span>
             </div>
           </div>
@@ -82,27 +175,31 @@ const sendMessage = () => {
 
         <!-- Messages -->
         <div class="flex-1 overflow-y-auto p-4 space-y-4">
+          <div v-if="messages.length === 0" class="text-sm text-gray-500">
+            No messages in this conversation yet.
+          </div>
           <div
             v-for="msg in messages"
             :key="msg.id"
             :class="[
               'flex gap-3',
-              msg.isOwn ? 'flex-row-reverse' : ''
+              isOwn(msg) ? 'flex-row-reverse' : ''
             ]"
           >
             <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
-              {{ msg.senderAvatar }}
+              {{ initials(msg.senderName || '?') }}
             </div>
             <div :class="[
               'max-w-[70%] rounded-lg p-3',
-              msg.isOwn ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'
+              isOwn(msg) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'
             ]">
-              <p class="text-sm">{{ msg.content }}</p>
+              <p class="text-sm font-medium mb-0.5">{{ msg.senderName }}</p>
+              <p class="text-sm">{{ msg.body }}</p>
               <p :class="[
                 'text-xs mt-1',
-                msg.isOwn ? 'text-blue-100' : 'text-gray-500'
+                isOwn(msg) ? 'text-blue-100' : 'text-gray-500'
               ]">
-                {{ msg.timestamp }}
+                {{ formatDateTime(msg.createdAt) }}
               </p>
             </div>
           </div>
@@ -110,6 +207,7 @@ const sendMessage = () => {
 
         <!-- Message Input -->
         <div class="p-4 border-t border-gray-200">
+          <p v-if="sendError" class="text-xs text-red-600 mb-2">{{ sendError }}</p>
           <div class="flex gap-2">
             <input
               v-model="newMessage"
@@ -120,7 +218,8 @@ const sendMessage = () => {
             />
             <button
               @click="sendMessage"
-              class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              :disabled="sending"
+              class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
             >
               Send
             </button>

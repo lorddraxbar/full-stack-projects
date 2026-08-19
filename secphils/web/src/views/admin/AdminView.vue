@@ -95,8 +95,8 @@ const toggleStaffStatus = (m: (typeof staffMembers.value)[0]) => {
 
 // ---------- Company Settings: Role & Permission Management ----------
 const roles = ref([
-  { id: 1, name: 'Project Manager', userType: 'PROVIDER', description: 'Manages assigned projects end-to-end', permissions: ['viewOwnProjects', 'uploadDocuments', 'manageAnnouncements'] },
-  { id: 2, name: 'Engineer', userType: 'PROVIDER', description: 'Executes technical work on projects', permissions: ['viewOwnProjects', 'uploadDocuments'] },
+  { id: 1, name: 'Project Manager', userType: 'USER', description: 'Manages assigned projects end-to-end', permissions: ['viewOwnProjects', 'uploadDocuments', 'manageAnnouncements'] },
+  { id: 2, name: 'Engineer', userType: 'USER', description: 'Executes technical work on projects', permissions: ['viewOwnProjects', 'uploadDocuments'] },
   { id: 3, name: 'Client Admin', userType: 'CLIENT', description: 'Manages client company profile and team', permissions: ['viewCompanyProjects', 'inviteTeam', 'uploadDocuments'] },
   { id: 4, name: 'Administrator', userType: 'ADMIN', description: 'Full system access', permissions: ['all'] },
 ])
@@ -104,7 +104,7 @@ const permissionOptions = [
   'viewOwnProjects', 'viewCompanyProjects', 'uploadDocuments', 'manageAnnouncements',
   'inviteTeam', 'manageProjects', 'manageUsers', 'all',
 ]
-const newRoleForm = ref({ name: '', userType: 'PROVIDER', description: '', permissions: ['viewOwnProjects'] as string[] })
+const newRoleForm = ref({ name: '', userType: 'USER', description: '', permissions: ['viewOwnProjects'] as string[] })
 const createRole = () => {
   if (!newRoleForm.value.name.trim()) return
   roles.value.push({
@@ -114,7 +114,7 @@ const createRole = () => {
     description: newRoleForm.value.description,
     permissions: [...newRoleForm.value.permissions],
   })
-  newRoleForm.value = { name: '', userType: 'PROVIDER', description: '', permissions: ['viewOwnProjects'] }
+  newRoleForm.value = { name: '', userType: 'USER', description: '', permissions: ['viewOwnProjects'] }
   alert('Role created.')
 }
 const toggleRolePermission = (role: { permissions: string[] }, perm: string) => {
@@ -521,7 +521,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
         <div class="p-6 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="text-lg font-semibold text-gray-900">Team Management</h2>
-            <p class="text-sm text-gray-600 mt-1">Internal provider/staff accounts, roles, and project assignments.</p>
+            <p class="text-sm text-gray-600 mt-1">Internal user/staff accounts, roles, and project assignments.</p>
           </div>
         </div>
         <div class="overflow-x-auto">
@@ -634,7 +634,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               <label class="block text-sm font-medium text-gray-700 mb-1">User Type</label>
               <select v-model="newRoleForm.userType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option>CLIENT</option>
-                <option>PROVIDER</option>
+                <option>USER</option>
                 <option>ADMIN</option>
               </select>
             </div>
