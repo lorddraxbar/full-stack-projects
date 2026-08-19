@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser } from '../../services/api'
+import { ref, computed, onMounted } from 'vue'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser } from '../../services/api'
+import { useAuthStore } from '../../stores/auth'
+
+const authStore = useAuthStore()
+const currentUserId = computed(() => {
+  const stored = localStorage.getItem('userId')
+  if (stored) return Number(stored)
+  return (authStore.user as any)?.id ?? null
+})
 
 const activeTab = ref('dashboard')
 
@@ -29,6 +37,7 @@ interface PortalUser {
   fullName: string
   role: string
   isActive: boolean
+  deactivatedAt: string | null
   lastLogin: string | null
 }
 
@@ -76,16 +85,57 @@ const addUser = async () => {
   }
 }
 
-const toggleUserStatus = async (user: PortalUser) => {
-  if (user.isActive) {
-    try {
-      await useDeactivateUser(user.id)
-      await loadUsers()
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to deactivate user')
-    }
-  } else {
-    alert('Re-activating users is not supported yet. Contact the system administrator.')
+const deactivateUser = async (user: PortalUser) => {
+  try {
+    await useDeactivateUser(user.id)
+    await loadUsers()
+  } catch (err: any) {
+    alert(err.response?.data?.message || 'Failed to deactivate user')
+  }
+}
+
+const activateUser = async (user: PortalUser) => {
+  try {
+    await useActivateUser(user.id)
+    await loadUsers()
+  } catch (err: any) {
+    alert(err.response?.data?.message || 'Failed to activate user')
+  }
+}
+
+// ---------- Hard delete ----------
+const hardDeleteTarget = ref<PortalUser | null>(null)
+const hardDeletePassword = ref('')
+const hardDeleteBusy = ref(false)
+const hardDeleteError = ref('')
+
+const daysDeactivated = (user: PortalUser) => {
+  if (!user.deactivatedAt) return 0
+  return Math.floor((Date.now() - new Date(user.deactivatedAt).getTime()) / 86400000)
+}
+
+const isEligibleForHardDelete = (user: PortalUser) =>
+  !user.isActive && daysDeactivated(user) >= 7
+
+const openHardDelete = (user: PortalUser) => {
+  hardDeleteTarget.value = user
+  hardDeletePassword.value = ''
+  hardDeleteError.value = ''
+}
+
+const confirmHardDelete = async () => {
+  const user = hardDeleteTarget.value
+  if (!user) return
+  hardDeleteBusy.value = true
+  hardDeleteError.value = ''
+  try {
+    await useHardDeleteUser(user.id, hardDeletePassword.value)
+    hardDeleteTarget.value = null
+    await loadUsers()
+  } catch (err: any) {
+    hardDeleteError.value = err.response?.data?.message || 'Failed to delete user'
+  } finally {
+    hardDeleteBusy.value = false
   }
 }
 
@@ -460,14 +510,30 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ user.lastLogin ? user.lastLogin.replace('T', ' ').slice(0, 16) : 'Never' }}</td>
                 <td class="px-6 py-4">
-                  <button
-                    v-if="user.isActive"
-                    @click="toggleUserStatus(user)"
-                    class="text-red-600 hover:text-red-700 text-sm font-medium"
-                  >
-                    Deactivate
-                  </button>
-                  <span v-else class="text-sm text-gray-400">—</span>
+                  <div class="flex items-center gap-3">
+                    <button
+                      v-if="user.isActive && user.id !== currentUserId"
+                      @click="deactivateUser(user)"
+                      class="text-red-600 hover:text-red-700 text-sm font-medium"
+                    >
+                      Deactivate
+                    </button>
+                    <button
+                      v-if="!user.isActive && user.id !== currentUserId"
+                      @click="activateUser(user)"
+                      class="text-green-600 hover:text-green-700 text-sm font-medium"
+                    >
+                      Activate
+                    </button>
+                    <button
+                      v-if="user.id !== currentUserId"
+                      @click="openHardDelete(user)"
+                      class="text-red-700 hover:text-red-800 text-sm font-medium underline decoration-dotted"
+                    >
+                      Delete
+                    </button>
+                    <span v-if="user.id === currentUserId" class="text-xs text-gray-400">(you)</span>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -1211,6 +1277,53 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Hard delete confirmation modal -->
+    <div v-if="hardDeleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold text-gray-900">
+          <i class="fas fa-triangle-exclamation text-red-600 mr-2" />Delete {{ hardDeleteTarget.fullName }} permanently?
+        </h3>
+        <p class="mt-2 text-sm text-gray-600">
+          This removes <strong>{{ hardDeleteTarget.email }}</strong> from the database. This action cannot be undone.
+        </p>
+        <div v-if="hardDeleteTarget.isActive" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          This user is still <strong>active</strong> — no 7-day deactivation period applies. Enter your admin password to delete immediately.
+        </div>
+        <div v-else-if="!isEligibleForHardDelete(hardDeleteTarget)" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          Deactivated only {{ daysDeactivated(hardDeleteTarget) }} day(s) ago — the 7-day window has not elapsed. Enter your admin password to delete immediately.
+        </div>
+        <div v-else class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          Deactivated {{ daysDeactivated(hardDeleteTarget) }} days ago — eligible for permanent deletion.
+        </div>
+        <div class="mt-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Your admin password</label>
+          <input
+            v-model="hardDeletePassword"
+            type="password"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            placeholder="Confirm with your password"
+            @keyup.enter="confirmHardDelete"
+          />
+          <div v-if="hardDeleteError" class="mt-2 text-sm text-red-600">{{ hardDeleteError }}</div>
+        </div>
+        <div class="mt-5 flex justify-end gap-3">
+          <button
+            @click="hardDeleteTarget = null"
+            class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            @click="confirmHardDelete"
+            :disabled="hardDeleteBusy || !hardDeletePassword"
+            class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ hardDeleteBusy ? 'Deleting…' : 'Delete Permanently' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>

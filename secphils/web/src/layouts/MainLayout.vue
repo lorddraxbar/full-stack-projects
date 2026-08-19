@@ -73,6 +73,7 @@ const logout = () => {
   localStorage.removeItem('refreshToken')
   localStorage.removeItem('userRole')
   localStorage.removeItem('userName')
+  localStorage.removeItem('userId')
   router.push('/auth/login')
 }
 </script>

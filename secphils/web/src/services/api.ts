@@ -23,6 +23,7 @@ api.interceptors.response.use(
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('userRole')
       localStorage.removeItem('userName')
+      localStorage.removeItem('userId')
       if (!window.location.pathname.startsWith('/auth/login')) {
         window.location.href = '/auth/login'
       }
@@ -68,6 +69,15 @@ export async function useUpdateUser(id: number, data: Record<string, unknown>) {
 export async function useDeactivateUser(id: number) {
   const response = await api.delete(`/users/${id}`)
   return response.data
+}
+
+export async function useActivateUser(id: number) {
+  const response = await api.post(`/users/${id}/activate`)
+  return response.data
+}
+
+export async function useHardDeleteUser(id: number, password: string) {
+  await api.delete(`/users/${id}/hard`, { data: { password } })
 }
 
 // ---------- Projects ----------

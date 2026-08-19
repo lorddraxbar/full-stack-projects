@@ -34,6 +34,9 @@ public class User {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "deactivated_at")
+    private LocalDateTime deactivatedAt;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

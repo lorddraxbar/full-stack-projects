@@ -2,6 +2,7 @@ package com.secphils.controller;
 
 import com.secphils.common.AuditService;
 import com.secphils.common.ApiException;
+import com.secphils.dto.HardDeleteUserRequest;
 import com.secphils.dto.UpdateUserRequest;
 import com.secphils.dto.UserResponse;
 import com.secphils.entity.User;
@@ -133,10 +134,65 @@ public class UserController {
     @Transactional
     public ResponseEntity<Void> deactivate(@PathVariable Long id, HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
+        if (actor.id().equals(id)) {
+            throw ApiException.forbidden("You cannot deactivate your own account");
+        }
         User user = userRepository.findById(id).orElseThrow(() -> ApiException.notFound("User"));
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw ApiException.conflict("User is already deactivated");
+        }
         user.setIsActive(false);
+        user.setDeactivatedAt(java.time.LocalDateTime.now());
         userRepository.save(user);
         auditService.audit(actor, "USER_DEACTIVATE", "User", user.getId(), "Email: " + user.getEmail(), http);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/activate")
+    @Transactional
+    public ResponseEntity<UserResponse> activate(@PathVariable Long id, HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        if (actor.id().equals(id)) {
+            throw ApiException.forbidden("You cannot activate your own account");
+        }
+        User user = userRepository.findById(id).orElseThrow(() -> ApiException.notFound("User"));
+        if (Boolean.TRUE.equals(user.getIsActive())) {
+            throw ApiException.conflict("User is already active");
+        }
+        user.setIsActive(true);
+        user.setDeactivatedAt(null);
+        user = userRepository.save(user);
+        auditService.audit(actor, "USER_ACTIVATE", "User", user.getId(), "Email: " + user.getEmail(), http);
+        return ResponseEntity.ok(UserResponse.from(user));
+    }
+
+    @DeleteMapping("/{id}/hard")
+    @Transactional
+    public ResponseEntity<Void> hardDelete(@PathVariable Long id,
+                                           @Valid @RequestBody HardDeleteUserRequest req,
+                                           HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        if (actor.id().equals(id)) {
+            throw ApiException.forbidden("You cannot delete your own account");
+        }
+        User user = userRepository.findById(id).orElseThrow(() -> ApiException.notFound("User"));
+        boolean eligible = user.getDeactivatedAt() != null
+                && user.getDeactivatedAt().plusDays(7).isBefore(java.time.LocalDateTime.now());
+        if (!eligible) {
+            // Immediate delete (active user, or deactivated < 7 days) requires the acting admin's own password
+            User actorRow = userRepository.findById(actor.id())
+                    .orElseThrow(() -> ApiException.notFound("User"));
+            if (!passwordEncoder.matches(req.password(), actorRow.getPasswordHash())) {
+                throw ApiException.forbidden("Password confirmation failed");
+            }
+        }
+        try {
+            userRepository.delete(user);
+            userRepository.flush();
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw ApiException.conflict("Cannot delete: this user still has related records (e.g. tasks, documents, audit history)");
+        }
+        auditService.audit(actor, "USER_HARD_DELETE", "User", user.getId(), "Email: " + user.getEmail(), http);
         return ResponseEntity.noContent().build();
     }
 }

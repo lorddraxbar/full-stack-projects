@@ -42,6 +42,7 @@ const handleLogin = async () => {
     localStorage.setItem('refreshToken', data.refreshToken)
     localStorage.setItem('userRole', data.user?.role || 'CLIENT')
     localStorage.setItem('userName', data.user?.fullName || 'User')
+    if (data.user?.id) localStorage.setItem('userId', String(data.user.id))
 
     const redirect = router.currentRoute.value.query.redirect as string || '/dashboard'
     router.push(redirect)

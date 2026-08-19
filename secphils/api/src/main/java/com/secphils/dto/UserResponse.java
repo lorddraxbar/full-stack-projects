@@ -12,11 +12,13 @@ public record UserResponse(
         String fullName,
         String role,
         Boolean isActive,
+        LocalDateTime deactivatedAt,
         LocalDateTime createdAt,
         LocalDateTime lastLogin
 ) {
     public static UserResponse from(User u) {
         return new UserResponse(u.getId(), u.getEmail(), u.getFirstName(), u.getLastName(),
-                u.getFullName(), u.getRole(), u.getIsActive(), u.getCreatedAt(), u.getLastLogin());
+                u.getFullName(), u.getRole(), u.getIsActive(), u.getDeactivatedAt(),
+                u.getCreatedAt(), u.getLastLogin());
     }
 }
