@@ -56,7 +56,7 @@ export async function useGetMe() {
   return response.data
 }
 
-export async function useCreateUser(data: { firstName: string; lastName: string; email: string; role: string; password: string; isActive?: boolean }) {
+export async function useCreateUser(data: { firstName: string; lastName: string; email: string; role: string; password?: string; isActive?: boolean }) {
   const response = await api.post('/users', data)
   return response.data
 }
@@ -73,6 +73,16 @@ export async function useDeactivateUser(id: number) {
 
 export async function useActivateUser(id: number) {
   const response = await api.post(`/users/${id}/activate`)
+  return response.data
+}
+
+export async function useResendInvite(id: number) {
+  const response = await api.post(`/users/${id}/resend-invite`)
+  return response.data
+}
+
+export async function useSetPassword(token: string, password: string) {
+  const response = await api.post('/users/set-password', { token, password })
   return response.data
 }
 

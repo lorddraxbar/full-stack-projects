@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 
 const authStore = useAuthStore()
@@ -58,13 +58,13 @@ const loadUsers = async () => {
   }
 }
 
-const addUserForm = ref({ firstName: '', lastName: '', email: '', role: 'CLIENT', password: '' })
+const addUserForm = ref({ firstName: '', lastName: '', email: '', role: 'CLIENT' })
 const addUserSaving = ref(false)
 const addUserMessage = ref<{ ok: boolean; text: string } | null>(null)
 
 const addUser = async () => {
   const f = addUserForm.value
-  if (!f.firstName.trim() || !f.lastName.trim() || !f.email.trim() || !f.password) return
+  if (!f.firstName.trim() || !f.lastName.trim() || !f.email.trim()) return
   addUserSaving.value = true
   addUserMessage.value = null
   try {
@@ -73,15 +73,23 @@ const addUser = async () => {
       lastName: f.lastName.trim(),
       email: f.email.trim(),
       role: f.role,
-      password: f.password,
     })
-    addUserMessage.value = { ok: true, text: 'User created. They can now sign in with their email and password.' }
-    addUserForm.value = { firstName: '', lastName: '', email: '', role: 'CLIENT', password: '' }
+    addUserMessage.value = { ok: true, text: 'User created. An invite link has been emailed to them — they set their own password on first use.' }
+    addUserForm.value = { firstName: '', lastName: '', email: '', role: 'CLIENT' }
     await loadUsers()
   } catch (err: any) {
     addUserMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to create user' }
   } finally {
     addUserSaving.value = false
+  }
+}
+
+const resendInvite = async (user: PortalUser) => {
+  try {
+    const data = await useResendInvite(user.id)
+    alert(data.message || 'Invite link re-sent')
+  } catch (err: any) {
+    alert(err.response?.data?.message || 'Failed to resend invite')
   }
 }
 
@@ -526,6 +534,13 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                       Activate
                     </button>
                     <button
+                      v-if="!user.isActive && user.id !== currentUserId"
+                      @click="resendInvite(user)"
+                      class="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    >
+                      Resend Invite
+                    </button>
+                    <button
                       v-if="user.id !== currentUserId"
                       @click="openHardDelete(user)"
                       class="text-red-700 hover:text-red-800 text-sm font-medium underline decoration-dotted"
@@ -543,7 +558,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
 
       <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-1">Add User</h2>
-        <p class="text-sm text-gray-600 mb-4">Creates a real account. Choose <strong>ADMIN</strong> for a provider admin, <strong>USER</strong> for provider staff, or <strong>CLIENT</strong> for a client-side account.</p>
+        <p class="text-sm text-gray-600 mb-4">Creates a real account and emails the user a <strong>set-your-own-password</strong> link. Choose <strong>ADMIN</strong> for a provider admin, <strong>USER</strong> for provider staff, or <strong>CLIENT</strong> for a client-side account.</p>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
@@ -565,10 +580,6 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               <option value="CLIENT">CLIENT — Client Account</option>
             </select>
           </div>
-          <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
-            <input v-model="addUserForm.password" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Min. 8 characters" />
-          </div>
         </div>
         <div v-if="addUserMessage" :class="[
           'mt-4 p-3 rounded-lg text-sm',
@@ -579,10 +590,10 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
         <div class="mt-4 flex justify-end">
           <button
             @click="addUser"
-            :disabled="addUserSaving || !addUserForm.firstName.trim() || !addUserForm.lastName.trim() || !addUserForm.email.trim() || !addUserForm.password"
+            :disabled="addUserSaving || !addUserForm.firstName.trim() || !addUserForm.lastName.trim() || !addUserForm.email.trim()"
             class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {{ addUserSaving ? 'Creating…' : '+ Create User' }}
+            {{ addUserSaving ? 'Creating…' : '+ Create User & Send Invite' }}
           </button>
         </div>
       </div>

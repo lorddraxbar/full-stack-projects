@@ -1,0 +1,10 @@
+package com.secphils.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+public record SetPasswordRequest(
+        @NotBlank(message = "Token is required") String token,
+        @NotBlank(message = "Password is required")
+        @Size(min = 8, max = 100, message = "Password must be 8-100 characters") String password
+) {}

@@ -17,4 +17,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByRoleAndIsActive(String role, Boolean isActive);
 
     List<User> findByIsActiveTrue();
+
+    Optional<User> findByPasswordResetToken(String passwordResetToken);
 }

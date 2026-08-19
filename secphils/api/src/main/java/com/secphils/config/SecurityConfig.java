@@ -44,6 +44,7 @@ public class SecurityConfig {
                 // admin-only
                 .requestMatchers("/api/v1/admin/**", "/api/v1/roles/**", "/api/v1/permissions/**", "/api/v1/settings/**").hasRole("ADMIN")
                 // user management is admin-only (prevents a USER from creating/escalating admins)
+                .requestMatchers(HttpMethod.POST, "/api/v1/users/set-password").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/users/me").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/api/v1/users/me").authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/v1/users", "/api/v1/users/**").hasRole("ADMIN")

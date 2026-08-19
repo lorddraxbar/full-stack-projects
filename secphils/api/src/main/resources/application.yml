@@ -17,6 +17,24 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+  mail:
+    host: ${SMTP_HOST:smtp.zoho.com}
+    port: ${SMTP_PORT:465}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    from: ${MAIL_FROM:notifications@secphils.com}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+            socketFactory:
+              port: ${SMTP_PORT:465}
+              class: javax.net.ssl.SSLSocketFactory
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
 
 server:
   port: 8080
@@ -33,6 +51,11 @@ app:
     secret: ${JWT_SECRET:dev-only-secret-change-me-in-production-min-32-chars}
     access-token-ttl: 15m
     refresh-token-ttl: 7d
+  invite:
+    # Base URL of the web app used to build invite links
+    base-url: ${INVITE_BASE_URL:http://localhost:3000}
+    # How long a set-password link stays valid
+    token-ttl: 24h
 
 logging:
   level:

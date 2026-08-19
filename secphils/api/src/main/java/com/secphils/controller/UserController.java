@@ -3,20 +3,27 @@ package com.secphils.controller;
 import com.secphils.common.AuditService;
 import com.secphils.common.ApiException;
 import com.secphils.dto.HardDeleteUserRequest;
+import com.secphils.dto.SetPasswordRequest;
 import com.secphils.dto.UpdateUserRequest;
 import com.secphils.dto.UserResponse;
 import com.secphils.entity.User;
 import com.secphils.repository.UserRepository;
 import com.secphils.security.CurrentUser;
 import com.secphils.security.AuthUser;
+import com.secphils.service.MailService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import org.springframework.transaction.annotation.Transactional;
 
 @RestController
@@ -26,11 +33,20 @@ public class UserController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final MailService mailService;
+    private final String inviteBaseUrl;
+    private final Duration inviteTtl;
 
-    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder, AuditService auditService) {
+    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                          AuditService auditService, MailService mailService,
+                          @Value("${app.invite.base-url}") String inviteBaseUrl,
+                          @Value("${app.invite.token-ttl:24h}") Duration inviteTtl) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
+        this.mailService = mailService;
+        this.inviteBaseUrl = inviteBaseUrl;
+        this.inviteTtl = inviteTtl;
     }
 
     @GetMapping("/me")
@@ -93,13 +109,69 @@ public class UserController {
         user.setFirstName(req.firstName());
         user.setLastName(req.lastName());
         user.setRole(req.role() != null ? req.role() : "CLIENT");
-        user.setIsActive(req.isActive() != null ? req.isActive() : true);
-        if (req.password() != null && !req.password().isBlank()) {
-            user.setPasswordHash(passwordEncoder.encode(req.password()));
-        }
+        // New users start inactive — they activate by setting their own password via the invite link
+        user.setIsActive(false);
         user = userRepository.save(user);
-        auditService.audit(actor, "USER_CREATE", "User", user.getId(), "Email: " + user.getEmail(), http);
+        issueInvite(user, actor, http);
         return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(user));
+    }
+
+    @PostMapping("/{id}/resend-invite")
+    @Transactional
+    public ResponseEntity<Map<String, String>> resendInvite(@PathVariable Long id, HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        User user = userRepository.findById(id).orElseThrow(() -> ApiException.notFound("User"));
+        issueInvite(user, actor, http);
+        return ResponseEntity.ok(Map.of("message", "Invite link re-sent to " + user.getEmail()));
+    }
+
+    /**
+     * Public: lets an invited (inactive) user set their own password with the one-time
+     * token from the invite email. Succeeds even if the token was already used
+     * (idempotent — clicking the link twice is fine).
+     */
+    @PostMapping("/set-password")
+    @Transactional
+    public ResponseEntity<Map<String, String>> setPassword(@Valid @RequestBody SetPasswordRequest req,
+                                                           HttpServletRequest http) {
+        User user = userRepository.findByPasswordResetToken(req.token())
+                .orElseThrow(() -> ApiException.badRequest("Invalid or expired link. Please ask your admin to resend the invite."));
+        if (user.getPasswordHash() != null) {
+            // Already activated — treat as success so a double-click doesn't error
+            return ResponseEntity.ok(Map.of("message", "Your password is already set. You can sign in now."));
+        }
+        if (user.getPasswordResetExpiresAt() == null || user.getPasswordResetExpiresAt().isBefore(LocalDateTime.now())) {
+            throw ApiException.badRequest("Invalid or expired link. Please ask your admin to resend the invite.");
+        }
+        user.setPasswordHash(passwordEncoder.encode(req.password()));
+        user.setIsActive(true);
+        user.setDeactivatedAt(null);
+        user.setPasswordResetToken(null);
+        user.setPasswordResetExpiresAt(null);
+        user.setPasswordResetRequestedAt(null);
+        userRepository.save(user);
+        auditService.audit(null, "USER_SET_PASSWORD", "User", user.getId(), "Email: " + user.getEmail(), http);
+        return ResponseEntity.ok(Map.of("message", "Password set. You can now sign in."));
+    }
+
+    private void issueInvite(User user, AuthUser actor, HttpServletRequest http) {
+        String token = newToken();
+        user.setPasswordResetToken(token);
+        user.setPasswordResetExpiresAt(LocalDateTime.now().plus(inviteTtl));
+        user.setPasswordResetRequestedAt(LocalDateTime.now());
+        userRepository.save(user);
+        String link = inviteBaseUrl + "/auth/set-password?token=" + token;
+        mailService.sendHtml(user.getEmail(), "Set your SECPhils Portal password",
+                mailService.inviteEmail(user.getFirstName(), user.getFullName(), link));
+        auditService.audit(actor, "USER_INVITE_SENT", "User", user.getId(), "Email: " + user.getEmail(), http);
+    }
+
+    private String newToken() {
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) sb.append(String.format("%02x", b));
+        return sb.toString();
     }
 
     @PutMapping("/{id}")

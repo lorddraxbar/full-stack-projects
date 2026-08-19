@@ -18,6 +18,12 @@ const routes: RouteRecordRaw[] = [
         meta: { guest: true },
       },
       {
+        path: 'set-password',
+        name: 'SetPassword',
+        component: () => import('@/views/auth/SetPasswordView.vue'),
+        meta: { guest: true },
+      },
+      {
         path: 'sso/callback',
         name: 'SSOCallback',
         component: () => import('@/views/auth/SSOCallbackView.vue'),
