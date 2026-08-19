@@ -1,28 +1,91 @@
 package com.secphils.config;
 
+import com.secphils.security.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-/**
- * Placeholder security config for Phase 2.
- * All endpoints are permitted so the data layer can be exercised while the
- * API is under construction. Phase 3 replaces this with JWT-based
- * authentication and role-based authorization.
- */
+import java.util.List;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private final JwtAuthFilter jwtAuthFilter;
+
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+        this.jwtAuthFilter = jwtAuthFilter;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+            .authorizeHttpRequests(auth -> auth
+                // public
+                .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers("/api/v1/landing").permitAll()
+                .requestMatchers("/api/v1/reviews/public").permitAll()
+                // swagger + actuator
+                .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**").permitAll()
+                .requestMatchers("/actuator/health").permitAll()
+                // admin-only
+                .requestMatchers("/api/v1/admin/**", "/api/v1/roles/**", "/api/v1/permissions/**", "/api/v1/settings/**").hasRole("ADMIN")
+                // provider or admin
+                .requestMatchers(HttpMethod.POST, "/api/v1/users", "/api/v1/companies").hasAnyRole("ADMIN", "PROVIDER")
+                .requestMatchers(HttpMethod.PUT, "/api/v1/users/**", "/api/v1/users", "/api/v1/companies/**").hasAnyRole("ADMIN", "PROVIDER")
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasAnyRole("ADMIN", "PROVIDER")
+                .requestMatchers(HttpMethod.POST, "/api/v1/services", "/api/v1/dropdowns/**").hasAnyRole("ADMIN", "PROVIDER")
+                .requestMatchers(HttpMethod.PUT, "/api/v1/services/**", "/api/v1/dropdowns/**").hasAnyRole("ADMIN", "PROVIDER")
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/services/**", "/api/v1/dropdowns/**").hasAnyRole("ADMIN", "PROVIDER")
+                // everything else requires authentication
+                .anyRequest().authenticated()
+            )
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((req, res, e) -> {
+                    res.setStatus(401);
+                    res.setContentType("application/json");
+                    res.getWriter().write("{\"status\":401,\"error\":\"Unauthorized\",\"message\":\"Authentication required\"}");
+                })
+                .accessDeniedHandler((req, res, e) -> {
+                    res.setStatus(403);
+                    res.setContentType("application/json");
+                    res.getWriter().write("{\"status\":403,\"error\":\"Forbidden\",\"message\":\"Insufficient permissions\"}");
+                })
+            )
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration cfg = new CorsConfiguration();
+        cfg.setAllowedOrigins(List.of(
+                "http://localhost:3000", "http://localhost:5173",
+                "http://10.0.1.78:3000", "http://192.168.1.11:3000"));
+        cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        cfg.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
+        cfg.setAllowCredentials(true);
+        cfg.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", cfg);
+        return source;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 }

@@ -3,6 +3,8 @@ package com.secphils.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -19,12 +21,15 @@ public class SystemSettings {
     @Column(name = "portal_name", length = 255)
     private String portalName;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "email_templates", columnDefinition = "JSONB")
     private String emailTemplates;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "JSONB")
     private String integrations;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "security_policies", columnDefinition = "JSONB")
     private String securityPolicies;
 

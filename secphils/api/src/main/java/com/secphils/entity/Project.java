@@ -3,6 +3,8 @@ package com.secphils.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -45,15 +47,18 @@ public class Project {
     @Column(name = "total_cost", precision = 15, scale = 2)
     private BigDecimal totalCost;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "raw_materials", columnDefinition = "JSONB")
     private String rawMaterials;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "production_output", columnDefinition = "JSONB")
     private String productionOutput;
 
     @Column(name = "waste_management", columnDefinition = "TEXT")
     private String wasteManagement;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "waste_materials", columnDefinition = "JSONB")
     private String wasteMaterials;
 
