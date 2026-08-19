@@ -221,7 +221,7 @@ const publishAnnouncement = () => {
 
 // ---------- System Settings ----------
 const systemSettings = ref({
-  portalName: 'SECPhils Client Portal',
+  portalName: 'SECPhils Portal',
   maintenanceMode: false,
   securityPolicies: {
     passwordMinLength: 12,
