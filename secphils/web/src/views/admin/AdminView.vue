@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
+import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 
 const authStore = useAuthStore()
 const currentUserId = computed(() => {
@@ -74,6 +75,13 @@ const loadUsers = async () => {
 const addUserForm = ref({ firstName: '', lastName: '', email: '', role: 'CLIENT', companyId: null as number | null })
 const addUserSaving = ref(false)
 const addUserMessage = ref<{ ok: boolean; text: string } | null>(null)
+const showAddUser = ref(false)
+
+const closeAddUser = () => {
+  showAddUser.value = false
+  addUserMessage.value = null
+  addUserForm.value = { firstName: '', lastName: '', email: '', role: 'CLIENT', companyId: null }
+}
 
 const addUser = async () => {
   const f = addUserForm.value
@@ -88,14 +96,28 @@ const addUser = async () => {
       role: f.role,
       companyId: f.companyId || null,
     })
-    addUserMessage.value = { ok: true, text: 'User created. An invite link has been emailed to them — they set their own password on first use.' }
-    addUserForm.value = { firstName: '', lastName: '', email: '', role: 'CLIENT', companyId: null }
     await loadUsers()
+    closeAddUser()
   } catch (err: any) {
     addUserMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to create user' }
   } finally {
     addUserSaving.value = false
   }
+}
+
+// Row actions menu for the users table
+const userRowActions = (user: PortalUser): RowAction[] => {
+  if (user.id === currentUserId.value) return []
+  const actions: RowAction[] = [{ label: 'Edit', onClick: () => openEdit(user) }]
+  if (user.isActive) {
+    actions.push({ label: 'Deactivate', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => deactivateUser(user) })
+  } else {
+    actions.push({ label: 'Activate', color: 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => activateUser(user) })
+    actions.push({ label: 'Resend Invite', color: 'text-blue-600 hover:text-blue-700 hover:bg-blue-50', onClick: () => resendInvite(user) })
+  }
+  actions.push({ divider: true, label: '', onClick: () => {} })
+  actions.push({ label: 'Delete', color: 'text-red-700 hover:text-red-800 hover:bg-red-50', onClick: () => openHardDelete(user) })
+  return actions
 }
 
 const resendInvite = async (user: PortalUser) => {
@@ -190,6 +212,14 @@ const openEdit = (user: PortalUser) => {
   }
   editError.value = ''
   editMessage.value = ''
+}
+
+const onEditRoleChange = () => {
+  if (editForm.value.role !== 'CLIENT') editForm.value.companyId = null
+}
+
+const onAddRoleChange = () => {
+  if (addUserForm.value.role !== 'CLIENT') addUserForm.value.companyId = null
 }
 
 const saveEdit = async () => {
@@ -568,9 +598,17 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             <h2 class="text-lg font-semibold text-gray-900">User Management</h2>
             <p class="text-sm text-gray-600 mt-1">All portal accounts — provider staff, admins, and clients. Create, and deactivate users here.</p>
           </div>
-          <button @click="loadUsers" class="text-sm text-blue-600 hover:text-blue-700 font-medium">
-            <i class="fas fa-rotate mr-1" />Refresh
-          </button>
+          <div class="flex items-center gap-3">
+            <button
+              @click="showAddUser = true"
+              class="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <i class="fas fa-user-plus mr-1" />Add
+            </button>
+            <button @click="loadUsers" class="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              <i class="fas fa-rotate mr-1" />Refresh
+            </button>
+          </div>
         </div>
         <div v-if="usersError" class="m-6 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
           {{ usersError }}
@@ -622,99 +660,13 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                   </span>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ user.lastLogin ? user.lastLogin.replace('T', ' ').slice(0, 16) : 'Never' }}</td>
-                <td class="px-6 py-4">
-                  <div class="flex items-center gap-3 whitespace-nowrap">
-                    <button
-                      v-if="user.id !== currentUserId"
-                      @click="openEdit(user)"
-                      class="text-gray-700 hover:text-gray-900 text-sm font-medium"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      v-if="user.isActive && user.id !== currentUserId"
-                      @click="deactivateUser(user)"
-                      class="text-red-600 hover:text-red-700 text-sm font-medium"
-                    >
-                      Deactivate
-                    </button>
-                    <button
-                      v-if="!user.isActive && user.id !== currentUserId"
-                      @click="activateUser(user)"
-                      class="text-green-600 hover:text-green-700 text-sm font-medium"
-                    >
-                      Activate
-                    </button>
-                    <button
-                      v-if="!user.isActive && user.id !== currentUserId"
-                      @click="resendInvite(user)"
-                      class="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                    >
-                      Resend Invite
-                    </button>
-                    <button
-                      v-if="user.id !== currentUserId"
-                      @click="openHardDelete(user)"
-                      class="text-red-700 hover:text-red-800 text-sm font-medium underline decoration-dotted"
-                    >
-                      Delete
-                    </button>
-                    <span v-if="user.id === currentUserId" class="text-xs text-gray-400">(you)</span>
-                  </div>
+                <td class="px-6 py-4 text-right">
+                  <RowActionsMenu v-if="user.id !== currentUserId" :actions="userRowActions(user)" />
+                  <span v-else class="text-xs text-gray-400">(you)</span>
                 </td>
               </tr>
             </tbody>
           </table>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-1">Add User</h2>
-        <p class="text-sm text-gray-600 mb-4">Creates a real account and emails the user a <strong>set-your-own-password</strong> link. Choose <strong>ADMIN</strong> for a provider admin, <strong>USER</strong> for provider staff, or <strong>CLIENT</strong> for a client-side account.</p>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-            <input v-model="addUserForm.firstName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Juan" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-            <input v-model="addUserForm.lastName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Dela Cruz" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input v-model="addUserForm.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="juan@secphils.com" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-            <select v-model="addUserForm.role" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="ADMIN">ADMIN — Provider Admin</option>
-              <option value="USER">USER — Provider Staff</option>
-              <option value="CLIENT">CLIENT — Client Account</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
-            <select v-model="addUserForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option :value="null">— No company —</option>
-              <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </select>
-            <p class="text-xs text-gray-500 mt-1">Assign the client's company (or the staff member's company). Leave blank to assign later.</p>
-          </div>
-        </div>
-        <div v-if="addUserMessage" :class="[
-          'mt-4 p-3 rounded-lg text-sm',
-          addUserMessage.ok ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
-        ]">
-          {{ addUserMessage.text }}
-        </div>
-        <div class="mt-4 flex justify-end">
-          <button
-            @click="addUser"
-            :disabled="addUserSaving || !addUserForm.firstName.trim() || !addUserForm.lastName.trim() || !addUserForm.email.trim()"
-            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {{ addUserSaving ? 'Creating…' : '+ Create User & Send Invite' }}
-          </button>
         </div>
       </div>
     </div>
@@ -978,11 +930,11 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                     {{ service.status }}
                   </span>
                 </td>
-                <td class="px-6 py-4">
-                  <button class="text-blue-600 hover:text-blue-700 text-sm font-medium mr-3">Edit</button>
-                  <button @click="toggleServiceStatus(service)" class="text-red-600 hover:text-red-700 text-sm font-medium">
-                    {{ service.status === 'Active' ? 'Archive' : 'Restore' }}
-                  </button>
+                <td class="px-6 py-4 text-right">
+                  <RowActionsMenu :actions="[
+                    { label: 'Edit', color: 'text-blue-600 hover:text-blue-700 hover:bg-blue-50', onClick: () => {} },
+                    { label: service.status === 'Active' ? 'Archive' : 'Restore', color: service.status === 'Active' ? 'text-red-600 hover:text-red-700 hover:bg-red-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => toggleServiceStatus(service) }
+                  ]" />
                 </td>
               </tr>
             </tbody>
@@ -1171,14 +1123,14 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 </span>
               </td>
               <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ review.approvedDate || '—' }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <template v-if="review.status === 'Pending'">
-                  <button @click="setReviewStatus(review, 'Approved')" class="text-green-600 hover:text-green-700 text-sm font-medium mr-3">Approve</button>
-                  <button @click="setReviewStatus(review, 'Rejected')" class="text-red-600 hover:text-red-700 text-sm font-medium">Reject</button>
-                </template>
-                <template v-else>
-                  <button @click="setReviewStatus(review, 'Pending')" class="text-blue-600 hover:text-blue-700 text-sm font-medium">Re-open</button>
-                </template>
+              <td class="px-6 py-4 text-right">
+                <RowActionsMenu v-if="review.status === 'Pending'" :actions="[
+                  { label: 'Approve', color: 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => setReviewStatus(review, 'Approved') },
+                  { label: 'Reject', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => setReviewStatus(review, 'Rejected') }
+                ]" />
+                <RowActionsMenu v-else :actions="[
+                  { label: 'Re-open', color: 'text-blue-600 hover:text-blue-700 hover:bg-blue-50', onClick: () => setReviewStatus(review, 'Pending') }
+                ]" />
               </td>
             </tr>
           </tbody>
@@ -1503,13 +1455,13 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-              <select v-model="editForm.role" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <select v-model="editForm.role" @change="onEditRoleChange" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="ADMIN">ADMIN — Provider Admin</option>
                 <option value="USER">USER — Provider Staff</option>
                 <option value="CLIENT">CLIENT — Client Account</option>
               </select>
             </div>
-            <div>
+            <div v-if="editForm.role === 'CLIENT'">
               <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
               <select v-model="editForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option :value="null">— No company —</option>
@@ -1546,6 +1498,70 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ editSaving ? 'Saving…' : 'Save Changes' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= ADD USER MODAL ================= -->
+    <div v-if="showAddUser" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold text-gray-900">
+          <i class="fas fa-user-plus text-blue-600 mr-2" />Add User
+        </h3>
+        <p class="mt-1 text-sm text-gray-500">Creates a real account and emails the user a <strong>set-your-own-password</strong> link. Choose <strong>ADMIN</strong> for a provider admin, <strong>USER</strong> for provider staff, or <strong>CLIENT</strong> for a client-side account.</p>
+        <div class="mt-4 space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <input v-model="addUserForm.firstName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Juan" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <input v-model="addUserForm.lastName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Dela Cruz" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input v-model="addUserForm.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="juan@secphils.com" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+              <select v-model="addUserForm.role" @change="onAddRoleChange" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="ADMIN">ADMIN — Provider Admin</option>
+                <option value="USER">USER — Provider Staff</option>
+                <option value="CLIENT">CLIENT — Client Account</option>
+              </select>
+            </div>
+            <div v-if="addUserForm.role === 'CLIENT'">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
+              <select v-model="addUserForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option :value="null">— No company —</option>
+                <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
+              </select>
+            </div>
+          </div>
+          <div v-if="addUserMessage" :class="[
+            'p-3 rounded-lg text-sm',
+            addUserMessage.ok ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
+          ]">
+            {{ addUserMessage.text }}
+          </div>
+        </div>
+        <div class="mt-5 flex justify-end gap-3">
+          <button
+            @click="closeAddUser"
+            class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
+          >
+            Close
+          </button>
+          <button
+            @click="addUser"
+            :disabled="addUserSaving || !addUserForm.firstName.trim() || !addUserForm.lastName.trim() || !addUserForm.email.trim()"
+            class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ addUserSaving ? 'Creating…' : 'Create User & Send Invite' }}
           </button>
         </div>
       </div>

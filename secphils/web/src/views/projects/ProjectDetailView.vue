@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useRole } from '@/composables/useRole'
+import RowActionsMenu from '@/components/RowActionsMenu.vue'
 import {
   useGetMe, useGetProject, useGetCompany, useGetProjectTeam,
   useGetDocuments, useCreateDocument, useDeleteDocument,
@@ -408,14 +409,10 @@ async function saveAdminChanges() {
                 <td class="px-6 py-4 text-sm text-gray-600">{{ doc.version }}</td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ doc.uploadedByName || '—' }}</td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ formatDate(doc.createdAt) }}</td>
-                <td class="px-6 py-4">
-                  <button
-                    v-if="!isClient"
-                    @click="deleteDocument(doc.id)"
-                    class="text-red-600 hover:text-red-700 text-sm font-medium"
-                  >
-                    Delete
-                  </button>
+                <td class="px-6 py-4 text-right">
+                  <RowActionsMenu v-if="!isClient" :actions="[
+                    { label: 'Delete', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => deleteDocument(doc.id) }
+                  ]" />
                 </td>
               </tr>
             </tbody>
