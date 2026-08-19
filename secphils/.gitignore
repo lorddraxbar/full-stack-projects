@@ -25,3 +25,8 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Java / Maven
+api/target/
+*.class
+*.jar
