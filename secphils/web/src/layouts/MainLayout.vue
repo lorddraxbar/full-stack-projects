@@ -14,8 +14,6 @@ const allNavItems = [
   { name: 'Messages', path: '/messages', icon: 'fas fa-comment-dots', roles: ['CLIENT', 'USER', 'ADMIN'] },
   { name: 'Announcements', path: '/announcements', icon: 'fas fa-bullhorn', roles: ['CLIENT', 'USER', 'ADMIN'] },
   { name: 'Reviews', path: '/reviews', icon: 'fas fa-star', roles: ['ADMIN'] },
-  { name: 'Settings', path: '/settings', icon: 'fas fa-cog', roles: ['CLIENT', 'USER', 'ADMIN'] },
-  { name: 'Admin', path: '/admin', icon: 'fas fa-tools', roles: ['ADMIN'] },
 ]
 
 const navItems = computed(() =>
@@ -24,6 +22,8 @@ const navItems = computed(() =>
 
 const isSidebarOpen = ref(true)
 const isMobile = ref(false)
+const isUserMenuOpen = ref(false)
+const userMenuRef = ref<HTMLElement | null>(null)
 const route = useRoute()
 
 const userName = computed(() => localStorage.getItem('userName') || 'User')
@@ -43,13 +43,21 @@ const checkMobile = () => {
   }
 }
 
+const onDocumentClick = (e: MouseEvent) => {
+  if (userMenuRef.value && !userMenuRef.value.contains(e.target as Node)) {
+    isUserMenuOpen.value = false
+  }
+}
+
 onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
+  document.addEventListener('click', onDocumentClick)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
+  document.removeEventListener('click', onDocumentClick)
 })
 
 const isActive = (path: string) => {
@@ -136,21 +144,52 @@ const logout = () => {
           </button>
 
           <!-- User menu -->
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
-              {{ userInitial }}
-            </div>
-            <div class="hidden sm:block">
-              <p class="text-sm font-medium text-gray-700 leading-tight">{{ userName }}</p>
-              <p class="text-xs text-gray-500 leading-tight">{{ roleLabel }}</p>
-            </div>
+          <div ref="userMenuRef" class="relative flex items-center gap-2">
             <button
-              @click="logout"
-              title="Log out"
-              class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-red-600"
+              @click="isUserMenuOpen = !isUserMenuOpen"
+              class="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-gray-100 transition-colors"
             >
-              <i class="fas fa-sign-out-alt" />
+              <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
+                {{ userInitial }}
+              </div>
+              <div class="hidden sm:block text-left">
+                <p class="text-sm font-medium text-gray-700 leading-tight">{{ userName }}</p>
+                <p class="text-xs text-gray-500 leading-tight">{{ roleLabel }}</p>
+              </div>
+              <i class="fas fa-chevron-down text-xs text-gray-400" />
             </button>
+
+            <!-- Popup menu -->
+            <div
+              v-if="isUserMenuOpen"
+              class="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50"
+            >
+              <RouterLink
+                to="/settings"
+                class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+                @click="isUserMenuOpen = false"
+              >
+                <i class="fas fa-cog w-4 text-center" />
+                Settings
+              </RouterLink>
+              <RouterLink
+                v-if="role === 'ADMIN'"
+                to="/admin"
+                class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+                @click="isUserMenuOpen = false"
+              >
+                <i class="fas fa-tools w-4 text-center" />
+                Admin
+              </RouterLink>
+              <div class="border-t border-gray-100 my-1" />
+              <button
+                @click="logout"
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <i class="fas fa-sign-out-alt w-4 text-center" />
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
