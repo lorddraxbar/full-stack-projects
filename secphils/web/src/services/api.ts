@@ -55,6 +55,21 @@ export async function useGetMe() {
   return response.data
 }
 
+export async function useCreateUser(data: { firstName: string; lastName: string; email: string; role: string; password: string; isActive?: boolean }) {
+  const response = await api.post('/users', data)
+  return response.data
+}
+
+export async function useUpdateUser(id: number, data: Record<string, unknown>) {
+  const response = await api.put(`/users/${id}`, data)
+  return response.data
+}
+
+export async function useDeactivateUser(id: number) {
+  const response = await api.delete(`/users/${id}`)
+  return response.data
+}
+
 // ---------- Projects ----------
 export async function useGetProjects(params?: { companyId?: number; status?: string; search?: string }) {
   const response = await api.get('/projects', { params })

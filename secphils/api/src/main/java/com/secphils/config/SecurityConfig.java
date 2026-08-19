@@ -43,10 +43,13 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health").permitAll()
                 // admin-only
                 .requestMatchers("/api/v1/admin/**", "/api/v1/roles/**", "/api/v1/permissions/**", "/api/v1/settings/**").hasRole("ADMIN")
-                // provider or admin
-                .requestMatchers(HttpMethod.POST, "/api/v1/users", "/api/v1/companies").hasAnyRole("ADMIN", "USER")
-                .requestMatchers(HttpMethod.PUT, "/api/v1/users/**", "/api/v1/users", "/api/v1/companies/**").hasAnyRole("ADMIN", "USER")
-                .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasAnyRole("ADMIN", "USER")
+                // user management is admin-only (prevents a USER from creating/escalating admins)
+                .requestMatchers(HttpMethod.PUT, "/api/v1/users/me").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/v1/users").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/v1/users/**", "/api/v1/users").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/v1/companies").hasAnyRole("ADMIN", "USER")
+                .requestMatchers(HttpMethod.PUT, "/api/v1/companies/**").hasAnyRole("ADMIN", "USER")
                 .requestMatchers(HttpMethod.POST, "/api/v1/services", "/api/v1/dropdowns/**").hasAnyRole("ADMIN", "USER")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/services/**", "/api/v1/dropdowns/**").hasAnyRole("ADMIN", "USER")
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/services/**", "/api/v1/dropdowns/**").hasAnyRole("ADMIN", "USER")

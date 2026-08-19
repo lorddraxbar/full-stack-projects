@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useGetUsers, useCreateUser, useDeactivateUser } from '../../services/api'
 
 const activeTab = ref('dashboard')
 
@@ -21,32 +22,76 @@ const auditLogs = ref([
   { id: 4, timestamp: '2026-08-15 10:15:00', user: 'Bob Wilson', action: 'DELETE', entity: 'TASK', details: 'Deleted task #45', ipAddress: '192.168.1.102' },
 ])
 
-// ---------- User Management (client users) ----------
-const clientUsers = ref([
-  { id: 1, name: 'Maria Santos', email: 'maria.santos@abcmfg.com', company: 'ABC Manufacturing', role: 'Client Admin', status: 'Active', projects: ['Energy Audit', 'ISO 9001 Certification'] },
-  { id: 2, name: 'Pedro Cruz', email: 'pedro.cruz@abcmfg.com', company: 'ABC Manufacturing', role: 'Team Member', status: 'Active', projects: ['Energy Audit'] },
-  { id: 3, name: 'Liza Reyes', email: 'liza.reyes@abcmfg.com', company: 'ABC Manufacturing', role: 'Team Member', status: 'Deactivated', projects: [] },
-  { id: 4, name: 'Carlos Tan', email: 'carlos.tan@globexph.com', company: 'Globex Philippines', role: 'Client Admin', status: 'Active', projects: ['Market Research Study', 'Financial Modeling'] },
-])
+// ---------- User Management (real API) ----------
+interface PortalUser {
+  id: number
+  email: string
+  fullName: string
+  role: string
+  isActive: boolean
+  lastLogin: string | null
+}
 
-const addUserForm = ref({ name: '', email: '', company: '', role: 'Team Member' })
-const addUser = () => {
-  if (!addUserForm.value.name.trim() || !addUserForm.value.email.trim()) return
-  clientUsers.value.push({
-    id: Date.now(),
-    name: addUserForm.value.name,
-    email: addUserForm.value.email,
-    company: addUserForm.value.company || '—',
-    role: addUserForm.value.role,
-    status: 'Active',
-    projects: [],
-  })
-  addUserForm.value = { name: '', email: '', company: '', role: 'Team Member' }
-  alert('User created successfully.')
+const clientUsers = ref<PortalUser[]>([])
+const usersLoading = ref(false)
+const usersError = ref('')
+
+const loadUsers = async () => {
+  usersLoading.value = true
+  usersError.value = ''
+  try {
+    const data = await useGetUsers()
+    clientUsers.value = data
+  } catch (err: any) {
+    usersError.value = err.response?.data?.message || 'Failed to load users'
+  } finally {
+    usersLoading.value = false
+  }
 }
-const toggleUserStatus = (user: (typeof clientUsers.value)[0]) => {
-  user.status = user.status === 'Active' ? 'Deactivated' : 'Active'
+
+const addUserForm = ref({ firstName: '', lastName: '', email: '', role: 'CLIENT', password: '' })
+const addUserSaving = ref(false)
+const addUserMessage = ref<{ ok: boolean; text: string } | null>(null)
+
+const addUser = async () => {
+  const f = addUserForm.value
+  if (!f.firstName.trim() || !f.lastName.trim() || !f.email.trim() || !f.password) return
+  addUserSaving.value = true
+  addUserMessage.value = null
+  try {
+    await useCreateUser({
+      firstName: f.firstName.trim(),
+      lastName: f.lastName.trim(),
+      email: f.email.trim(),
+      role: f.role,
+      password: f.password,
+    })
+    addUserMessage.value = { ok: true, text: 'User created. They can now sign in with their email and password.' }
+    addUserForm.value = { firstName: '', lastName: '', email: '', role: 'CLIENT', password: '' }
+    await loadUsers()
+  } catch (err: any) {
+    addUserMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to create user' }
+  } finally {
+    addUserSaving.value = false
+  }
 }
+
+const toggleUserStatus = async (user: PortalUser) => {
+  if (user.isActive) {
+    try {
+      await useDeactivateUser(user.id)
+      await loadUsers()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to deactivate user')
+    }
+  } else {
+    alert('Re-activating users is not supported yet. Contact the system administrator.')
+  }
+}
+
+onMounted(() => {
+  loadUsers()
+})
 
 // ---------- Company Settings: Company Profile ----------
 const companyProfile = ref({
@@ -357,9 +402,17 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
     <!-- ================= USERS ================= -->
     <div v-if="isActiveTab('users')" class="space-y-6">
       <div class="bg-white rounded-lg shadow">
-        <div class="p-6 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-900">User Management</h2>
-          <p class="text-sm text-gray-600 mt-1">Client accounts — create, edit, and deactivate users.</p>
+        <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">User Management</h2>
+            <p class="text-sm text-gray-600 mt-1">All portal accounts — provider staff, admins, and clients. Create, and deactivate users here.</p>
+          </div>
+          <button @click="loadUsers" class="text-sm text-blue-600 hover:text-blue-700 font-medium">
+            <i class="fas fa-rotate mr-1" />Refresh
+          </button>
+        </div>
+        <div v-if="usersError" class="m-6 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          {{ usersError }}
         </div>
         <div class="overflow-x-auto">
           <table class="w-full">
@@ -367,44 +420,54 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned Projects</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Login</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
+              <tr v-if="usersLoading && clientUsers.length === 0">
+                <td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500">Loading users…</td>
+              </tr>
+              <tr v-else-if="clientUsers.length === 0">
+                <td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500">No users found.</td>
+              </tr>
               <tr v-for="user in clientUsers" :key="user.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
-                      {{ user.name.charAt(0) }}
+                      {{ user.fullName.charAt(0) }}
                     </div>
-                    <span class="font-medium text-gray-900">{{ user.name }}</span>
+                    <span class="font-medium text-gray-900">{{ user.fullName }}</span>
                   </div>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ user.email }}</td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ user.company }}</td>
                 <td class="px-6 py-4">
-                  <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">{{ user.role }}</span>
+                  <span :class="[
+                    'px-2 py-1 text-xs font-medium rounded',
+                    user.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' :
+                    user.role === 'USER' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                  ]">{{ user.role }}</span>
                 </td>
                 <td class="px-6 py-4">
                   <span :class="[
                     'px-2 py-1 text-xs font-medium rounded-full',
-                    user.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    user.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                   ]">
-                    {{ user.status }}
+                    {{ user.isActive ? 'Active' : 'Deactivated' }}
                   </span>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-600">
-                  {{ user.projects.length ? user.projects.join(', ') : '—' }}
-                </td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ user.lastLogin ? user.lastLogin.replace('T', ' ').slice(0, 16) : 'Never' }}</td>
                 <td class="px-6 py-4">
-                  <button class="text-blue-600 hover:text-blue-700 text-sm font-medium mr-3">Edit</button>
-                  <button @click="toggleUserStatus(user)" class="text-red-600 hover:text-red-700 text-sm font-medium">
-                    {{ user.status === 'Active' ? 'Deactivate' : 'Activate' }}
+                  <button
+                    v-if="user.isActive"
+                    @click="toggleUserStatus(user)"
+                    class="text-red-600 hover:text-red-700 text-sm font-medium"
+                  >
+                    Deactivate
                   </button>
+                  <span v-else class="text-sm text-gray-400">—</span>
                 </td>
               </tr>
             </tbody>
@@ -413,31 +476,47 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
       </div>
 
       <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Add Client User</h2>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <h2 class="text-lg font-semibold text-gray-900 mb-1">Add User</h2>
+        <p class="text-sm text-gray-600 mb-4">Creates a real account. Choose <strong>ADMIN</strong> for a provider admin, <strong>USER</strong> for provider staff, or <strong>CLIENT</strong> for a client-side account.</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input v-model="addUserForm.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+            <input v-model="addUserForm.firstName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Juan" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+            <input v-model="addUserForm.lastName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Dela Cruz" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input v-model="addUserForm.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
-            <input v-model="addUserForm.company" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="addUserForm.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="juan@secphils.com" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
             <select v-model="addUserForm.role" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option>Client Admin</option>
-              <option>Team Member</option>
+              <option value="ADMIN">ADMIN — Provider Admin</option>
+              <option value="USER">USER — Provider Staff</option>
+              <option value="CLIENT">CLIENT — Client Account</option>
             </select>
           </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
+            <input v-model="addUserForm.password" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Min. 8 characters" />
+          </div>
+        </div>
+        <div v-if="addUserMessage" :class="[
+          'mt-4 p-3 rounded-lg text-sm',
+          addUserMessage.ok ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
+        ]">
+          {{ addUserMessage.text }}
         </div>
         <div class="mt-4 flex justify-end">
-          <button @click="addUser" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm">
-            + Create User
+          <button
+            @click="addUser"
+            :disabled="addUserSaving || !addUserForm.firstName.trim() || !addUserForm.lastName.trim() || !addUserForm.email.trim() || !addUserForm.password"
+            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ addUserSaving ? 'Creating…' : '+ Create User' }}
           </button>
         </div>
       </div>
