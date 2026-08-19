@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useGetMe } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 
@@ -10,6 +10,18 @@ const currentUserId = computed(() => {
   if (stored) return Number(stored)
   return (authStore.user as any)?.id ?? null
 })
+
+// The provider company = the currently-logged-in admin's own company.
+// Defaults USER/ADMIN accounts to it on create and edit.
+const providerCompanyId = ref<number | null>(null)
+const loadProviderCompany = async () => {
+  try {
+    const me = await useGetMe()
+    providerCompanyId.value = (me as any)?.companyId ?? null
+  } catch {
+    providerCompanyId.value = null
+  }
+}
 
 const activeTab = ref('dashboard')
 
@@ -215,11 +227,13 @@ const openEdit = (user: PortalUser) => {
 }
 
 const onEditRoleChange = () => {
-  if (editForm.value.role !== 'CLIENT') editForm.value.companyId = null
+  // Company only applies to CLIENT accounts; default USER/ADMIN to the provider company
+  editForm.value.companyId = editForm.value.role === 'CLIENT' ? editForm.value.companyId : providerCompanyId.value
 }
 
 const onAddRoleChange = () => {
-  if (addUserForm.value.role !== 'CLIENT') addUserForm.value.companyId = null
+  // Company only applies to CLIENT accounts; default USER/ADMIN to the provider company
+  addUserForm.value.companyId = addUserForm.value.role === 'CLIENT' ? addUserForm.value.companyId : providerCompanyId.value
 }
 
 const saveEdit = async () => {
@@ -251,6 +265,7 @@ const saveEdit = async () => {
 }
 
 onMounted(() => {
+  loadProviderCompany()
   loadUsers()
   loadCompanies()
   loadSystemSettings()

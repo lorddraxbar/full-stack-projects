@@ -127,7 +127,15 @@ public class UserController {
         user.setFirstName(req.firstName());
         user.setLastName(req.lastName());
         user.setRole(req.role() != null ? req.role() : "CLIENT");
-        user.setCompanyId(req.companyId());
+        // For provider staff (USER/ADMIN), default the company to the acting admin's own company
+        // (the provider company) unless an explicit company was chosen.
+        Long companyId = req.companyId();
+        if (companyId == null && !"CLIENT".equals(user.getRole())) {
+            companyId = userRepository.findById(actor.id())
+                    .map(User::getCompanyId)
+                    .orElse(null);
+        }
+        user.setCompanyId(companyId);
         // New users start inactive — they activate by setting their own password via the invite link
         user.setIsActive(false);
         user = userRepository.save(user);
@@ -260,6 +268,13 @@ public class UserController {
                 throw ApiException.badRequest("Selected company does not exist");
             }
             user.setCompanyId(req.companyId());
+        } else if (req.companyId() == null && req.role() != null && !"CLIENT".equals(req.role())) {
+            // Switching a user to provider staff without an explicit company:
+            // default to the acting admin's own (provider) company.
+            Long providerId = userRepository.findById(actor.id())
+                    .map(User::getCompanyId)
+                    .orElse(null);
+            if (providerId != null) user.setCompanyId(providerId);
         }
         user = userRepository.save(user);
         auditService.audit(actor, "USER_UPDATE", "User", user.getId(), "Email: " + user.getEmail(), http);

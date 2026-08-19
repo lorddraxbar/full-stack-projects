@@ -16,9 +16,37 @@ const props = defineProps<{
 
 const open = ref(false)
 const menuRef = ref<HTMLElement | null>(null)
+const btnRef = ref<HTMLElement | null>(null)
 
-const toggle = () => { open.value = !open.value }
+// Fixed-position style for the menu, computed so it never clips inside
+// an overflow container and flips upward when near the bottom viewport edge.
+const posStyle = ref<{ top: string; left: string }>({ top: '0px', left: '0px' })
+const flip = ref(false)
+
+const MENU_W = 176   // matches w-44 (11rem)
+const EST_ITEM_H = 38
+
+const toggle = () => {
+  if (open.value) {
+    close()
+  } else {
+    openMenu()
+  }
+}
 const close = () => { open.value = false }
+
+const openMenu = () => {
+  const btn = btnRef.value
+  if (!btn) return
+  const rect = btn.getBoundingClientRect()
+  const menuH = Math.min(360, (props.actions.filter(a => !a.divider).length * EST_ITEM_H) + 16)
+  const spaceBelow = window.innerHeight - rect.bottom
+  flip.value = spaceBelow < menuH
+  const top = flip.value ? rect.top - menuH - 6 : rect.bottom + 6
+  const left = Math.max(8, Math.min(rect.right - MENU_W, window.innerWidth - MENU_W - 8))
+  posStyle.value = { top: `${Math.max(8, top)}px`, left: `${left}px` }
+  open.value = true
+}
 
 const run = (action: RowAction) => {
   close()
@@ -30,21 +58,28 @@ const onKeydown = (e: KeyboardEvent) => {
 }
 
 const onDocClick = (e: MouseEvent) => {
-  if (menuRef.value && !menuRef.value.contains(e.target as Node)) close()
+  if (open.value && menuRef.value && !menuRef.value.contains(e.target as Node)
+      && btnRef.value && !btnRef.value.contains(e.target as Node)) close()
 }
+
+const onScroll = () => { if (open.value) close() }
 
 onMounted(() => {
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onKeydown)
+  document.addEventListener('scroll', onScroll, true)
+  window.addEventListener('resize', onScroll)
 })
 onBeforeUnmount(() => {
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('scroll', onScroll, true)
+  window.removeEventListener('resize', onScroll)
 })
 </script>
 
 <template>
-  <div ref="menuRef" class="relative inline-block text-left">
+  <div ref="btnRef" class="inline-block text-left">
     <button
       type="button"
       @click.stop="toggle"
@@ -54,23 +89,30 @@ onBeforeUnmount(() => {
     >
       <i class="fas fa-ellipsis-vertical text-sm" />
     </button>
-    <div
-      v-if="open"
-      class="absolute right-0 z-30 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
-    >
-      <template v-for="(action, i) in props.actions" :key="i">
-        <div v-if="action.divider" class="my-1 border-t border-gray-100" />
-        <button
-          type="button"
-          @click="run(action)"
-          :class="[
-            'w-full text-left px-4 py-2 text-sm font-medium transition-colors',
-            action.color || 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-          ]"
-        >
-          {{ action.label }}
-        </button>
-      </template>
-    </div>
+    <Teleport to="body">
+      <div
+        v-if="open"
+        ref="menuRef"
+        :style="posStyle"
+        :class="[
+          'fixed z-50 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1',
+          flip ? 'mb-1' : 'mt-1'
+        ]"
+      >
+        <template v-for="(action, i) in props.actions" :key="i">
+          <div v-if="action.divider" class="my-1 border-t border-gray-100" />
+          <button
+            type="button"
+            @click="run(action)"
+            :class="[
+              'w-full text-left px-4 py-2 text-sm font-medium transition-colors',
+              action.color || 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+            ]"
+          >
+            {{ action.label }}
+          </button>
+        </template>
+      </div>
+    </Teleport>
   </div>
 </template>
