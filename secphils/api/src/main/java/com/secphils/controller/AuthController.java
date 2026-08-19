@@ -37,25 +37,6 @@ public class AuthController {
         this.auditService = auditService;
     }
 
-    @PostMapping("/register")
-    @Transactional
-    public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest req,
-                                                 HttpServletRequest http) {
-        if (userRepository.findByEmail(req.email()).isPresent()) {
-            throw ApiException.conflict("A user with this email already exists");
-        }
-        User user = new User();
-        user.setEmail(req.email());
-        user.setPasswordHash(passwordEncoder.encode(req.password()));
-        user.setFirstName(req.firstName());
-        user.setLastName(req.lastName());
-        user.setRole(req.role());
-        user.setIsActive(true);
-        user = userRepository.save(user);
-        auditService.audit(null, "USER_REGISTER", "User", user.getId(), "Email: " + user.getEmail(), http);
-        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(user));
-    }
-
     @PostMapping("/login")
     @Transactional
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest req,

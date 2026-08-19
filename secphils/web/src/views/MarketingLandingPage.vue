@@ -110,18 +110,15 @@ onMounted(() => {
             Streamline project management, collaboration, and delivery with our enterprise-grade client portal.
           </p>
           <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" @click="router.push('/login')">
-              Get Started
-            </Button>
-            <Button variant="outline" size="lg" class="bg-white/10 text-white border-white/20 hover:bg-white/20" @click="router.push('/register')">
-              Request a Demo
+            <Button size="lg" @click="router.push('/auth/login')">
+              Portal Login
             </Button>
           </div>
         </div>
       </div>
 
       <!-- Decorative elements -->
-      <div class="absolute inset-0 overflow-hidden">
+      <div class="absolute inset-0 overflow-hidden pointer-events-none">
         <div class="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl" />
         <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl" />
       </div>
@@ -226,8 +223,8 @@ onMounted(() => {
         <p class="text-xl text-blue-100 mb-8">
           Join hundreds of companies using our portal to streamline their project delivery.
         </p>
-        <Button size="lg" variant="secondary" @click="router.push('/login')">
-          Create Your Account
+        <Button size="lg" variant="secondary" @click="router.push('/auth/login')">
+          Portal Login
         </Button>
       </div>
     </section>

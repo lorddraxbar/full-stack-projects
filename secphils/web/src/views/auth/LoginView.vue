@@ -101,15 +101,6 @@ const handleLogin = async () => {
       </button>
     </form>
 
-    <div class="mt-6 text-center">
-      <p class="text-sm text-gray-600">
-        Don't have an account?
-        <RouterLink to="/auth/register" class="text-blue-600 hover:text-blue-700 font-medium">
-          Create one
-        </RouterLink>
-      </p>
-    </div>
-
     <div class="mt-6">
       <div class="relative">
         <div class="absolute inset-0 flex items-center">

@@ -18,12 +18,6 @@ const routes: RouteRecordRaw[] = [
         meta: { guest: true },
       },
       {
-        path: 'register',
-        name: 'Register',
-        component: () => import('@/views/auth/RegisterView.vue'),
-        meta: { guest: true },
-      },
-      {
         path: 'sso/callback',
         name: 'SSOCallback',
         component: () => import('@/views/auth/SSOCallbackView.vue'),
@@ -88,6 +82,10 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAdmin: true },
       },
     ],
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/',
   },
 ]
 

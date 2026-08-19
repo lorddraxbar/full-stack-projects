@@ -39,11 +39,6 @@ export async function useLogin(credentials: { email: string; password: string })
   return response.data
 }
 
-export async function useRegister(data: Record<string, unknown>) {
-  const response = await api.post('/auth/register', data)
-  return response.data
-}
-
 export async function useSSOCallback(provider: string, identity: { email: string; firstName: string; lastName: string }) {
   const response = await api.post(`/auth/sso/${provider}`, identity)
   return response.data

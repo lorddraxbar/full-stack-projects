@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useRole } from '../composables/useRole'
 
 const { role } = useRole()
+const router = useRouter()
 
 const allNavItems = [
   { name: 'Dashboard', path: '/dashboard', icon: 'fas fa-chart-bar', roles: ['CLIENT', 'USER', 'ADMIN'] },
@@ -58,6 +59,14 @@ const isActive = (path: string) => {
 const roleLabel = computed(() =>
   role.value === 'CLIENT' ? 'Client' : role.value === 'USER' ? 'User' : 'Admin'
 )
+
+const logout = () => {
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('refreshToken')
+  localStorage.removeItem('userRole')
+  localStorage.removeItem('userName')
+  router.push('/auth/login')
+}
 </script>
 
 <template>
@@ -135,6 +144,13 @@ const roleLabel = computed(() =>
               <p class="text-sm font-medium text-gray-700 leading-tight">{{ userName }}</p>
               <p class="text-xs text-gray-500 leading-tight">{{ roleLabel }}</p>
             </div>
+            <button
+              @click="logout"
+              title="Log out"
+              class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-red-600"
+            >
+              <i class="fas fa-sign-out-alt" />
+            </button>
           </div>
         </div>
       </header>
