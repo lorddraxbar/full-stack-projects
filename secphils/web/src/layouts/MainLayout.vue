@@ -97,7 +97,7 @@ const logout = () => {
       <!-- Logo -->
       <div class="h-16 flex items-center justify-center border-b border-gray-200">
         <h1 class="text-lg font-bold text-blue-600" :class="{ 'hidden': !isSidebarOpen }">
-          SecPhils
+          SECPhils
         </h1>
       </div>
 

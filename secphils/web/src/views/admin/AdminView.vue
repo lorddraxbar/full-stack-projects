@@ -50,9 +50,9 @@ const toggleUserStatus = (user: (typeof clientUsers.value)[0]) => {
 
 // ---------- Company Settings: Company Profile ----------
 const companyProfile = ref({
-  name: 'SecPhils Consulting',
+  name: 'SECPhils Consulting',
   tagline: 'Expertise you can trust',
-  description: 'SecPhils provides management consulting, compliance, and engineering services to Philippine enterprises.',
+  description: 'SECPhils provides management consulting, compliance, and engineering services to Philippine enterprises.',
   industrySectors: 'Manufacturing, Energy, Finance, Government',
   headquarters: '60F Tower, 2000 Shaw Boulevard, Makati City, Philippines',
   phone: '+63 2 8888 1234',
@@ -60,7 +60,7 @@ const companyProfile = ref({
   website: 'https://www.secphils.com',
   socialLinks: 'https://www.linkedin.com/company/secphils',
   taxNumber: 'BTW-000-123-456-789',
-  bankingDetails: 'BDO · Acct ****4821 · SecPhils Consulting Inc.',
+  bankingDetails: 'BDO · Acct ****4821 · SECPhils Consulting Inc.',
   operationalFields: 'Preferred Language, Work Location, Project Reference Number',
   logo: null as string | null,
   brandPrimary: '#2563eb',
@@ -221,7 +221,7 @@ const publishAnnouncement = () => {
 
 // ---------- System Settings ----------
 const systemSettings = ref({
-  portalName: 'SecPhils Client Portal',
+  portalName: 'SECPhils Client Portal',
   maintenanceMode: false,
   securityPolicies: {
     passwordMinLength: 12,
@@ -231,9 +231,9 @@ const systemSettings = ref({
   },
 })
 const emailTemplates = ref([
-  { id: 1, name: 'Welcome Email', subject: 'Welcome to the SecPhils Portal', body: 'Hi {{name}},\n\nYour account is ready. Sign in to view your assigned projects.\n\n— SecPhils Team' },
-  { id: 2, name: 'Team Invitation', subject: 'You have been invited to {{company}}', body: 'Hi {{name}},\n\n{{inviter}} has invited you to join {{company}} on the SecPhils Portal.\n\nSetup link: {{setupLink}}\n\n— SecPhils Team' },
-  { id: 3, name: 'Project Update', subject: 'Update on {{project}}', body: 'Hi {{name}},\n\nNew update on {{project}}: {{updateText}}\n\n— SecPhils Team' },
+  { id: 1, name: 'Welcome Email', subject: 'Welcome to the SECPhils Portal', body: 'Hi {{name}},\n\nYour account is ready. Sign in to view your assigned projects.\n\n— SECPhils Team' },
+  { id: 2, name: 'Team Invitation', subject: 'You have been invited to {{company}}', body: 'Hi {{name}},\n\n{{inviter}} has invited you to join {{company}} on the SECPhils Portal.\n\nSetup link: {{setupLink}}\n\n— SECPhils Team' },
+  { id: 3, name: 'Project Update', subject: 'Update on {{project}}', body: 'Hi {{name}},\n\nNew update on {{project}}: {{updateText}}\n\n— SECPhils Team' },
 ])
 const integrations = ref([
   { id: 1, name: 'Gmail / Google Workspace', type: 'Email', status: 'Connected', detail: 'notifications@secphils.com' },
