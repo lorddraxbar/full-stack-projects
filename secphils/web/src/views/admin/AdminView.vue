@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 
 const authStore = useAuthStore()
@@ -39,11 +39,24 @@ interface PortalUser {
   isActive: boolean
   deactivatedAt: string | null
   lastLogin: string | null
+  companyId: number | null
+  companyName: string | null
 }
 
 const clientUsers = ref<PortalUser[]>([])
 const usersLoading = ref(false)
 const usersError = ref('')
+
+// Companies (for assigning a client/staff member to a company)
+const companies = ref<{ id: number; name: string }[]>([])
+const loadCompanies = async () => {
+  try {
+    const data = await useGetCompanies()
+    companies.value = data.map((c: any) => ({ id: c.id, name: c.name }))
+  } catch {
+    companies.value = []
+  }
+}
 
 const loadUsers = async () => {
   usersLoading.value = true
@@ -58,7 +71,7 @@ const loadUsers = async () => {
   }
 }
 
-const addUserForm = ref({ firstName: '', lastName: '', email: '', role: 'CLIENT' })
+const addUserForm = ref({ firstName: '', lastName: '', email: '', role: 'CLIENT', companyId: null as number | null })
 const addUserSaving = ref(false)
 const addUserMessage = ref<{ ok: boolean; text: string } | null>(null)
 
@@ -73,9 +86,10 @@ const addUser = async () => {
       lastName: f.lastName.trim(),
       email: f.email.trim(),
       role: f.role,
+      companyId: f.companyId || null,
     })
     addUserMessage.value = { ok: true, text: 'User created. An invite link has been emailed to them — they set their own password on first use.' }
-    addUserForm.value = { firstName: '', lastName: '', email: '', role: 'CLIENT' }
+    addUserForm.value = { firstName: '', lastName: '', email: '', role: 'CLIENT', companyId: null }
     await loadUsers()
   } catch (err: any) {
     addUserMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to create user' }
@@ -147,8 +161,69 @@ const confirmHardDelete = async () => {
   }
 }
 
+// ---------- Edit User ----------
+interface EditForm {
+  email: string
+  firstName: string
+  lastName: string
+  role: string
+  companyId: number | null
+  isActive: boolean
+  password: string
+}
+const editTarget = ref<PortalUser | null>(null)
+const editForm = ref<EditForm>({ email: '', firstName: '', lastName: '', role: 'CLIENT', companyId: null, isActive: true, password: '' })
+const editSaving = ref(false)
+const editError = ref('')
+const editMessage = ref('')
+
+const openEdit = (user: PortalUser) => {
+  editTarget.value = user
+  editForm.value = {
+    email: user.email,
+    firstName: user.fullName.split(' ')[0] || '',
+    lastName: user.fullName.split(' ').slice(1).join(' ') || '',
+    role: user.role,
+    companyId: user.companyId ?? null,
+    isActive: user.isActive,
+    password: '',
+  }
+  editError.value = ''
+  editMessage.value = ''
+}
+
+const saveEdit = async () => {
+  const user = editTarget.value
+  if (!user) return
+  const f = editForm.value
+  if (!f.email.trim() || !f.firstName.trim() || !f.lastName.trim()) return
+  editSaving.value = true
+  editError.value = ''
+  editMessage.value = ''
+  try {
+    await useUpdateUser(user.id, {
+      email: f.email.trim(),
+      firstName: f.firstName.trim(),
+      lastName: f.lastName.trim(),
+      role: f.role,
+      companyId: f.companyId,
+      isActive: f.isActive,
+      ...(f.password.trim() ? { password: f.password.trim() } : {}),
+    })
+    editMessage.value = 'User updated.'
+    await loadUsers()
+    editTarget.value = null
+  } catch (err: any) {
+    editError.value = err.response?.data?.message || 'Failed to update user'
+  } finally {
+    editSaving.value = false
+  }
+}
+
 onMounted(() => {
   loadUsers()
+  loadCompanies()
+  loadSystemSettings()
 })
 
 // ---------- Company Settings: Company Profile ----------
@@ -322,10 +397,11 @@ const publishAnnouncement = () => {
   alert('Announcement published.')
 }
 
-// ---------- System Settings ----------
+// ---------- System Settings (real API) ----------
 const systemSettings = ref({
   portalName: 'SECPhils Portal',
   maintenanceMode: false,
+  inviteBaseUrl: '',
   securityPolicies: {
     passwordMinLength: 12,
     require2fa: false,
@@ -333,6 +409,34 @@ const systemSettings = ref({
     maxLoginAttempts: 5,
   },
 })
+const systemSettingsMessage = ref<{ ok: boolean; text: string } | null>(null)
+
+const loadSystemSettings = async () => {
+  try {
+    const data = await useGetSystemSettings()
+    if (data) {
+      systemSettings.value.portalName = data.portalName ?? systemSettings.value.portalName
+      systemSettings.value.maintenanceMode = !!data.maintenanceMode
+      systemSettings.value.inviteBaseUrl = data.inviteBaseUrl ?? ''
+    }
+  } catch {
+    // keep defaults if the settings endpoint is unavailable
+  }
+}
+
+const saveSystemSettings = async () => {
+  systemSettingsMessage.value = null
+  try {
+    await useUpdateSystemSettings({
+      portalName: systemSettings.value.portalName,
+      maintenanceMode: systemSettings.value.maintenanceMode,
+      inviteBaseUrl: systemSettings.value.inviteBaseUrl.trim(),
+    })
+    systemSettingsMessage.value = { ok: true, text: 'System settings saved.' }
+  } catch (err: any) {
+    systemSettingsMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save settings' }
+  }
+}
 const emailTemplates = ref([
   { id: 1, name: 'Welcome Email', subject: 'Welcome to the SECPhils Portal', body: 'Hi {{name}},\n\nYour account is ready. Sign in to view your assigned projects.\n\n— SECPhils Team' },
   { id: 2, name: 'Team Invitation', subject: 'You have been invited to {{company}}', body: 'Hi {{name}},\n\n{{inviter}} has invited you to join {{company}} on the SECPhils Portal.\n\nSetup link: {{setupLink}}\n\n— SECPhils Team' },
@@ -348,7 +452,6 @@ const toggleIntegration = (i: (typeof integrations.value)[0]) => {
   i.status = i.status === 'Connected' ? 'Disconnected' : 'Connected'
   i.detail = i.status === 'Connected' ? i.detail === '—' ? 'Connected' : i.detail : '—'
 }
-const saveSystemSettings = () => alert('System settings saved!')
 
 // ---------- Tabs ----------
 const tabItems = [
@@ -479,17 +582,18 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Login</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Last Login</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
               <tr v-if="usersLoading && clientUsers.length === 0">
-                <td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500">Loading users…</td>
+                <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">Loading users…</td>
               </tr>
               <tr v-else-if="clientUsers.length === 0">
-                <td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500">No users found.</td>
+                <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">No users found.</td>
               </tr>
               <tr v-for="user in clientUsers" :key="user.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4">
@@ -508,6 +612,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                     user.role === 'USER' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
                   ]">{{ user.role }}</span>
                 </td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ user.companyName || '—' }}</td>
                 <td class="px-6 py-4">
                   <span :class="[
                     'px-2 py-1 text-xs font-medium rounded-full',
@@ -516,9 +621,16 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                     {{ user.isActive ? 'Active' : 'Deactivated' }}
                   </span>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ user.lastLogin ? user.lastLogin.replace('T', ' ').slice(0, 16) : 'Never' }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ user.lastLogin ? user.lastLogin.replace('T', ' ').slice(0, 16) : 'Never' }}</td>
                 <td class="px-6 py-4">
-                  <div class="flex items-center gap-3">
+                  <div class="flex items-center gap-3 whitespace-nowrap">
+                    <button
+                      v-if="user.id !== currentUserId"
+                      @click="openEdit(user)"
+                      class="text-gray-700 hover:text-gray-900 text-sm font-medium"
+                    >
+                      Edit
+                    </button>
                     <button
                       v-if="user.isActive && user.id !== currentUserId"
                       @click="deactivateUser(user)"
@@ -579,6 +691,14 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               <option value="USER">USER — Provider Staff</option>
               <option value="CLIENT">CLIENT — Client Account</option>
             </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
+            <select v-model="addUserForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option :value="null">— No company —</option>
+              <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Assign the client's company (or the staff member's company). Leave blank to assign later.</p>
           </div>
         </div>
         <div v-if="addUserMessage" :class="[
@@ -1139,6 +1259,19 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             />
           </div>
 
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Invite Link Base URL</label>
+            <input
+              v-model="systemSettings.inviteBaseUrl"
+              type="url"
+              placeholder="https://portal.secphils.com"
+              class="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p class="text-xs text-gray-500 mt-1">
+              The host used in the "Set your password" link sent to invited users. Leave blank to use the URL the admin is currently on (dynamic).
+            </p>
+          </div>
+
           <div class="flex items-center gap-2">
             <input
               id="maintenance"
@@ -1186,6 +1319,13 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 <label for="require2fa" class="text-sm text-gray-700">Require 2FA</label>
               </div>
             </div>
+          </div>
+
+          <div v-if="systemSettingsMessage" :class="[
+            'p-3 rounded-lg text-sm',
+            systemSettingsMessage.ok ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
+          ]">
+            {{ systemSettingsMessage.text }}
           </div>
 
           <div class="flex justify-end">
@@ -1333,6 +1473,79 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ hardDeleteBusy ? 'Deleting…' : 'Delete Permanently' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit user modal -->
+    <div v-if="editTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold text-gray-900">
+          <i class="fas fa-pen text-blue-600 mr-2" />Edit {{ editTarget.fullName }}
+        </h3>
+        <p class="mt-1 text-sm text-gray-500">{{ editTarget.email }}</p>
+        <div class="mt-4 space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <input v-model="editForm.firstName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <input v-model="editForm.lastName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input v-model="editForm.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+              <select v-model="editForm.role" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="ADMIN">ADMIN — Provider Admin</option>
+                <option value="USER">USER — Provider Staff</option>
+                <option value="CLIENT">CLIENT — Client Account</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
+              <select v-model="editForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option :value="null">— No company —</option>
+                <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">New Password (optional)</label>
+            <input v-model="editForm.password" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Leave blank to keep current" />
+          </div>
+          <div class="flex items-center gap-2">
+            <input
+              id="editIsActive"
+              v-model="editForm.isActive"
+              type="checkbox"
+              class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <label for="editIsActive" class="text-sm text-gray-700">Account is active</label>
+          </div>
+          <div v-if="editError" class="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ editError }}</div>
+          <div v-if="editMessage" class="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">{{ editMessage }}</div>
+        </div>
+        <div class="mt-5 flex justify-end gap-3">
+          <button
+            @click="editTarget = null"
+            class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
+          >
+            Close
+          </button>
+          <button
+            @click="saveEdit"
+            :disabled="editSaving || !editForm.firstName.trim() || !editForm.lastName.trim() || !editForm.email.trim()"
+            class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ editSaving ? 'Saving…' : 'Save Changes' }}
           </button>
         </div>
       </div>

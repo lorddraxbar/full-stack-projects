@@ -6,7 +6,11 @@ import com.secphils.dto.HardDeleteUserRequest;
 import com.secphils.dto.SetPasswordRequest;
 import com.secphils.dto.UpdateUserRequest;
 import com.secphils.dto.UserResponse;
+import com.secphils.entity.Company;
+import com.secphils.entity.SystemSettings;
 import com.secphils.entity.User;
+import com.secphils.repository.CompanyRepository;
+import com.secphils.repository.SystemSettingsRepository;
 import com.secphils.repository.UserRepository;
 import com.secphils.security.CurrentUser;
 import com.secphils.security.AuthUser;
@@ -31,17 +35,22 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserController {
 
     private final UserRepository userRepository;
+    private final CompanyRepository companyRepository;
+    private final SystemSettingsRepository settingsRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
     private final MailService mailService;
     private final String inviteBaseUrl;
     private final Duration inviteTtl;
 
-    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder,
+    public UserController(UserRepository userRepository, CompanyRepository companyRepository,
+                          SystemSettingsRepository settingsRepository, PasswordEncoder passwordEncoder,
                           AuditService auditService, MailService mailService,
                           @Value("${app.invite.base-url}") String inviteBaseUrl,
                           @Value("${app.invite.token-ttl:24h}") Duration inviteTtl) {
         this.userRepository = userRepository;
+        this.companyRepository = companyRepository;
+        this.settingsRepository = settingsRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
         this.mailService = mailService;
@@ -55,7 +64,7 @@ public class UserController {
         AuthUser me = CurrentUser.require();
         User user = userRepository.findById(me.id())
                 .orElseThrow(() -> ApiException.notFound("User"));
-        return ResponseEntity.ok(UserResponse.from(user));
+        return ResponseEntity.ok(UserResponse.from(user, companyName(user)));
     }
 
     @PutMapping("/me")
@@ -82,13 +91,19 @@ public class UserController {
         // self cannot change own role or active status
         user = userRepository.save(user);
         auditService.audit(me, "USER_UPDATE_SELF", "User", user.getId(), null, http);
-        return ResponseEntity.ok(UserResponse.from(user));
+        return ResponseEntity.ok(UserResponse.from(user, companyName(user)));
     }
 
     @GetMapping
     @Transactional(readOnly = true)
     public ResponseEntity<List<UserResponse>> list() {
-        return ResponseEntity.ok(userRepository.findAll().stream().map(UserResponse::from).toList());
+        // Batch-load company names so the user table doesn't N+1
+        Map<Long, String> companyNames = companyRepository.findAll().stream()
+                .collect(java.util.stream.Collectors.toMap(Company::getId, Company::getName, (a, b) -> a));
+        List<UserResponse> users = userRepository.findAll().stream()
+                .map(u -> UserResponse.from(u, u.getCompanyId() != null ? companyNames.get(u.getCompanyId()) : null))
+                .toList();
+        return ResponseEntity.ok(users);
     }
 
     @PostMapping
@@ -104,16 +119,20 @@ public class UserController {
         if (userRepository.findByEmail(req.email()).isPresent()) {
             throw ApiException.conflict("A user with this email already exists");
         }
+        if (req.companyId() != null && companyRepository.findById(req.companyId()).isEmpty()) {
+            throw ApiException.badRequest("Selected company does not exist");
+        }
         User user = new User();
         user.setEmail(req.email());
         user.setFirstName(req.firstName());
         user.setLastName(req.lastName());
         user.setRole(req.role() != null ? req.role() : "CLIENT");
+        user.setCompanyId(req.companyId());
         // New users start inactive — they activate by setting their own password via the invite link
         user.setIsActive(false);
         user = userRepository.save(user);
         issueInvite(user, actor, http);
-        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(user));
+        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(user, companyName(user)));
     }
 
     @PostMapping("/{id}/resend-invite")
@@ -160,10 +179,46 @@ public class UserController {
         user.setPasswordResetExpiresAt(LocalDateTime.now().plus(inviteTtl));
         user.setPasswordResetRequestedAt(LocalDateTime.now());
         userRepository.save(user);
-        String link = inviteBaseUrl + "/auth/set-password?token=" + token;
+        String link = resolveInviteBaseUrl(http) + "/auth/set-password?token=" + token;
         mailService.sendHtml(user.getEmail(), "Set your SECPhils Portal password",
-                mailService.inviteEmail(user.getFirstName(), user.getFullName(), link));
+                mailService.inviteEmail(user.getFirstName(), user.getFullName(), link), link);
         auditService.audit(actor, "USER_INVITE_SENT", "User", user.getId(), "Email: " + user.getEmail(), http);
+    }
+
+    /**
+     * Invite link base URL, in priority order:
+     * 1. The admin-set value in System Settings (explicit, wins).
+     * 2. The host the admin is currently using (Origin/Referer) — dynamic, so a
+     *    fresh deployment works without any configuration.
+     * 3. The INVITE_BASE_URL environment variable as a last resort (e.g. non-browser callers).
+     */
+    private String resolveInviteBaseUrl(HttpServletRequest http) {
+        String fromSettings = settingsRepository.findAll().stream().findFirst()
+                .map(SystemSettings::getInviteBaseUrl)
+                .filter(s -> s != null && !s.isBlank())
+                .orElse(null);
+        if (fromSettings != null) return fromSettings.replaceAll("/+$", "");
+        String origin = http.getHeader("Origin");
+        if (origin == null || origin.isBlank()) {
+            String referer = http.getHeader("Referer");
+            if (referer != null && !referer.isBlank()) {
+                try {
+                    java.net.URI u = java.net.URI.create(referer);
+                    if (u.getScheme() != null && u.getAuthority() != null) {
+                        origin = u.getScheme() + "://" + u.getAuthority();
+                    }
+                } catch (Exception ignored) {
+                    // malformed referer — fall through
+                }
+            }
+        }
+        if (origin != null && !origin.isBlank()) return origin.replaceAll("/+$", "");
+        return inviteBaseUrl.replaceAll("/+$", "");
+    }
+
+    private String companyName(User user) {
+        if (user.getCompanyId() == null) return null;
+        return companyRepository.findById(user.getCompanyId()).map(Company::getName).orElse(null);
     }
 
     private String newToken() {
@@ -180,6 +235,9 @@ public class UserController {
                                                @Valid @RequestBody UpdateUserRequest req,
                                                HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
+        if (actor.id().equals(id)) {
+            throw ApiException.forbidden("You cannot edit your own account here — use Settings");
+        }
         User user = userRepository.findById(id).orElseThrow(() -> ApiException.notFound("User"));
         if (req.email() != null && !req.email().isBlank()) {
             final Long currentId = user.getId();
@@ -197,9 +255,15 @@ public class UserController {
         if (req.lastName() != null && !req.lastName().isBlank()) user.setLastName(req.lastName());
         if (req.role() != null && !req.role().isBlank()) user.setRole(req.role());
         if (req.isActive() != null) user.setIsActive(req.isActive());
+        if (req.companyId() != null) {
+            if (companyRepository.findById(req.companyId()).isEmpty()) {
+                throw ApiException.badRequest("Selected company does not exist");
+            }
+            user.setCompanyId(req.companyId());
+        }
         user = userRepository.save(user);
         auditService.audit(actor, "USER_UPDATE", "User", user.getId(), "Email: " + user.getEmail(), http);
-        return ResponseEntity.ok(UserResponse.from(user));
+        return ResponseEntity.ok(UserResponse.from(user, companyName(user)));
     }
 
     @DeleteMapping("/{id}")

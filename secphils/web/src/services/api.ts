@@ -56,7 +56,7 @@ export async function useGetMe() {
   return response.data
 }
 
-export async function useCreateUser(data: { firstName: string; lastName: string; email: string; role: string; password?: string; isActive?: boolean }) {
+export async function useCreateUser(data: { firstName: string; lastName: string; email: string; role: string; companyId?: number | null; password?: string; isActive?: boolean }) {
   const response = await api.post('/users', data)
   return response.data
 }

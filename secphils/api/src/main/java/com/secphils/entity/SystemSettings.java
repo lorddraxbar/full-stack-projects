@@ -36,6 +36,9 @@ public class SystemSettings {
     @Column(name = "maintenance_mode")
     private Boolean maintenanceMode = false;
 
+    @Column(name = "invite_base_url")
+    private String inviteBaseUrl;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 

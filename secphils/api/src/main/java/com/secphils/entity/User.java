@@ -34,6 +34,9 @@ public class User {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @Column(name = "deactivated_at")
     private LocalDateTime deactivatedAt;
 

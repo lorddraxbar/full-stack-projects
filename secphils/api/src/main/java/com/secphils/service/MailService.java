@@ -26,7 +26,7 @@ public class MailService {
         this.fromAddress = fromAddress;
     }
 
-    public void sendHtml(String to, String subject, String htmlBody) {
+    public void sendHtml(String to, String subject, String htmlBody, String link) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
@@ -35,7 +35,7 @@ public class MailService {
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
             mailSender.send(message);
-            log.info("Mail sent to {} — {}", to, subject);
+            log.info("Mail sent to {} — {} (link: {})", to, subject, link);
         } catch (Exception e) {
             log.error("Failed to send mail to {} — {}: {}", to, subject, e.getMessage(), e);
         }
@@ -56,7 +56,7 @@ public class MailService {
                         <tr><td style="padding:32px;">
                           <h1 style="margin:0 0 16px;font-size:18px;font-weight:600;">Welcome, %FIRSTNAME%</h1>
                           <p style="margin:0 0 16px;font-size:14px;line-height:1.6;">
-                            %FULLNAME% has created a SECPhils Portal account for you.
+                            You have been invited to join the SECPhils portal.
                             Set your password to activate it — no one else, including us, knows it.
                           </p>
                           <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0;">

@@ -49,6 +49,10 @@ public class AdminController {
         if (body.containsKey("maintenanceMode")) {
             settings.setMaintenanceMode(Boolean.valueOf(String.valueOf(body.get("maintenanceMode"))));
         }
+        if (body.containsKey("inviteBaseUrl")) {
+            String url = body.get("inviteBaseUrl") == null ? null : String.valueOf(body.get("inviteBaseUrl")).trim();
+            settings.setInviteBaseUrl(url == null || url.isEmpty() ? null : url);
+        }
         settings.setUpdatedAt(LocalDateTime.now());
         settings = settingsRepository.save(settings);
         auditService.audit(actor, "SETTINGS_UPDATE", "SystemSettings", settings.getId(), null, http);
