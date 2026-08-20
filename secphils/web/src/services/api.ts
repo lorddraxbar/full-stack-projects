@@ -304,3 +304,45 @@ export async function useUpdateSystemSettings(data: Record<string, unknown>) {
   const response = await api.put('/admin/settings', data)
   return response.data
 }
+
+// ---------- Public landing page ----------
+export interface LandingCompany {
+  id?: number
+  name?: string
+  location?: string
+  owner?: string
+  description?: string
+  tagline?: string
+  industrySectors?: string
+  headquarters?: string
+  phone?: string
+  email?: string
+  website?: string
+  socialLinks?: string
+  brandPrimary?: string
+  brandSecondary?: string
+  logoUrl?: string
+}
+
+export interface LandingReview {
+  id: number
+  customerName?: string
+  projectName?: string
+  rating: number
+  title: string
+  body: string
+  createdAt?: string
+}
+
+export interface LandingPayload {
+  portalName: string
+  tagline: string
+  maintenanceMode: boolean
+  company?: LandingCompany
+  reviews?: LandingReview[]
+}
+
+export async function useGetLanding(): Promise<LandingPayload> {
+  const response = await api.get('/landing')
+  return response.data
+}

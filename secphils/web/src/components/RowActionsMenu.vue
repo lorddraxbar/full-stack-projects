@@ -10,7 +10,7 @@ export interface RowAction {
   divider?: boolean
   /** grey out and block the item (e.g. role still assigned to accounts) */
   disabled?: boolean
-  /** tooltip shown when the item is disabled (rendered via the title attribute) */
+  /** hint shown as a hover tooltip next to the item when it is disabled */
   disabledHint?: string
 }
 
@@ -53,6 +53,7 @@ const openMenu = () => {
 }
 
 const run = (action: RowAction) => {
+  if (action.disabled) return
   close()
   action.onClick()
 }
@@ -108,20 +109,30 @@ onBeforeUnmount(() => {
       >
         <template v-for="(action, i) in props.actions" :key="i">
           <div v-if="action.divider" class="my-1 border-t border-gray-100" />
-          <button
-            type="button"
-            :disabled="action.disabled"
-            :title="action.disabled ? action.disabledHint : undefined"
-            @click="run(action)"
-            :class="[
-              'w-full text-left px-4 py-2 text-sm font-medium transition-colors',
-              action.disabled
-                ? 'text-gray-400 cursor-not-allowed'
-                : (action.color || 'text-gray-700 hover:bg-gray-50 hover:text-gray-900')
-            ]"
-          >
-            {{ action.label }}
-          </button>
+          <div v-else class="group relative">
+            <button
+              type="button"
+              :aria-disabled="action.disabled || undefined"
+              @click="run(action)"
+              :class="[
+                'w-full text-left px-4 py-2 text-sm font-medium transition-colors',
+                action.disabled
+                  ? 'text-gray-400 cursor-not-allowed'
+                  : (action.color || 'text-gray-700 hover:bg-gray-50 hover:text-gray-900')
+              ]"
+            >
+              {{ action.label }}
+            </button>
+            <!-- CSS tooltip: native title tooltips don't fire on hover for disabled buttons -->
+            <span
+              v-if="action.disabled && action.disabledHint"
+              class="pointer-events-none absolute right-full top-1/2 z-50 mr-2 hidden w-52 -translate-y-1/2 rounded-md bg-gray-900 px-3 py-2 text-xs leading-snug text-white shadow-lg group-hover:block"
+              role="tooltip"
+            >
+              {{ action.disabledHint }}
+              <span class="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-gray-900" />
+            </span>
+          </div>
         </template>
       </div>
     </Teleport>
