@@ -27,6 +27,10 @@ public class Role {
     @Column(name = "is_system", nullable = false)
     private Boolean isSystem = false;
 
+    /** Account type this role applies to: CLIENT / USER / ADMIN */
+    @Column(name = "user_type", length = 20)
+    private String userType = "USER";
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

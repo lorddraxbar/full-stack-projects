@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useGetMe } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 
@@ -282,86 +282,192 @@ const saveEdit = async () => {
   }
 }
 
-onMounted(() => {
-  loadProviderCompany()
+onMounted(async () => {
+  await loadProviderCompany()
   loadUsers()
   loadCompanies()
   loadSystemSettings()
+  loadProviderCompanyProfile()
+  loadRoles()
 })
 
 // ---------- Company Settings: Company Profile ----------
 const companyProfile = ref({
-  name: 'SECPhils Consulting',
-  tagline: 'Expertise you can trust',
-  description: 'SECPhils provides management consulting, compliance, and engineering services to Philippine enterprises.',
-  industrySectors: 'Manufacturing, Energy, Finance, Government',
-  headquarters: '60F Tower, 2000 Shaw Boulevard, Makati City, Philippines',
-  phone: '+63 2 8888 1234',
-  email: 'contact@secphils.com',
-  website: 'https://www.secphils.com',
-  socialLinks: 'https://www.linkedin.com/company/secphils',
-  taxNumber: 'BTW-000-123-456-789',
-  bankingDetails: 'BDO · Acct ****4821 · SECPhils Consulting Inc.',
-  operationalFields: 'Preferred Language, Work Location, Project Reference Number',
+  name: '',
+  tagline: '',
+  description: '',
+  industrySectors: '',
+  headquarters: '',
+  phone: '',
+  email: '',
+  website: '',
+  socialLinks: '',
+  taxNumber: '',
+  bankingDetails: '',
+  operationalFields: '',
   logo: null as string | null,
   brandPrimary: '#2563eb',
   brandSecondary: '#64748b',
 })
-const saveCompanyProfile = () => alert('Company profile saved!')
+const companyProfileLoaded = ref(false)
+const companyProfileError = ref('')
+const savingCompanyProfile = ref(false)
 
-// ---------- Company Settings: Team Management ----------
-const staffMembers = ref([
-  { id: 1, name: 'John Doe', email: 'john@secphils.com', role: 'Project Manager', status: 'Active', projects: ['Energy Audit', 'ISO 9001 Certification', 'Market Research Study'], permissions: ['viewOwnProjects', 'uploadDocuments'] },
-  { id: 2, name: 'Jane Smith', email: 'jane@secphils.com', role: 'Consultant', status: 'Active', projects: ['Financial Modeling'], permissions: ['viewOwnProjects', 'uploadDocuments'] },
-  { id: 3, name: 'Bob Wilson', email: 'bob@secphils.com', role: 'Engineer', status: 'Deactivated', projects: [], permissions: ['viewOwnProjects'] },
-])
-const addStaffForm = ref({ name: '', email: '', role: 'Consultant' })
-const addStaffMember = () => {
-  if (!addStaffForm.value.name.trim() || !addStaffForm.value.email.trim()) return
-  staffMembers.value.push({
-    id: Date.now(),
-    name: addStaffForm.value.name,
-    email: addStaffForm.value.email,
-    role: addStaffForm.value.role,
-    status: 'Active',
-    projects: [],
-    permissions: ['viewOwnProjects'],
-  })
-  addStaffForm.value = { name: '', email: '', role: 'Consultant' }
-  alert('Team member added.')
+const loadProviderCompanyProfile = async () => {
+  companyProfileError.value = ''
+  try {
+    const cid = providerCompanyId.value
+    if (cid) {
+      const c: any = await useGetCompany(cid)
+      companyProfile.value = {
+        name: c.name ?? '',
+        tagline: c.tagline ?? '',
+        description: c.description ?? '',
+        industrySectors: c.industrySectors ?? '',
+        headquarters: c.headquarters ?? '',
+        phone: c.phone ?? '',
+        email: c.email ?? '',
+        website: c.website ?? '',
+        socialLinks: c.socialLinks ?? '',
+        taxNumber: c.taxNumber ?? '',
+        bankingDetails: c.bankingDetails ?? '',
+        operationalFields: c.operationalFields ?? '',
+        logo: c.logoUrl ?? null,
+        brandPrimary: c.brandPrimary ?? '#2563eb',
+        brandSecondary: c.brandSecondary ?? '#64748b',
+      }
+    }
+  } catch {
+    companyProfileError.value = 'Could not load your company profile.'
+  } finally {
+    companyProfileLoaded.value = true
+  }
 }
-const toggleStaffStatus = (m: (typeof staffMembers.value)[0]) => {
-  m.status = m.status === 'Active' ? 'Deactivated' : 'Active'
+
+const saveCompanyProfile = async () => {
+  if (savingCompanyProfile.value) return
+  if (!companyProfile.value.name.trim()) {
+    companyProfileError.value = 'Company name is required.'
+    return
+  }
+  savingCompanyProfile.value = true
+  companyProfileError.value = ''
+  try {
+    const payload: Record<string, unknown> = {
+      name: companyProfile.value.name,
+      location: null,
+      owner: null,
+      description: companyProfile.value.description || null,
+      tagline: companyProfile.value.tagline || null,
+      industrySectors: companyProfile.value.industrySectors || null,
+      headquarters: companyProfile.value.headquarters || null,
+      phone: companyProfile.value.phone || null,
+      email: companyProfile.value.email || null,
+      website: companyProfile.value.website || null,
+      socialLinks: companyProfile.value.socialLinks || null,
+      taxNumber: companyProfile.value.taxNumber || null,
+      bankingDetails: companyProfile.value.bankingDetails || null,
+      operationalFields: companyProfile.value.operationalFields || null,
+      brandPrimary: companyProfile.value.brandPrimary || null,
+      brandSecondary: companyProfile.value.brandSecondary || null,
+      logoUrl: companyProfile.value.logo || null,
+      authorizedRepId: null,
+    }
+    const cid = providerCompanyId.value
+    if (cid) {
+      const c: any = await useUpdateCompany(cid, payload)
+      providerCompanyId.value = c.id
+    } else {
+      // No provider company yet — create one and link it to the admin's own account.
+      const c: any = await useCreateCompany(payload)
+      providerCompanyId.value = c.id
+      await useUpdateMe({ companyId: c.id })
+    }
+    await loadProviderCompanyProfile()
+  } catch (e: any) {
+    companyProfileError.value = e?.response?.data?.message || 'Failed to save company profile.'
+  } finally {
+    savingCompanyProfile.value = false
+  }
 }
 
 // ---------- Company Settings: Role & Permission Management ----------
-const roles = ref([
-  { id: 1, name: 'Project Manager', userType: 'USER', description: 'Manages assigned projects end-to-end', permissions: ['viewOwnProjects', 'uploadDocuments', 'manageAnnouncements'] },
-  { id: 2, name: 'Engineer', userType: 'USER', description: 'Executes technical work on projects', permissions: ['viewOwnProjects', 'uploadDocuments'] },
-  { id: 3, name: 'Client Admin', userType: 'CLIENT', description: 'Manages client company profile and team', permissions: ['viewCompanyProjects', 'inviteTeam', 'uploadDocuments'] },
-  { id: 4, name: 'Administrator', userType: 'ADMIN', description: 'Full system access', permissions: ['all'] },
-])
-const permissionOptions = [
-  'viewOwnProjects', 'viewCompanyProjects', 'uploadDocuments', 'manageAnnouncements',
-  'inviteTeam', 'manageProjects', 'manageUsers', 'all',
-]
-const newRoleForm = ref({ name: '', userType: 'USER', description: '', permissions: ['viewOwnProjects'] as string[] })
-const createRole = () => {
-  if (!newRoleForm.value.name.trim()) return
-  roles.value.push({
-    id: Date.now(),
-    name: newRoleForm.value.name,
-    userType: newRoleForm.value.userType,
-    description: newRoleForm.value.description,
-    permissions: [...newRoleForm.value.permissions],
-  })
-  newRoleForm.value = { name: '', userType: 'USER', description: '', permissions: ['viewOwnProjects'] }
-  alert('Role created.')
+interface RoleItem {
+  id: number
+  name: string
+  description: string
+  userType: string
+  isSystem: boolean
+  permissionIds: number[]
 }
-const toggleRolePermission = (role: { permissions: string[] }, perm: string) => {
-  const i = role.permissions.indexOf(perm)
-  if (i === -1) role.permissions.push(perm)
-  else role.permissions.splice(i, 1)
+const roles = ref<RoleItem[]>([])
+const permissions = ref<{ id: number; name: string; description: string }[]>([])
+const rolesLoading = ref(false)
+const rolesError = ref('')
+const newRoleForm = ref({ name: '', userType: 'USER', description: '', permissionIds: [] as number[] })
+const creatingRole = ref(false)
+
+const loadRoles = async () => {
+  rolesLoading.value = true
+  rolesError.value = ''
+  try {
+    const [r, p] = await Promise.all([useGetRoles(), useGetPermissions()])
+    roles.value = r as RoleItem[]
+    permissions.value = p as { id: number; name: string; description: string }[]
+  } catch {
+    rolesError.value = 'Could not load roles and permissions.'
+  } finally {
+    rolesLoading.value = false
+  }
+}
+
+const toggleRolePermission = (role: { permissionIds: number[] }, permId: number) => {
+  const i = role.permissionIds.indexOf(permId)
+  if (i === -1) role.permissionIds.push(permId)
+  else role.permissionIds.splice(i, 1)
+}
+
+const saveRolePermissions = async (role: RoleItem) => {
+  try {
+    await useUpdateRole(role.id, {
+      name: role.name,
+      userType: role.userType,
+      description: role.description,
+      permissionIds: role.permissionIds,
+    })
+  } catch (e: any) {
+    alert(e?.response?.data?.message || 'Failed to save role permissions.')
+  }
+}
+
+const createRole = async () => {
+  if (creatingRole.value) return
+  if (!newRoleForm.value.name.trim()) return
+  creatingRole.value = true
+  try {
+    await useCreateRole({
+      name: newRoleForm.value.name,
+      userType: newRoleForm.value.userType,
+      description: newRoleForm.value.description,
+      permissionIds: newRoleForm.value.permissionIds,
+    })
+    newRoleForm.value = { name: '', userType: 'USER', description: '', permissionIds: [] }
+    await loadRoles()
+  } catch (e: any) {
+    alert(e?.response?.data?.message || 'Failed to create role.')
+  } finally {
+    creatingRole.value = false
+  }
+}
+
+const deleteRole = async (role: RoleItem) => {
+  if (!confirm(`Delete role "${role.name}"? This cannot be undone.`)) return
+  try {
+    await useDeleteRole(role.id)
+    await loadRoles()
+  } catch (e: any) {
+    alert(e?.response?.data?.message || 'Failed to delete role.')
+  }
 }
 
 // ---------- Service Catalog ----------
@@ -730,7 +836,10 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
     <div v-if="isActiveTab('company')" class="space-y-6">
       <!-- Company Profile -->
       <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-2">Company Profile</h2>
+        <div class="flex items-center justify-between gap-3 mb-2">
+          <h2 class="text-lg font-semibold text-gray-900">Company Profile</h2>
+          <span v-if="!companyProfileLoaded" class="text-xs text-gray-400">Loading profile…</span>
+        </div>
         <p class="text-sm text-gray-600 mb-6">Consultancy profile shown across the portal for client-facing information.</p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -792,121 +901,84 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           </div>
         </div>
 
-        <div class="mt-6 flex justify-end">
-          <button @click="saveCompanyProfile" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-            Save Company Profile
+        <div class="mt-6 flex items-center justify-between gap-4">
+          <p v-if="companyProfileError" class="text-sm text-red-600">{{ companyProfileError }}</p>
+          <p v-else-if="!providerCompanyId" class="text-sm text-amber-600">No company on file yet — saving will create one for your organization.</p>
+          <button
+            @click="saveCompanyProfile"
+            :disabled="savingCompanyProfile"
+            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+          >
+            {{ savingCompanyProfile ? 'Saving…' : 'Save Company Profile' }}
           </button>
         </div>
       </div>
 
-      <!-- Team Management -->
+      <!-- Role & Permission Management -->
       <div class="bg-white rounded-lg shadow">
-        <div class="p-6 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 class="text-lg font-semibold text-gray-900">Team Management</h2>
-            <p class="text-sm text-gray-600 mt-1">Internal user/staff accounts, roles, and project assignments.</p>
-          </div>
+        <div class="p-6 border-b border-gray-200">
+          <h2 class="text-lg font-semibold text-gray-900">Role &amp; Permission Management</h2>
+          <p class="text-sm text-gray-600 mt-1">Which permissions each role carries. System roles cannot be deleted and their names are locked.</p>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Staff Name</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned Projects</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Type</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Permissions</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
-              <tr v-for="member in staffMembers" :key="member.id" class="hover:bg-gray-50">
+              <tr v-if="rolesLoading && roles.length === 0">
+                <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500">Loading roles…</td>
+              </tr>
+              <tr v-else-if="rolesError">
+                <td colspan="4" class="px-6 py-8 text-center text-sm text-red-600">{{ rolesError }}</td>
+              </tr>
+              <tr v-else-if="roles.length === 0">
+                <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500">No roles found.</td>
+              </tr>
+              <tr v-for="role in roles" :key="role.id" class="hover:bg-gray-50 align-top">
                 <td class="px-6 py-4">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-medium">
-                      {{ member.name.charAt(0) }}
-                    </div>
-                    <span class="font-medium text-gray-900">{{ member.name }}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium text-gray-900">{{ role.name }}</span>
+                    <span v-if="role.isSystem" class="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">System</span>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-1">{{ role.description || '—' }}</p>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">{{ role.userType }}</span>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex flex-wrap gap-1.5 max-w-md">
+                    <button
+                      v-for="perm in permissions"
+                      :key="perm.id"
+                      @click="toggleRolePermission(role, perm.id)"
+                      :title="perm.description"
+                      :class="[
+                        'px-2 py-0.5 text-xs font-medium rounded-full border transition-colors',
+                        role.permissionIds.includes(perm.id)
+                          ? 'bg-green-100 border-green-300 text-green-800'
+                          : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100',
+                      ]"
+                    >
+                      {{ perm.name }}
+                    </button>
                   </div>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ member.email }}</td>
-                <td class="px-6 py-4">
-                  <span class="px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded">{{ member.role }}</span>
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ member.projects.length ? member.projects.join(', ') : '—' }}</td>
-                <td class="px-6 py-4">
-                  <span :class="[
-                    'px-2 py-1 text-xs font-medium rounded-full',
-                    member.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  ]">
-                    {{ member.status }}
-                  </span>
-                </td>
-                <td class="px-6 py-4">
-                  <button class="text-blue-600 hover:text-blue-700 text-sm font-medium mr-3">Edit</button>
-                  <button @click="toggleStaffStatus(member)" class="text-red-600 hover:text-red-700 text-sm font-medium">
-                    {{ member.status === 'Active' ? 'Deactivate' : 'Activate' }}
-                  </button>
+                <td class="px-6 py-4 text-right whitespace-nowrap">
+                  <button @click="saveRolePermissions(role)" class="text-blue-600 hover:text-blue-700 text-sm font-medium mr-3">Save</button>
+                  <button v-if="!role.isSystem" @click="deleteRole(role)" class="text-red-600 hover:text-red-700 text-sm font-medium">Delete</button>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+
         <div class="p-6 border-t border-gray-200">
-          <h3 class="text-sm font-semibold text-gray-900 mb-3">Add Team Member</h3>
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input v-model="addStaffForm.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input v-model="addStaffForm.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-              <select v-model="addStaffForm.role" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option v-for="r in roles" :key="r.id" :value="r.name">{{ r.name }}</option>
-              </select>
-            </div>
-            <div class="flex items-end">
-              <button @click="addStaffMember" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
-                + Add Member
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Role & Permission Management -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Role &amp; Permission Management</h2>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div v-for="role in roles" :key="role.id" class="border border-gray-200 rounded-lg p-4">
-            <div class="flex items-center justify-between mb-2">
-              <h3 class="font-semibold text-gray-900">{{ role.name }}</h3>
-              <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">{{ role.userType }}</span>
-            </div>
-            <p class="text-sm text-gray-600 mb-3">{{ role.description }}</p>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="perm in permissionOptions"
-                :key="perm"
-                @click="toggleRolePermission(role, perm)"
-                :class="[
-                  'px-2 py-1 text-xs font-medium rounded-full border transition-colors',
-                  role.permissions.includes(perm)
-                    ? 'bg-green-100 border-green-300 text-green-800'
-                    : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100',
-                ]"
-              >
-                {{ perm.replace(/_/g, ' ') }}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-6 pt-6 border-t border-gray-200">
           <h3 class="text-sm font-semibold text-gray-900 mb-3">Create New Role</h3>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -926,24 +998,29 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               <input v-model="newRoleForm.description" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
-          <div class="mt-3 flex flex-wrap gap-2">
+          <div class="mt-3 flex flex-wrap gap-1.5">
             <button
-              v-for="perm in permissionOptions"
-              :key="'new-' + perm"
-              @click="toggleRolePermission(newRoleForm, perm)"
+              v-for="perm in permissions"
+              :key="'new-' + perm.id"
+              @click="toggleRolePermission(newRoleForm, perm.id)"
+              :title="perm.description"
               :class="[
-                'px-2 py-1 text-xs font-medium rounded-full border transition-colors',
-                newRoleForm.permissions.includes(perm)
+                'px-2 py-0.5 text-xs font-medium rounded-full border transition-colors',
+                newRoleForm.permissionIds.includes(perm.id)
                   ? 'bg-green-100 border-green-300 text-green-800'
                   : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100',
               ]"
             >
-              {{ perm.replace(/_/g, ' ') }}
+              {{ perm.name }}
             </button>
           </div>
           <div class="mt-4 flex justify-end">
-            <button @click="createRole" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
-              + Create Role
+            <button
+              @click="createRole"
+              :disabled="creatingRole"
+              class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
+            >
+              {{ creatingRole ? 'Creating…' : '+ Create Role' }}
             </button>
           </div>
         </div>

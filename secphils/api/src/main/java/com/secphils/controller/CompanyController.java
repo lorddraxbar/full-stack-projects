@@ -45,11 +45,13 @@ public class CompanyController {
     public ResponseEntity<CompanyResponse> create(@Valid @RequestBody CompanyRequest req,
                                                   HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
-        User rep = userRepository.findById(req.authorizedRepId())
-                .orElseThrow(() -> ApiException.notFound("Authorized representative user"));
         Company company = new Company();
         apply(company, req);
-        company.setAuthorizedRep(rep);
+        if (req.authorizedRepId() != null) {
+            User rep = userRepository.findById(req.authorizedRepId())
+                    .orElseThrow(() -> ApiException.notFound("Authorized representative user"));
+            company.setAuthorizedRep(rep);
+        }
         company = companyRepository.save(company);
         auditService.audit(actor, "COMPANY_CREATE", "Company", company.getId(), "Name: " + company.getName(), http);
         return ResponseEntity.status(HttpStatus.CREATED).body(CompanyResponse.from(company));
@@ -70,9 +72,11 @@ public class CompanyController {
         AuthUser actor = CurrentUser.require();
         Company company = companyRepository.findById(id).orElseThrow(() -> ApiException.notFound("Company"));
         apply(company, req);
-        User rep = userRepository.findById(req.authorizedRepId())
-                .orElseThrow(() -> ApiException.notFound("Authorized representative user"));
-        company.setAuthorizedRep(rep);
+        if (req.authorizedRepId() != null) {
+            User rep = userRepository.findById(req.authorizedRepId())
+                    .orElseThrow(() -> ApiException.notFound("Authorized representative user"));
+            company.setAuthorizedRep(rep);
+        }
         company = companyRepository.save(company);
         auditService.audit(actor, "COMPANY_UPDATE", "Company", company.getId(), "Name: " + company.getName(), http);
         return ResponseEntity.ok(CompanyResponse.from(company));
@@ -83,5 +87,18 @@ public class CompanyController {
         company.setLocation(req.location());
         company.setOwner(req.owner());
         company.setDescription(req.description());
+        company.setTagline(req.tagline());
+        company.setIndustrySectors(req.industrySectors());
+        company.setHeadquarters(req.headquarters());
+        company.setPhone(req.phone());
+        company.setEmail(req.email());
+        company.setWebsite(req.website());
+        company.setSocialLinks(req.socialLinks());
+        company.setTaxNumber(req.taxNumber());
+        company.setBankingDetails(req.bankingDetails());
+        company.setOperationalFields(req.operationalFields());
+        company.setBrandPrimary(req.brandPrimary());
+        company.setBrandSecondary(req.brandSecondary());
+        company.setLogoUrl(req.logoUrl());
     }
 }

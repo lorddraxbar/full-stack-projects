@@ -88,6 +88,13 @@ public class UserController {
         }
         if (req.firstName() != null && !req.firstName().isBlank()) user.setFirstName(req.firstName());
         if (req.lastName() != null && !req.lastName().isBlank()) user.setLastName(req.lastName());
+        // Self may link/unlink their own company (used by the Company Settings tab).
+        if (req.companyId() != null) {
+            if (companyRepository.findById(req.companyId()).isEmpty()) {
+                throw ApiException.badRequest("Selected company does not exist");
+            }
+            user.setCompanyId(req.companyId());
+        }
         // self cannot change own role or active status
         user = userRepository.save(user);
         auditService.audit(me, "USER_UPDATE_SELF", "User", user.getId(), null, http);

@@ -143,6 +143,46 @@ export async function useGetCompany(id: number) {
   return response.data
 }
 
+export async function useCreateCompany(data: Record<string, unknown>) {
+  const response = await api.post('/companies', data)
+  return response.data
+}
+
+export async function useUpdateCompany(id: number, data: Record<string, unknown>) {
+  const response = await api.put(`/companies/${id}`, data)
+  return response.data
+}
+
+// ---------- Roles & Permissions (ADMIN) ----------
+export async function useGetRoles() {
+  const response = await api.get('/roles')
+  return response.data
+}
+
+export async function useCreateRole(data: { name: string; userType: string; description?: string; permissionIds?: number[] }) {
+  const response = await api.post('/roles', data)
+  return response.data
+}
+
+export async function useUpdateRole(id: number, data: { name: string; userType: string; description?: string; permissionIds?: number[] }) {
+  const response = await api.put(`/roles/${id}`, data)
+  return response.data
+}
+
+export async function useDeleteRole(id: number) {
+  await api.delete(`/roles/${id}`)
+}
+
+export async function useGetPermissions() {
+  const response = await api.get('/permissions')
+  return response.data
+}
+
+export async function useUpdateMe(data: Record<string, unknown>) {
+  const response = await api.put('/users/me', data)
+  return response.data
+}
+
 // ---------- Tasks ----------
 export async function useGetTasks(params?: { projectId?: number; status?: string; priority?: string; assigneeId?: number }) {
   const response = await api.get('/tasks', { params })

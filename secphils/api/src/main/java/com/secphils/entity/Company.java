@@ -28,8 +28,47 @@ public class Company {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(length = 255)
+    private String tagline;
+
+    @Column(name = "industry_sectors", length = 500)
+    private String industrySectors;
+
+    @Column(length = 500)
+    private String headquarters;
+
+    @Column(length = 100)
+    private String phone;
+
+    @Column(length = 255)
+    private String email;
+
+    @Column(length = 255)
+    private String website;
+
+    @Column(name = "social_links", length = 500)
+    private String socialLinks;
+
+    @Column(name = "tax_number", length = 100)
+    private String taxNumber;
+
+    @Column(name = "banking_details", columnDefinition = "TEXT")
+    private String bankingDetails;
+
+    @Column(name = "operational_fields", length = 500)
+    private String operationalFields;
+
+    @Column(name = "brand_primary", length = 7)
+    private String brandPrimary;
+
+    @Column(name = "brand_secondary", length = 7)
+    private String brandSecondary;
+
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "authorized_rep_user_id", nullable = false)
+    @JoinColumn(name = "authorized_rep_user_id")
     private User authorizedRep;
 
     @Column(name = "created_at", updatable = false)
