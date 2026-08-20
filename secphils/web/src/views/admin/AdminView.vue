@@ -84,6 +84,24 @@ const loadUsers = async () => {
   }
 }
 
+// User table filter: space-separated terms, all must match (name/email/role/company/status)
+const userFilter = ref('')
+const filteredUsers = computed(() => {
+  const query = userFilter.value.trim().toLowerCase()
+  if (!query) return clientUsers.value
+  const terms = query.split(/\s+/)
+  return clientUsers.value.filter((u) => {
+    const haystack = [
+      u.fullName,
+      u.email,
+      u.role,
+      u.companyName || '',
+      u.isActive ? 'active' : 'deactivated',
+    ].join(' ').toLowerCase()
+    return terms.every((t) => haystack.includes(t))
+  })
+})
+
 const addUserForm = ref({ firstName: '', lastName: '', email: '', role: 'CLIENT', companyId: null as number | null })
 const addUserSaving = ref(false)
 const addUserMessage = ref<{ ok: boolean; text: string } | null>(null)
@@ -625,6 +643,25 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             </button>
           </div>
         </div>
+        <div class="px-6 pt-2">
+          <div class="relative mt-2">
+            <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+            <input
+              v-model="userFilter"
+              type="text"
+              placeholder="Filter users — type one or more terms separated by spaces (e.g. admin client acme)"
+              class="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+            <button
+              v-if="userFilter"
+              @click="userFilter = ''"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Clear filter"
+            >
+              <i class="fas fa-xmark"></i>
+            </button>
+          </div>
+        </div>
         <div v-if="usersError" class="m-6 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
           {{ usersError }}
         </div>
@@ -648,7 +685,10 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               <tr v-else-if="clientUsers.length === 0">
                 <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">No users found.</td>
               </tr>
-              <tr v-for="user in clientUsers" :key="user.id" class="hover:bg-gray-50">
+              <tr v-else-if="filteredUsers.length === 0">
+                <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">No users match your filter.</td>
+              </tr>
+              <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
