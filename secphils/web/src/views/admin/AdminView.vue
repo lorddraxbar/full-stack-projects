@@ -638,7 +638,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Last Login</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
@@ -675,7 +675,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                   </span>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ user.lastLogin ? user.lastLogin.replace('T', ' ').slice(0, 16) : 'Never' }}</td>
-                <td class="px-6 py-4 text-right">
+                <td class="px-3 py-4 text-right whitespace-nowrap">
                   <RowActionsMenu v-if="user.id !== currentUserId" :actions="userRowActions(user)" />
                   <span v-else class="text-xs text-gray-400">(you)</span>
                 </td>
@@ -926,7 +926,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price / Rate</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
@@ -945,7 +945,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                     {{ service.status }}
                   </span>
                 </td>
-                <td class="px-6 py-4 text-right">
+                <td class="px-3 py-4 text-right whitespace-nowrap">
                   <RowActionsMenu :actions="[
                     { label: 'Edit', color: 'text-blue-600 hover:text-blue-700 hover:bg-blue-50', onClick: () => {} },
                     { label: service.status === 'Active' ? 'Archive' : 'Restore', color: service.status === 'Active' ? 'text-red-600 hover:text-red-700 hover:bg-red-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => toggleServiceStatus(service) }
@@ -1115,7 +1115,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Review</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Approved Date</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
@@ -1138,7 +1138,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 </span>
               </td>
               <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ review.approvedDate || '—' }}</td>
-              <td class="px-6 py-4 text-right">
+              <td class="px-3 py-4 text-right whitespace-nowrap">
                 <RowActionsMenu v-if="review.status === 'Pending'" :actions="[
                   { label: 'Approve', color: 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => setReviewStatus(review, 'Approved') },
                   { label: 'Reject', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => setReviewStatus(review, 'Rejected') }
@@ -1467,22 +1467,23 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input v-model="editForm.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-              <select v-model="editForm.role" @change="onEditRoleChange" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <div class="relative">
+              <select v-model="editForm.role" @change="onEditRoleChange" class="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
                 <option value="ADMIN">ADMIN — Provider Admin</option>
                 <option value="USER">USER — Provider Staff</option>
                 <option value="CLIENT">CLIENT — Client Account</option>
               </select>
+              <i class="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-xs transition-colors pointer-events-none"></i>
             </div>
-            <div v-if="editForm.role === 'CLIENT'">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
-              <select v-model="editForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option :value="null">— No company —</option>
-                <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
-              </select>
-            </div>
+          </div>
+          <div v-if="editForm.role === 'CLIENT'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
+            <select v-model="editForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option :value="null">— No company —</option>
+              <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">New Password (optional)</label>
@@ -1540,22 +1541,23 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input v-model="addUserForm.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="juan@secphils.com" />
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-              <select v-model="addUserForm.role" @change="onAddRoleChange" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <div class="relative">
+              <select v-model="addUserForm.role" @change="onAddRoleChange" class="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
                 <option value="ADMIN">ADMIN — Provider Admin</option>
                 <option value="USER">USER — Provider Staff</option>
                 <option value="CLIENT">CLIENT — Client Account</option>
               </select>
+              <i class="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-xs transition-colors pointer-events-none"></i>
             </div>
-            <div v-if="addUserForm.role === 'CLIENT'">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
-              <select v-model="addUserForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option :value="null">— No company —</option>
-                <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
-              </select>
-            </div>
+          </div>
+          <div v-if="addUserForm.role === 'CLIENT'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
+            <select v-model="addUserForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option :value="null">— No company —</option>
+              <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
           </div>
           <div v-if="addUserMessage" :class="[
             'p-3 rounded-lg text-sm',

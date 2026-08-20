@@ -65,13 +65,16 @@ const onDocClick = (e: MouseEvent) => {
 const onScroll = () => { if (open.value) close() }
 
 onMounted(() => {
-  document.addEventListener('click', onDocClick)
+  // Capture phase is deliberate: it fires BEFORE every other kebab button's
+  // own @click.stop handler, so clicking another row's kebab closes this
+  // menu first (otherwise two menus would stay open at once).
+  document.addEventListener('click', onDocClick, true)
   document.addEventListener('keydown', onKeydown)
   document.addEventListener('scroll', onScroll, true)
   window.addEventListener('resize', onScroll)
 })
 onBeforeUnmount(() => {
-  document.removeEventListener('click', onDocClick)
+  document.removeEventListener('click', onDocClick, true)
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('scroll', onScroll, true)
   window.removeEventListener('resize', onScroll)

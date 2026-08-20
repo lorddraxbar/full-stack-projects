@@ -387,7 +387,7 @@ async function saveAdminChanges() {
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Version</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded By</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
@@ -409,7 +409,7 @@ async function saveAdminChanges() {
                 <td class="px-6 py-4 text-sm text-gray-600">{{ doc.version }}</td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ doc.uploadedByName || '—' }}</td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ formatDate(doc.createdAt) }}</td>
-                <td class="px-6 py-4 text-right">
+                <td class="px-3 py-4 text-right whitespace-nowrap">
                   <RowActionsMenu v-if="!isClient" :actions="[
                     { label: 'Delete', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => deleteDocument(doc.id) }
                   ]" />
