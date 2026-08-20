@@ -8,6 +8,10 @@ export interface RowAction {
   color?: string
   /** render as a separator line before this item */
   divider?: boolean
+  /** grey out and block the item (e.g. role still assigned to accounts) */
+  disabled?: boolean
+  /** tooltip shown when the item is disabled (rendered via the title attribute) */
+  disabledHint?: string
 }
 
 const props = defineProps<{
@@ -106,10 +110,14 @@ onBeforeUnmount(() => {
           <div v-if="action.divider" class="my-1 border-t border-gray-100" />
           <button
             type="button"
+            :disabled="action.disabled"
+            :title="action.disabled ? action.disabledHint : undefined"
             @click="run(action)"
             :class="[
               'w-full text-left px-4 py-2 text-sm font-medium transition-colors',
-              action.color || 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+              action.disabled
+                ? 'text-gray-400 cursor-not-allowed'
+                : (action.color || 'text-gray-700 hover:bg-gray-50 hover:text-gray-900')
             ]"
           >
             {{ action.label }}

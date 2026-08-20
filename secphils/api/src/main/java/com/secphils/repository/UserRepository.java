@@ -16,6 +16,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByRoleAndIsActive(String role, Boolean isActive);
 
+    /** Number of portal accounts currently holding this role name. */
+    long countByRole(String role);
+
     List<User> findByIsActiveTrue();
 
     Optional<User> findByPasswordResetToken(String passwordResetToken);

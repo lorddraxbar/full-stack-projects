@@ -8,5 +8,6 @@ public record RoleResponse(
         String description,
         String userType,
         Boolean isSystem,
-        List<Long> permissionIds
+        List<Long> permissionIds,
+        Long assignedUserCount
 ) {}

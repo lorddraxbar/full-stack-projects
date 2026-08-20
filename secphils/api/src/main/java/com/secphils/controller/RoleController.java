@@ -8,6 +8,7 @@ import com.secphils.entity.Permission;
 import com.secphils.entity.Role;
 import com.secphils.repository.PermissionRepository;
 import com.secphils.repository.RoleRepository;
+import com.secphils.repository.UserRepository;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,12 +34,14 @@ public class RoleController {
 
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+    private final UserRepository userRepository;
     private final AuditService auditService;
 
     public RoleController(RoleRepository roleRepository, PermissionRepository permissionRepository,
-                          AuditService auditService) {
+                          UserRepository userRepository, AuditService auditService) {
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
+        this.userRepository = userRepository;
         this.auditService = auditService;
     }
 
@@ -97,6 +100,11 @@ public class RoleController {
         if (Boolean.TRUE.equals(role.getIsSystem())) {
             throw ApiException.forbidden("System roles cannot be deleted");
         }
+        long assigned = userRepository.countByRole(role.getName());
+        if (assigned > 0) {
+            throw ApiException.conflict("This role is assigned to " + assigned
+                    + " account" + (assigned == 1 ? "" : "s") + " and cannot be deleted");
+        }
         roleRepository.delete(role);
         auditService.audit(actor, "ROLE_DELETE", "Role", id, "Name: " + role.getName(), http);
         return ResponseEntity.noContent().build();
@@ -127,7 +135,8 @@ public class RoleController {
                 .map(Permission::getId)
                 .sorted()
                 .collect(Collectors.toList());
+        long assigned = userRepository.countByRole(role.getName());
         return new RoleResponse(role.getId(), role.getName(), role.getDescription(),
-                role.getUserType(), role.getIsSystem(), permissionIds);
+                role.getUserType(), role.getIsSystem(), permissionIds, assigned);
     }
 }

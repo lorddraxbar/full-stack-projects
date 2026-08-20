@@ -399,13 +399,12 @@ interface RoleItem {
   userType: string
   isSystem: boolean
   permissionIds: number[]
+  assignedUserCount: number
 }
 const roles = ref<RoleItem[]>([])
 const permissions = ref<{ id: number; name: string; description: string }[]>([])
 const rolesLoading = ref(false)
 const rolesError = ref('')
-const newRoleForm = ref({ name: '', userType: 'USER', description: '', permissionIds: [] as number[] })
-const creatingRole = ref(false)
 
 const loadRoles = async () => {
   rolesLoading.value = true
@@ -421,42 +420,96 @@ const loadRoles = async () => {
   }
 }
 
-const toggleRolePermission = (role: { permissionIds: number[] }, permId: number) => {
-  const i = role.permissionIds.indexOf(permId)
-  if (i === -1) role.permissionIds.push(permId)
-  else role.permissionIds.splice(i, 1)
+// Table filter (same convention as User Management: space-separated terms, all must match)
+const roleFilter = ref('')
+
+const userTypeOptions = ['CLIENT', 'USER', 'ADMIN']
+const filteredRoles = computed(() => {
+  const query = roleFilter.value.trim().toLowerCase()
+  if (!query) return roles.value
+  const terms = query.split(/\s+/)
+  return roles.value.filter((r) => {
+    const hayPerms = permissions.value.filter((p) => r.permissionIds.includes(p.id)).map((p) => p.name)
+    const haystack = [
+      r.name,
+      r.userType,
+      r.description || '',
+      ...hayPerms,
+      r.assignedUserCount > 0 ? `in use ${r.assignedUserCount}` : 'available',
+    ].join(' ').toLowerCase()
+    return terms.every((t) => haystack.includes(t))
+  })
+})
+
+// Role modal (shared by Add / Edit)
+const showRoleModal = ref(false)
+const roleModalMode = ref<'create' | 'edit'>('create')
+const roleModalTarget = ref<RoleItem | null>(null)
+const roleForm = ref({ name: '', userType: 'USER', description: '', permissionIds: [] as number[] })
+const roleSaving = ref(false)
+const roleMessage = ref<{ ok: boolean; text: string } | null>(null)
+
+const resetRoleForm = () => {
+  roleForm.value = { name: '', userType: 'USER', description: '', permissionIds: [] }
 }
 
-const saveRolePermissions = async (role: RoleItem) => {
-  try {
-    await useUpdateRole(role.id, {
-      name: role.name,
-      userType: role.userType,
-      description: role.description,
-      permissionIds: role.permissionIds,
-    })
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to save role permissions.')
+const openCreateRole = () => {
+  roleModalMode.value = 'create'
+  roleModalTarget.value = null
+  resetRoleForm()
+  roleMessage.value = null
+  showRoleModal.value = true
+}
+
+const openEditRole = (role: RoleItem) => {
+  roleModalMode.value = 'edit'
+  roleModalTarget.value = role
+  roleForm.value = {
+    name: role.name,
+    userType: role.userType,
+    description: role.description || '',
+    permissionIds: [...role.permissionIds],
   }
+  roleMessage.value = null
+  showRoleModal.value = true
 }
 
-const createRole = async () => {
-  if (creatingRole.value) return
-  if (!newRoleForm.value.name.trim()) return
-  creatingRole.value = true
+const closeRoleModal = () => {
+  showRoleModal.value = false
+  roleMessage.value = null
+  resetRoleForm()
+}
+
+const toggleRolePermission = (permId: number) => {
+  const i = roleForm.value.permissionIds.indexOf(permId)
+  if (i === -1) roleForm.value.permissionIds.push(permId)
+  else roleForm.value.permissionIds.splice(i, 1)
+}
+
+const saveRole = async () => {
+  const f = roleForm.value
+  if (roleSaving.value) return
+  if (!f.name.trim()) return
+  roleSaving.value = true
+  roleMessage.value = null
   try {
-    await useCreateRole({
-      name: newRoleForm.value.name,
-      userType: newRoleForm.value.userType,
-      description: newRoleForm.value.description,
-      permissionIds: newRoleForm.value.permissionIds,
-    })
-    newRoleForm.value = { name: '', userType: 'USER', description: '', permissionIds: [] }
+    const payload = {
+      name: f.name.trim(),
+      userType: f.userType,
+      description: f.description.trim(),
+      permissionIds: f.permissionIds,
+    }
+    if (roleModalMode.value === 'edit' && roleModalTarget.value) {
+      await useUpdateRole(roleModalTarget.value.id, payload)
+    } else {
+      await useCreateRole(payload)
+    }
     await loadRoles()
+    closeRoleModal()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to create role.')
+    roleMessage.value = { ok: false, text: e?.response?.data?.message || 'Failed to save role.' }
   } finally {
-    creatingRole.value = false
+    roleSaving.value = false
   }
 }
 
@@ -468,6 +521,25 @@ const deleteRole = async (role: RoleItem) => {
   } catch (e: any) {
     alert(e?.response?.data?.message || 'Failed to delete role.')
   }
+}
+
+const roleRowActions = (role: RoleItem): RowAction[] => {
+  const inUse = role.assignedUserCount > 0
+  const actions: RowAction[] = [{ label: 'Edit', onClick: () => openEditRole(role) }]
+  actions.push({ divider: true, label: '', onClick: () => {} })
+  if (role.isSystem) {
+    actions.push({ label: 'Delete', disabled: true, disabledHint: 'System roles cannot be deleted', onClick: () => {} })
+  } else if (inUse) {
+    actions.push({
+      label: 'Delete',
+      disabled: true,
+      disabledHint: `In use by ${role.assignedUserCount} account${role.assignedUserCount === 1 ? '' : 's'} — reassign them first`,
+      onClick: () => {},
+    })
+  } else {
+    actions.push({ label: 'Delete', color: 'text-red-700 hover:text-red-800 hover:bg-red-50', onClick: () => deleteRole(role) })
+  }
+  return actions
 }
 
 // ---------- Service Catalog ----------
@@ -914,11 +986,43 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
         </div>
       </div>
 
-      <!-- Role & Permission Management -->
+      <!-- Role & Permission Management (mirrors User Management) -->
       <div class="bg-white rounded-lg shadow">
-        <div class="p-6 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-900">Role &amp; Permission Management</h2>
-          <p class="text-sm text-gray-600 mt-1">Which permissions each role carries. System roles cannot be deleted and their names are locked.</p>
+        <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Role &amp; Permission Management</h2>
+            <p class="text-sm text-gray-600 mt-1">Which permissions each role carries. System roles cannot be deleted and their names are locked.</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <button
+              @click="openCreateRole"
+              class="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <i class="fas fa-plus mr-1" />Add Role
+            </button>
+            <button @click="loadRoles" class="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              <i class="fas fa-rotate mr-1" />Refresh
+            </button>
+          </div>
+        </div>
+        <div class="px-6 py-4">
+          <div class="relative">
+            <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+            <input
+              v-model="roleFilter"
+              type="text"
+              placeholder="Filter roles — type one or more terms separated by spaces (e.g. admin system)"
+              class="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+            <button
+              v-if="roleFilter"
+              @click="roleFilter = ''"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Clear filter"
+            >
+              <i class="fas fa-xmark"></i>
+            </button>
+          </div>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full">
@@ -927,20 +1031,24 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Type</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Permissions</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
               <tr v-if="rolesLoading && roles.length === 0">
-                <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500">Loading roles…</td>
+                <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">Loading roles…</td>
               </tr>
               <tr v-else-if="rolesError">
-                <td colspan="4" class="px-6 py-8 text-center text-sm text-red-600">{{ rolesError }}</td>
+                <td colspan="5" class="px-6 py-8 text-center text-sm text-red-600">{{ rolesError }}</td>
               </tr>
               <tr v-else-if="roles.length === 0">
-                <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500">No roles found.</td>
+                <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">No roles found.</td>
               </tr>
-              <tr v-for="role in roles" :key="role.id" class="hover:bg-gray-50 align-top">
+              <tr v-else-if="filteredRoles.length === 0">
+                <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">No roles match your filter.</td>
+              </tr>
+              <tr v-for="role in filteredRoles" :key="role.id" class="hover:bg-gray-50 align-top">
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-2">
                     <span class="font-medium text-gray-900">{{ role.name }}</span>
@@ -953,74 +1061,112 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 </td>
                 <td class="px-6 py-4">
                   <div class="flex flex-wrap gap-1.5 max-w-md">
-                    <button
-                      v-for="perm in permissions"
-                      :key="perm.id"
-                      @click="toggleRolePermission(role, perm.id)"
-                      :title="perm.description"
-                      :class="[
-                        'px-2 py-0.5 text-xs font-medium rounded-full border transition-colors',
-                        role.permissionIds.includes(perm.id)
-                          ? 'bg-green-100 border-green-300 text-green-800'
-                          : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100',
-                      ]"
-                    >
-                      {{ perm.name }}
-                    </button>
+                    <template v-for="perm in permissions" :key="perm.id">
+                      <span
+                        v-if="role.permissionIds.includes(perm.id)"
+                        :title="perm.description"
+                        class="px-2 py-0.5 bg-green-100 border border-green-300 text-green-800 text-xs font-medium rounded-full"
+                      >
+                        {{ perm.name }}
+                      </span>
+                    </template>
+                    <span v-if="role.permissionIds.length === 0" class="text-xs text-gray-400">No permissions</span>
                   </div>
                 </td>
+                <td class="px-6 py-4">
+                  <span
+                    :class="[
+                      'px-2 py-0.5 text-xs font-medium rounded-full',
+                      role.isSystem
+                        ? 'bg-purple-100 text-purple-800'
+                        : role.assignedUserCount > 0
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-green-100 text-green-800',
+                    ]"
+                  >
+                    {{ role.isSystem ? 'System' : role.assignedUserCount > 0 ? `In Use (${role.assignedUserCount})` : 'Available' }}
+                  </span>
+                </td>
                 <td class="px-6 py-4 text-right whitespace-nowrap">
-                  <button @click="saveRolePermissions(role)" class="text-blue-600 hover:text-blue-700 text-sm font-medium mr-3">Save</button>
-                  <button v-if="!role.isSystem" @click="deleteRole(role)" class="text-red-600 hover:text-red-700 text-sm font-medium">Delete</button>
+                  <RowActionsMenu :actions="roleRowActions(role)" />
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+      </div>
 
-        <div class="p-6 border-t border-gray-200">
-          <h3 class="text-sm font-semibold text-gray-900 mb-3">Create New Role</h3>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Role Name</label>
-              <input v-model="newRoleForm.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">User Type</label>
-              <select v-model="newRoleForm.userType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>CLIENT</option>
-                <option>USER</option>
-                <option>ADMIN</option>
-              </select>
+      <!-- Create / Edit Role Modal (mirrors User Management modals) -->
+      <div v-if="showRoleModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" @click.self="closeRoleModal">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col">
+          <div class="p-6 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">{{ roleModalMode === 'create' ? 'Create New Role' : 'Edit Role' }}</h3>
+            <p class="text-sm text-gray-500 mt-1">
+              {{ roleModalMode === 'create' ? 'Define a new role and the permissions it carries.' : `Edit "${roleForm.name}" and its permissions.` }}
+              <template v-if="roleModalMode === 'edit' && roleModalTarget?.isSystem"> Names on system roles are locked.</template>
+            </p>
+          </div>
+          <div class="p-6 space-y-4 overflow-y-auto">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Role Name <span class="text-red-500">*</span></label>
+                <input
+                  v-model="roleForm.name"
+                  type="text"
+                  :disabled="roleModalMode === 'edit' && roleModalTarget?.isSystem"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">User Type</label>
+                <select v-model="roleForm.userType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option v-for="t in userTypeOptions" :key="t" :value="t">{{ t }}</option>
+                </select>
+              </div>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <input v-model="newRoleForm.description" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input
+                v-model="roleForm.description"
+                type="text"
+                placeholder="What is this role used for?"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label class="block text-sm font-medium text-gray-700">Permissions</label>
+                <span class="text-xs text-gray-500">{{ roleForm.permissionIds.length }} selected</span>
+              </div>
+              <div class="border border-gray-200 rounded-lg p-3 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
+                <button
+                  v-for="perm in permissions"
+                  :key="perm.id"
+                  @click="toggleRolePermission(perm.id)"
+                  :title="perm.description"
+                  :class="[
+                    'px-2 py-0.5 text-xs font-medium rounded-full border transition-colors',
+                    roleForm.permissionIds.includes(perm.id)
+                      ? 'bg-green-100 border-green-300 text-green-800'
+                      : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100',
+                  ]"
+                >
+                  {{ perm.name }}
+                </button>
+              </div>
+            </div>
+            <div v-if="roleMessage" class="text-sm" :class="roleMessage.ok ? 'text-green-600' : 'text-red-600'">{{ roleMessage.text }}</div>
           </div>
-          <div class="mt-3 flex flex-wrap gap-1.5">
-            <button
-              v-for="perm in permissions"
-              :key="'new-' + perm.id"
-              @click="toggleRolePermission(newRoleForm, perm.id)"
-              :title="perm.description"
-              :class="[
-                'px-2 py-0.5 text-xs font-medium rounded-full border transition-colors',
-                newRoleForm.permissionIds.includes(perm.id)
-                  ? 'bg-green-100 border-green-300 text-green-800'
-                  : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100',
-              ]"
-            >
-              {{ perm.name }}
+          <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <button @click="closeRoleModal" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              Cancel
             </button>
-          </div>
-          <div class="mt-4 flex justify-end">
             <button
-              @click="createRole"
-              :disabled="creatingRole"
+              @click="saveRole"
+              :disabled="roleSaving || !roleForm.name.trim()"
               class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
             >
-              {{ creatingRole ? 'Creating…' : '+ Create Role' }}
+              {{ roleSaving ? 'Saving…' : roleModalMode === 'create' ? 'Create Role' : 'Save Changes' }}
             </button>
           </div>
         </div>
