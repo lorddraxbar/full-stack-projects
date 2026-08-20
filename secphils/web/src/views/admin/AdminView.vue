@@ -643,8 +643,8 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             </button>
           </div>
         </div>
-        <div class="px-6 pt-2">
-          <div class="relative mt-2">
+        <div class="px-6 pt-4">
+          <div class="relative">
             <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
             <input
               v-model="userFilter"
