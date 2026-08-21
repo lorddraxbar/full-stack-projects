@@ -2,6 +2,13 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  OverlayScrollbars,
+  ScrollbarsHidingPlugin,
+  SizeObserverPlugin,
+  ClickScrollPlugin,
+} from 'overlayscrollbars'
+import 'overlayscrollbars/overlayscrollbars.css'
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -12,6 +19,53 @@ import {
 import { useGetLanding, usePostLandingContact, type LandingCompany, type LandingReview } from '@/services/api'
 
 const router = useRouter()
+
+// ---------- OverlayScrollbars (kingsora/OverlayScrollbars) ----------
+// Replaces the native document scrollbar with a thin floating overlay bar
+// on the landing page only — no reserved gutter, no layout gap, native
+// scroll feel preserved (finger/mouse/pen + keyboard). The native APIs
+// keep working on body targets, so window.scrollY (navbar state) and
+// scrollIntoView (anchor nav) are untouched.
+// Plugin registration is idempotent — safe even if the chunk loads twice.
+OverlayScrollbars.plugin([ScrollbarsHidingPlugin, SizeObserverPlugin, ClickScrollPlugin])
+
+let osInstance: OverlayScrollbars | undefined
+
+const initOverlayScrollbars = () => {
+  // Attribute must exist BEFORE init: it hides the native scrollbar
+  // immediately so the swap to the overlay bar doesn't flicker.
+  document.documentElement.setAttribute('data-overlayscrollbars-initialize', '')
+  document.body.setAttribute('data-overlayscrollbars-initialize', '')
+  // No `cancel` guard: OverlayScrollbars would otherwise abort on systems
+  // whose native scrollbars already overlay (macOS, Chromium, most phones)
+  // and strip the attribute. We want the custom themed bar everywhere.
+  osInstance = OverlayScrollbars(
+    { target: document.body },
+    {
+      overflow: { x: 'hidden', y: 'scroll' },
+      scrollbars: {
+        theme: 'os-theme-secphils',
+        visibility: 'auto',
+        autoHide: 'move',
+        autoHideDelay: 1300,
+        dragScroll: true,
+        clickScroll: true,
+        pointers: ['mouse', 'touch', 'pen'],
+      },
+    },
+  )
+  // The navbar's transparent→solid flip tracks scroll position.
+  osInstance.on({ scroll: () => onScroll() })
+}
+
+const destroyOverlayScrollbars = () => {
+  osInstance?.destroy()
+  osInstance = undefined
+  // Remove the pre-init attribute so the native scrollbar rules (and any
+  // non-overlaid fallback on this route) apply again immediately.
+  document.documentElement.removeAttribute('data-overlayscrollbars-initialize')
+  document.body.removeAttribute('data-overlayscrollbars-initialize')
+}
 
 // ---------- Company profile (Admin Panel > Company Settings) ----------
 const company = ref<LandingCompany | null>(null)
@@ -244,6 +298,7 @@ onMounted(() => {
   document.title = 'Strategic Engineering Consultancy - Philippines'
   window.addEventListener('scroll', onScroll, { passive: true })
   onScroll()
+  initOverlayScrollbars()
   useGetLanding()
     .then((data) => {
       if (data.company && Object.keys(data.company).length > 0) company.value = data.company
@@ -256,7 +311,10 @@ onMounted(() => {
       loading.value = false
     })
 })
-onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScroll)
+  destroyOverlayScrollbars()
+})
 </script>
 
 <template>

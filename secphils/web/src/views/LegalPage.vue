@@ -247,6 +247,7 @@ onMounted(async () => {
   padding: 12px 24px;
   display: flex;
   align-items: center;
+  justify-content: center;
   position: sticky;
   top: 0;
   z-index: 10;

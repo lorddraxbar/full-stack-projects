@@ -140,6 +140,36 @@ html::-webkit-scrollbar-thumb:hover {
   background: #b3b3b3;
 }
 
+/* ---------- OverlayScrollbars (kingsora/OverlayScrollbars) ----------
+   The landing page swaps the native document scrollbar for the plugin's
+   thin floating overlay bar (initialized per-route in
+   MarketingLandingPage.vue; its CSS hides the native bar on that page).
+   Custom brand theme for the overlay bar: 8px, subtle grey track,
+   soft-grey handle with hover feedback — visible while interacting,
+   auto-hides ~1.3s after idle.
+   Note: the theme must be scoped to `.os-scrollbar.os-theme-secphils`
+   (specificity 0,2,0) because the library's own reset block
+   `.os-scrollbar { --os-size:0; --os-handle-bg:none; ... }` is a
+   single-class selector loaded in the lazy landing chunk — i.e. AFTER
+   this global stylesheet — so a bare `.os-theme-secphils` (0,1,0) loses
+   the cascade and the bar renders invisible (0px, transparent). */
+.os-scrollbar.os-theme-secphils {
+  --os-size: 8px;
+  --os-padding-perpendicular: 0px;
+  --os-padding-axis: 0px;
+  --os-track-bg: transparent;
+  --os-track-bg-hover: rgba(0, 0, 0, 0.05);
+  --os-track-bg-active: rgba(0, 0, 0, 0.08);
+  --os-handle-bg: rgba(96, 96, 96, 0.42);
+  --os-handle-bg-hover: rgba(96, 96, 96, 0.62);
+  --os-handle-bg-active: rgba(96, 96, 96, 0.78);
+  --os-handle-border-radius: 999px;
+  --os-handle-perpendicular-size: 6px;
+  --os-handle-perpendicular-size-hover: 7px;
+  --os-handle-perpendicular-size-active: 8px;
+  --os-handle-interactive-area-offset: 3px;
+}
+
 @theme inline {
   --font-sans: 'Raleway', sans-serif;
   --font-heading: var(--font-sans);
