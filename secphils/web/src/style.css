@@ -8,25 +8,29 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(222.2 84% 4.9%);
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(222.2 84% 4.9%);
-  --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(222.2 84% 4.9%);
-  --color-primary: hsl(221.2 83.2% 53.3%);
-  --color-primary-foreground: hsl(210 40% 98%);
-  --color-secondary: hsl(210 40% 96.1%);
-  --color-secondary-foreground: hsl(222.2 47.4% 11.2%);
-  --color-muted: hsl(210 40% 96.1%);
-  --color-muted-foreground: hsl(215.4 16.3% 46.9%);
-  --color-accent: hsl(210 40% 96.1%);
-  --color-accent-foreground: hsl(222.2 47.4% 11.2%);
-  --color-destructive: hsl(0 84.2% 60.2%);
-  --color-destructive-foreground: hsl(210 40% 98%);
-  --color-border: hsl(214.3 31.8% 91.4%);
-  --color-input: hsl(214.3 31.8% 91.4%);
-  --color-ring: hsl(221.2 83.2% 53.3%);
+  /* Landing / brand palette — mirrors MarketingLandingPage.vue so the
+     public landing and the authenticated portal share one color scheme.
+     primary = brand teal #29ca8e; neutrals = warm grays from the landing;
+     accent/gold #f5a623 + slate #292e49 for secondary surfaces & charts. */
+  --color-background: #ffffff;
+  --color-foreground: #202020;
+  --color-card: #ffffff;
+  --color-card-foreground: #202020;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #202020;
+  --color-primary: #29ca8e;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f9f9f9;
+  --color-secondary-foreground: #202020;
+  --color-muted: #f9f9f9;
+  --color-muted-foreground: #757575;
+  --color-accent: #f0fbf7;
+  --color-accent-foreground: #202020;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e8e8e8;
+  --color-input: #e8e8e8;
+  --color-ring: #29ca8e;
   --radius-sm: calc(0.25rem - 2px);
   --radius-md: calc(0.375rem - 2px);
   --radius-lg: 0.5rem;
@@ -211,36 +215,42 @@ html::-webkit-scrollbar-thumb:hover {
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.546 0.245 262.881);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.97 0.014 254.604);
-  --accent-foreground: oklch(0.969 0.016 293.756);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.623 0.214 259.815);
-  --chart-1: oklch(0.811 0.111 293.571);
-  --chart-2: oklch(0.606 0.25 292.717);
-  --chart-3: oklch(0.541 0.281 293.009);
-  --chart-4: oklch(0.491 0.27 292.581);
-  --chart-5: oklch(0.432 0.232 292.759);
+  /* Landing / brand palette (light) — the portal mirrors the public landing's
+     color scheme so they read as one product. These `--*` vars are the
+     source of truth the `@theme inline` bridge aliases (var(--*) → --color-*)
+     and that the `.bg-primary`-style utilities resolve. Landing palette:
+     warm-white body, teal #29ca8e brand/primary, warm-neutral greys,
+     dark-slate + gold chart accents. (Hex, not oklch — no conversion drift.) */
+  --background: #ffffff;
+  --foreground: #202020;
+  --card: #ffffff;
+  --card-foreground: #202020;
+  --popover: #ffffff;
+  --popover-foreground: #202020;
+  --primary: #29ca8e;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f5f7;
+  --secondary-foreground: #202020;
+  --muted: #f9f9f9;
+  --muted-foreground: #757575;
+  --accent: #e9f8f2;
+  --accent-foreground: #1f9d6b;
+  --destructive: #dc2626;
+  --border: #e8e8e8;
+  --input: #e8e8e8;
+  --ring: #29ca8e;
+  --chart-1: #29ca8e;
+  --chart-2: #f5a623;
+  --chart-3: #536976;
+  --chart-4: #dc2626;
+  --chart-5: #8a94a6;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.546 0.245 262.881);
-  --sidebar-primary-foreground: oklch(0.969 0.016 293.756);
-  --sidebar-accent: oklch(0.97 0.014 254.604);
-  --sidebar-accent-foreground: oklch(0.969 0.016 293.756);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.623 0.214 259.815);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #202020;
+  --sidebar-primary: #29ca8e;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e9f8f2;
+  --sidebar-accent-foreground: #1f9d6b;
+  --sidebar-border: #e8e8e8;
+  --sidebar-ring: #29ca8e;
 }

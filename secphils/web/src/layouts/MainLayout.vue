@@ -97,7 +97,7 @@ const logout = () => {
     >
       <!-- Logo -->
       <div class="h-16 flex items-center justify-center border-b border-gray-200">
-        <h1 class="text-lg font-bold text-blue-600" :class="{ 'hidden': !isSidebarOpen }">
+        <h1 class="text-lg font-bold text-emerald-600" :class="{ 'hidden': !isSidebarOpen }">
           SECPhils
         </h1>
       </div>
@@ -109,8 +109,8 @@ const logout = () => {
           :key="item.path"
           :to="item.path"
           :class="[
-            'flex items-center px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors',
-            isActive(item.path) ? 'bg-blue-50 text-blue-600 border-r-2 border-blue-600' : '',
+            'flex items-center px-4 py-3 text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 transition-colors',
+            isActive(item.path) ? 'bg-emerald-50 text-emerald-600 border-r-2 border-emerald-600' : '',
             !isSidebarOpen && !isMobile ? 'justify-center' : '',
           ]"
           @click="isMobile && (isSidebarOpen = false)"
@@ -150,7 +150,7 @@ const logout = () => {
               @click="isUserMenuOpen = !isUserMenuOpen"
               class="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-gray-100 transition-colors"
             >
-              <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
+              <div class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-sm font-medium">
                 {{ userInitial }}
               </div>
               <div class="hidden sm:block text-left">
@@ -167,7 +167,7 @@ const logout = () => {
             >
               <RouterLink
                 to="/settings"
-                class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+                class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-emerald-600 transition-colors"
                 @click="isUserMenuOpen = false"
               >
                 <i class="fas fa-cog w-4 text-center" />
@@ -176,7 +176,7 @@ const logout = () => {
               <RouterLink
                 v-if="role === 'ADMIN'"
                 to="/admin"
-                class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+                class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-emerald-600 transition-colors"
                 @click="isUserMenuOpen = false"
               >
                 <i class="fas fa-tools w-4 text-center" />

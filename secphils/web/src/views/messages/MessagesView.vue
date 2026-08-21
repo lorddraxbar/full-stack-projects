@@ -121,7 +121,7 @@ onMounted(loadConversations)
     </div>
 
     <div v-if="loading" class="flex items-center justify-center py-20">
-      <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin h-8 w-8 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
       </svg>
@@ -148,7 +148,7 @@ onMounted(loadConversations)
             @click="selectConversation(conv.id)"
             :class="[
               'p-4 cursor-pointer hover:bg-gray-50 transition-colors',
-              selectedId === conv.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+              selectedId === conv.id ? 'bg-emerald-50 border-l-4 border-emerald-600' : ''
             ]"
           >
             <div class="flex items-start justify-between mb-1">
@@ -186,18 +186,18 @@ onMounted(loadConversations)
               isOwn(msg) ? 'flex-row-reverse' : ''
             ]"
           >
-            <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
+            <div class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
               {{ initials(msg.senderName || '?') }}
             </div>
             <div :class="[
               'max-w-[70%] rounded-lg p-3',
-              isOwn(msg) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'
+              isOwn(msg) ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-900'
             ]">
               <p class="text-sm font-medium mb-0.5">{{ msg.senderName }}</p>
               <p class="text-sm">{{ msg.body }}</p>
               <p :class="[
                 'text-xs mt-1',
-                isOwn(msg) ? 'text-blue-100' : 'text-gray-500'
+                isOwn(msg) ? 'text-emerald-100' : 'text-gray-500'
               ]">
                 {{ formatDateTime(msg.createdAt) }}
               </p>
@@ -214,12 +214,12 @@ onMounted(loadConversations)
               @keyup.enter="sendMessage"
               type="text"
               placeholder="Type a message..."
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
             />
             <button
               @click="sendMessage"
               :disabled="sending"
-              class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+              class="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50"
             >
               Send
             </button>

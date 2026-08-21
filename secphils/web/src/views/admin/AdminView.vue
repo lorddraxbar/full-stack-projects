@@ -143,7 +143,7 @@ const userRowActions = (user: PortalUser): RowAction[] => {
     actions.push({ label: 'Deactivate', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => deactivateUser(user) })
   } else {
     actions.push({ label: 'Activate', color: 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => activateUser(user) })
-    actions.push({ label: 'Resend Invite', color: 'text-blue-600 hover:text-blue-700 hover:bg-blue-50', onClick: () => resendInvite(user) })
+    actions.push({ label: 'Resend Invite', color: 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50', onClick: () => resendInvite(user) })
   }
   actions.push({ divider: true, label: '', onClick: () => {} })
   actions.push({ label: 'Delete', color: 'text-red-700 hover:text-red-800 hover:bg-red-50', onClick: () => openHardDelete(user) })
@@ -306,8 +306,8 @@ const companyProfile = ref({
   bankingDetails: '',
   operationalFields: '',
   logo: null as string | null,
-  brandPrimary: '#2563eb',
-  brandSecondary: '#64748b',
+  brandPrimary: '#29ca8e',
+  brandSecondary: '#536976',
 })
 const companyProfileLoaded = ref(false)
 const companyProfileError = ref('')
@@ -333,8 +333,8 @@ const loadProviderCompanyProfile = async () => {
         bankingDetails: c.bankingDetails ?? '',
         operationalFields: c.operationalFields ?? '',
         logo: c.logoUrl ?? null,
-        brandPrimary: c.brandPrimary ?? '#2563eb',
-        brandSecondary: c.brandSecondary ?? '#64748b',
+        brandPrimary: c.brandPrimary ?? '#29ca8e',
+        brandSecondary: c.brandSecondary ?? '#536976',
       }
     }
   } catch {
@@ -729,7 +729,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           :class="[
             'py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap transition-colors',
             isActiveTab(tab.id)
-              ? 'border-blue-600 text-blue-600'
+              ? 'border-emerald-600 text-emerald-600'
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
           ]"
         >
@@ -812,11 +812,11 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           <div class="flex items-center gap-3">
             <button
               @click="showAddUser = true"
-              class="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              class="px-3 py-1.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors"
             >
               <i class="fas fa-user-plus mr-1" />Add
             </button>
-            <button @click="loadUsers" class="text-sm text-blue-600 hover:text-blue-700 font-medium">
+            <button @click="loadUsers" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
               <i class="fas fa-rotate mr-1" />Refresh
             </button>
           </div>
@@ -828,7 +828,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               v-model="userFilter"
               type="text"
               placeholder="Filter users — type one or more terms separated by spaces (e.g. admin client acme)"
-              class="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              class="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
             <button
               v-if="userFilter"
@@ -869,7 +869,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
+                    <div class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-sm font-medium">
                       {{ user.fullName.charAt(0) }}
                     </div>
                     <span class="font-medium text-gray-900">{{ user.fullName }}</span>
@@ -880,7 +880,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                   <span :class="[
                     'px-2 py-1 text-xs font-medium rounded',
                     user.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' :
-                    user.role === 'USER' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                    user.role === 'USER' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'
                   ]">{{ user.role }}</span>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ user.companyName || '—' }}</td>
@@ -917,52 +917,52 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-            <input v-model="companyProfile.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="companyProfile.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Tagline / Slogan</label>
-            <input v-model="companyProfile.tagline" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="companyProfile.tagline" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Business Description</label>
-            <textarea v-model="companyProfile.description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+            <textarea v-model="companyProfile.description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
           </div>
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Industry Sector(s)</label>
-            <input v-model="companyProfile.industrySectors" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="companyProfile.industrySectors" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Headquarters Address</label>
-            <input v-model="companyProfile.headquarters" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="companyProfile.headquarters" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number(s)</label>
-            <input v-model="companyProfile.phone" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="companyProfile.phone" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Email Addresses</label>
-            <input v-model="companyProfile.email" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="one@secphils.com, two@secphils.com" />
+            <input v-model="companyProfile.email" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="one@secphils.com, two@secphils.com" />
             <p class="mt-1 text-xs text-gray-400">Separate multiple addresses with commas. Website contact forms are delivered to all of them.</p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
-            <input v-model="companyProfile.website" type="url" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="companyProfile.website" type="url" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Social Media Links</label>
-            <input v-model="companyProfile.socialLinks" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="companyProfile.socialLinks" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Tax / Registration Number</label>
-            <input v-model="companyProfile.taxNumber" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="companyProfile.taxNumber" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Banking / Payment Details</label>
-            <input v-model="companyProfile.bankingDetails" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="companyProfile.bankingDetails" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Operational Data Fields</label>
-            <input v-model="companyProfile.operationalFields" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="companyProfile.operationalFields" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Primary Brand Color</label>
@@ -980,7 +980,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           <button
             @click="saveCompanyProfile"
             :disabled="savingCompanyProfile"
-            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+            class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50"
           >
             {{ savingCompanyProfile ? 'Saving…' : 'Save Company Profile' }}
           </button>
@@ -997,11 +997,11 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           <div class="flex items-center gap-3">
             <button
               @click="openCreateRole"
-              class="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              class="px-3 py-1.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors"
             >
               <i class="fas fa-plus mr-1" />Add Role
             </button>
-            <button @click="loadRoles" class="text-sm text-blue-600 hover:text-blue-700 font-medium">
+            <button @click="loadRoles" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
               <i class="fas fa-rotate mr-1" />Refresh
             </button>
           </div>
@@ -1013,7 +1013,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               v-model="roleFilter"
               type="text"
               placeholder="Filter roles — type one or more terms separated by spaces (e.g. admin system)"
-              class="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              class="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
             <button
               v-if="roleFilter"
@@ -1058,7 +1058,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                   <p class="text-xs text-gray-500 mt-1">{{ role.description || '—' }}</p>
                 </td>
                 <td class="px-6 py-4">
-                  <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">{{ role.userType }}</span>
+                  <span class="px-2 py-1 bg-emerald-100 text-emerald-800 text-xs font-medium rounded">{{ role.userType }}</span>
                 </td>
                 <td class="px-6 py-4">
                   <div class="flex flex-wrap gap-1.5 max-w-md">
@@ -1115,12 +1115,12 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                   v-model="roleForm.name"
                   type="text"
                   :disabled="roleModalMode === 'edit' && roleModalTarget?.isSystem"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">User Type</label>
-                <select v-model="roleForm.userType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select v-model="roleForm.userType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
                   <option v-for="t in userTypeOptions" :key="t" :value="t">{{ t }}</option>
                 </select>
               </div>
@@ -1131,7 +1131,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 v-model="roleForm.description"
                 type="text"
                 placeholder="What is this role used for?"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
             <div>
@@ -1165,7 +1165,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             <button
               @click="saveRole"
               :disabled="roleSaving || !roleForm.name.trim()"
-              class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
+              class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
             >
               {{ roleSaving ? 'Saving…' : roleModalMode === 'create' ? 'Create Role' : 'Save Changes' }}
             </button>
@@ -1211,7 +1211,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 </td>
                 <td class="px-3 py-4 text-right whitespace-nowrap">
                   <RowActionsMenu :actions="[
-                    { label: 'Edit', color: 'text-blue-600 hover:text-blue-700 hover:bg-blue-50', onClick: () => {} },
+                    { label: 'Edit', color: 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50', onClick: () => {} },
                     { label: service.status === 'Active' ? 'Archive' : 'Restore', color: service.status === 'Active' ? 'text-red-600 hover:text-red-700 hover:bg-red-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => toggleServiceStatus(service) }
                   ]" />
                 </td>
@@ -1226,15 +1226,15 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Service Name</label>
-            <input v-model="newServiceForm.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="newServiceForm.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <input v-model="newServiceForm.description" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="newServiceForm.description" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <select v-model="newServiceForm.category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select v-model="newServiceForm.category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
               <option>Consulting</option>
               <option>Compliance</option>
               <option>Research</option>
@@ -1243,11 +1243,11 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           </div>
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Price / Rate (optional)</label>
-            <input v-model="newServiceForm.rate" type="text" placeholder="e.g. Php 1,000 / hr or Php 150,000 flat" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="newServiceForm.rate" type="text" placeholder="e.g. Php 1,000 / hr or Php 150,000 flat" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
         </div>
         <div class="mt-4 flex justify-end">
-          <button @click="addService" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+          <button @click="addService" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
             + Add Service
           </button>
         </div>
@@ -1274,14 +1274,14 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 <button
                   v-if="i > 0"
                   @click="() => { workflowSteps.splice(i - 1, 0, workflowSteps.splice(i, 1)[0]) }"
-                  class="text-blue-600 hover:text-blue-700 text-xs"
+                  class="text-emerald-600 hover:text-emerald-700 text-xs"
                 >
                   <i class="fas fa-arrow-up" />
                 </button>
                 <button
                   v-if="i < workflowSteps.length - 1"
                   @click="() => { workflowSteps.splice(i + 1, 0, workflowSteps.splice(i, 1)[0]) }"
-                  class="text-blue-600 hover:text-blue-700 text-xs"
+                  class="text-emerald-600 hover:text-emerald-700 text-xs"
                 >
                   <i class="fas fa-arrow-down" />
                 </button>
@@ -1296,9 +1296,9 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               v-model="newStep"
               type="text"
               placeholder="New step name"
-              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
-            <button @click="addWorkflowStep" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+            <button @click="addWorkflowStep" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
               + Add
             </button>
           </div>
@@ -1314,12 +1314,12 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 <input
                   v-model="status.name"
                   type="text"
-                  class="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  class="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
                 />
                 <input
                   v-model="status.description"
                   type="text"
-                  class="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs text-gray-500"
+                  class="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs text-gray-500"
                 />
               </div>
             </div>
@@ -1349,11 +1349,11 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 @keyup.enter="addDropdownValue(category, newDropdownValues[category.name] || ''); newDropdownValues[category.name] = ''"
                 type="text"
                 placeholder="Add value"
-                class="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                class="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
               />
               <button
                 @click="addDropdownValue(category, newDropdownValues[category.name] || ''); newDropdownValues[category.name] = ''"
-                class="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
+                class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors text-xs font-medium"
               >
                 + Add
               </button>
@@ -1408,7 +1408,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                   { label: 'Reject', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => setReviewStatus(review, 'Rejected') }
                 ]" />
                 <RowActionsMenu v-else :actions="[
-                  { label: 'Re-open', color: 'text-blue-600 hover:text-blue-700 hover:bg-blue-50', onClick: () => setReviewStatus(review, 'Pending') }
+                  { label: 'Re-open', color: 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50', onClick: () => setReviewStatus(review, 'Pending') }
                 ]" />
               </td>
             </tr>
@@ -1424,15 +1424,15 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
         <div class="space-y-4 max-w-2xl">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
-            <input v-model="announcementForm.title" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="announcementForm.title" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Body</label>
-            <textarea v-model="announcementForm.body" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+            <textarea v-model="announcementForm.body" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Audience</label>
-            <select v-model="announcementForm.audience" class="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select v-model="announcementForm.audience" class="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
               <option>Company</option>
               <option>Project: Energy Audit</option>
               <option>Project: ISO 9001 Certification</option>
@@ -1440,7 +1440,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             </select>
           </div>
           <div class="flex justify-end">
-            <button @click="publishAnnouncement" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+            <button @click="publishAnnouncement" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium">
               <i class="fas fa-bullhorn mr-1" /> Publish
             </button>
           </div>
@@ -1486,7 +1486,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             <input
               v-model="systemSettings.portalName"
               type="text"
-              class="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
 
@@ -1496,7 +1496,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               v-model="systemSettings.inviteBaseUrl"
               type="url"
               placeholder="https://portal.secphils.com"
-              class="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
             <p class="text-xs text-gray-500 mt-1">
               The host used in the "Set your password" link sent to invited users. Leave blank to use the URL the admin is currently on (dynamic).
@@ -1508,7 +1508,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               id="maintenance"
               v-model="systemSettings.maintenanceMode"
               type="checkbox"
-              class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              class="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
             />
             <label for="maintenance" class="text-sm text-gray-700">Enable Maintenance Mode</label>
           </div>
@@ -1521,7 +1521,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 <input
                   v-model="systemSettings.securityPolicies.passwordMinLength"
                   type="number"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
               <div>
@@ -1529,7 +1529,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 <input
                   v-model="systemSettings.securityPolicies.sessionTimeoutMinutes"
                   type="number"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
               <div>
@@ -1537,7 +1537,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 <input
                   v-model="systemSettings.securityPolicies.maxLoginAttempts"
                   type="number"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
               <div class="flex items-center gap-2 mt-6">
@@ -1545,7 +1545,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                   id="require2fa"
                   v-model="systemSettings.securityPolicies.require2fa"
                   type="checkbox"
-                  class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  class="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
                 />
                 <label for="require2fa" class="text-sm text-gray-700">Require 2FA</label>
               </div>
@@ -1560,7 +1560,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           </div>
 
           <div class="flex justify-end">
-            <button @click="saveSystemSettings" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+            <button @click="saveSystemSettings" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium">
               Save Settings
             </button>
           </div>
@@ -1576,23 +1576,23 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             <input
               v-model="template.name"
               type="text"
-              class="font-semibold text-gray-900 w-full px-2 py-1 border-b border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-t-lg bg-transparent mb-2"
+              class="font-semibold text-gray-900 w-full px-2 py-1 border-b border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-t-lg bg-transparent mb-2"
             />
             <input
               v-model="template.subject"
               type="text"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm mb-2"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm mb-2"
               placeholder="Subject"
             />
             <textarea
               v-model="template.body"
               rows="4"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono"
             />
           </div>
         </div>
         <div class="mt-4 flex justify-end">
-          <button @click="saveSystemSettings" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+          <button @click="saveSystemSettings" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
             Save Templates
           </button>
         </div>
@@ -1649,7 +1649,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               <td class="px-6 py-4 text-sm text-gray-600">{{ log.timestamp }}</td>
               <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ log.user }}</td>
               <td class="px-6 py-4">
-                <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                <span class="px-2 py-1 bg-emerald-100 text-emerald-800 text-xs font-medium rounded">
                   {{ log.action }}
                 </span>
               </td>
@@ -1713,28 +1713,28 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
     <div v-if="editTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
         <h3 class="text-lg font-semibold text-gray-900">
-          <i class="fas fa-pen text-blue-600 mr-2" />Edit {{ editTarget.fullName }}
+          <i class="fas fa-pen text-emerald-600 mr-2" />Edit {{ editTarget.fullName }}
         </h3>
         <p class="mt-1 text-sm text-gray-500">{{ editTarget.email }}</p>
         <div class="mt-4 space-y-3">
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-              <input v-model="editForm.firstName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input v-model="editForm.firstName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-              <input v-model="editForm.lastName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input v-model="editForm.lastName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
             </div>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input v-model="editForm.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input v-model="editForm.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
             <div class="relative">
-              <select v-model="editForm.role" @change="onEditRoleChange" class="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
+              <select v-model="editForm.role" @change="onEditRoleChange" class="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none">
                 <option value="ADMIN">ADMIN — Provider Admin</option>
                 <option value="USER">USER — Provider Staff</option>
                 <option value="CLIENT">CLIENT — Client Account</option>
@@ -1744,21 +1744,21 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           </div>
           <div v-if="editForm.role === 'CLIENT'">
             <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
-            <select v-model="editForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select v-model="editForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
               <option :value="null">— No company —</option>
               <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">New Password (optional)</label>
-            <input v-model="editForm.password" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Leave blank to keep current" />
+            <input v-model="editForm.password" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Leave blank to keep current" />
           </div>
           <div class="flex items-center gap-2">
             <input
               id="editIsActive"
               v-model="editForm.isActive"
               type="checkbox"
-              class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              class="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
             />
             <label for="editIsActive" class="text-sm text-gray-700">Account is active</label>
           </div>
@@ -1775,7 +1775,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           <button
             @click="saveEdit"
             :disabled="editSaving || !editForm.firstName.trim() || !editForm.lastName.trim() || !editForm.email.trim()"
-            class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ editSaving ? 'Saving…' : 'Save Changes' }}
           </button>
@@ -1787,28 +1787,28 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
     <div v-if="showAddUser" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
         <h3 class="text-lg font-semibold text-gray-900">
-          <i class="fas fa-user-plus text-blue-600 mr-2" />Add User
+          <i class="fas fa-user-plus text-emerald-600 mr-2" />Add User
         </h3>
         <p class="mt-1 text-sm text-gray-500">Creates a real account and emails the user a <strong>set-your-own-password</strong> link. Choose <strong>ADMIN</strong> for a provider admin, <strong>USER</strong> for provider staff, or <strong>CLIENT</strong> for a client-side account.</p>
         <div class="mt-4 space-y-3">
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-              <input v-model="addUserForm.firstName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Juan" />
+              <input v-model="addUserForm.firstName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Juan" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-              <input v-model="addUserForm.lastName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Dela Cruz" />
+              <input v-model="addUserForm.lastName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Dela Cruz" />
             </div>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input v-model="addUserForm.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="juan@secphils.com" />
+            <input v-model="addUserForm.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="juan@secphils.com" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
             <div class="relative">
-              <select v-model="addUserForm.role" @change="onAddRoleChange" class="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
+              <select v-model="addUserForm.role" @change="onAddRoleChange" class="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none">
                 <option value="ADMIN">ADMIN — Provider Admin</option>
                 <option value="USER">USER — Provider Staff</option>
                 <option value="CLIENT">CLIENT — Client Account</option>
@@ -1818,7 +1818,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           </div>
           <div v-if="addUserForm.role === 'CLIENT'">
             <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
-            <select v-model="addUserForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select v-model="addUserForm.companyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
               <option :value="null">— No company —</option>
               <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
@@ -1840,7 +1840,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           <button
             @click="addUser"
             :disabled="addUserSaving || !addUserForm.firstName.trim() || !addUserForm.lastName.trim() || !addUserForm.email.trim()"
-            class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ addUserSaving ? 'Creating…' : 'Create User & Send Invite' }}
           </button>

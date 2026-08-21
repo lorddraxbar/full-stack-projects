@@ -150,7 +150,7 @@ function formatDate(d: string) {
       <button
         v-if="isUser"
         @click="openForm"
-        class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+        class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
       >
         + New Announcement
       </button>
@@ -165,7 +165,7 @@ function formatDate(d: string) {
           <input
             v-model="form.title"
             type="text"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             placeholder="Announcement title"
           />
         </div>
@@ -174,7 +174,7 @@ function formatDate(d: string) {
           <textarea
             v-model="form.body"
             rows="3"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             placeholder="Announcement details"
           />
         </div>
@@ -183,7 +183,7 @@ function formatDate(d: string) {
             <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
             <select
               v-model="form.category"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <option value="PROJECT_UPDATE">Project Update</option>
               <option value="COMPANY_NEWS">Company News</option>
@@ -194,7 +194,7 @@ function formatDate(d: string) {
             <label class="block text-sm font-medium text-gray-700 mb-1">Audience</label>
             <select
               v-model="form.audience"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <option value="COMPANY">Company-wide</option>
               <option value="PROJECT">Project</option>
@@ -204,7 +204,7 @@ function formatDate(d: string) {
             <label class="block text-sm font-medium text-gray-700 mb-1">Project</label>
             <select
               v-model="form.projectId"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <option :value="null" disabled>Select project…</option>
               <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
@@ -216,7 +216,7 @@ function formatDate(d: string) {
           <button
             @click="submit"
             :disabled="saving"
-            class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
           >
             {{ saving ? 'Publishing…' : 'Publish' }}
           </button>
@@ -239,7 +239,7 @@ function formatDate(d: string) {
         :key="announcement.id"
         :class="[
           'bg-white rounded-lg shadow p-6 transition-all',
-          !readIds.has(announcement.id) ? 'border-l-4 border-blue-600' : ''
+          !readIds.has(announcement.id) ? 'border-l-4 border-emerald-600' : ''
         ]"
       >
         <div class="flex items-start justify-between mb-3">
@@ -251,11 +251,11 @@ function formatDate(d: string) {
               </span>
               <span
                 :class="['px-2 py-0.5 text-xs font-medium rounded-full',
-                  announcement.audience === 'COMPANY' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800']"
+                  announcement.audience === 'COMPANY' ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800']"
               >
                 {{ ANNOUNCEMENT_AUDIENCE_LABELS[announcement.audience] || announcement.audience }}
               </span>
-              <span v-if="!readIds.has(announcement.id)" class="w-2 h-2 bg-blue-600 rounded-full" />
+              <span v-if="!readIds.has(announcement.id)" class="w-2 h-2 bg-emerald-600 rounded-full" />
             </div>
             <p class="text-gray-700 text-sm whitespace-pre-line">{{ announcement.body }}</p>
           </div>
@@ -265,7 +265,7 @@ function formatDate(d: string) {
           <div class="flex items-center gap-4 flex-wrap">
             <span>By: {{ announcement.createdByName || '—' }}</span>
             <span>Published: {{ formatDate(announcement.createdAt) }}</span>
-            <span v-if="announcement.audience === 'PROJECT' && announcement.projectId" class="text-blue-600">
+            <span v-if="announcement.audience === 'PROJECT' && announcement.projectId" class="text-emerald-600">
               Project: {{ projectById(announcement.projectId)?.name || 'N/A' }}
             </span>
           </div>
@@ -273,7 +273,7 @@ function formatDate(d: string) {
             <button
               v-if="!readIds.has(announcement.id)"
               @click="markAsRead(announcement.id)"
-              class="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+              class="px-3 py-1 text-sm text-emerald-600 hover:text-emerald-700 font-medium"
             >
               Mark as read
             </button>

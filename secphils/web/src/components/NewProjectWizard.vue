@@ -426,8 +426,8 @@ const handleClose = () => {
             </CardContent>
           </Card>
 
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p class="text-sm text-blue-800">
+          <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+            <p class="text-sm text-emerald-800">
               <strong>Note:</strong> An email will be sent to the authorized representative with a link to review the provided information and complete any additional details as needed. Login credentials will be created for this new customer.
             </p>
           </div>
@@ -474,8 +474,8 @@ const handleClose = () => {
             </CardContent>
           </Card>
 
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p class="text-sm text-blue-800">
+          <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+            <p class="text-sm text-emerald-800">
               <strong>Note:</strong> An email will be sent to the authorized representative with a link to review the provided information and complete any additional details as needed.
             </p>
           </div>

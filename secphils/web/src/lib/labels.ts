@@ -23,7 +23,7 @@ export const PRIORITY_LABELS: Record<string, string> = {
 
 export const PROJECT_STATUS_COLORS: Record<string, string> = {
   'Not Started': 'bg-gray-100 text-gray-800',
-  'In Progress': 'bg-blue-100 text-blue-800',
+  'In Progress': 'bg-teal-100 text-teal-800',
   'On Hold': 'bg-red-100 text-red-800',
   'Completed': 'bg-green-100 text-green-800',
   'Archived': 'bg-gray-100 text-gray-500',
@@ -37,7 +37,7 @@ export const PRIORITY_COLORS: Record<string, string> = {
 
 export const TASK_STATUS_COLORS: Record<string, string> = {
   'To Do': 'bg-gray-100 text-gray-800',
-  'In Progress': 'bg-blue-100 text-blue-800',
+  'In Progress': 'bg-teal-100 text-teal-800',
   'Done': 'bg-green-100 text-green-800',
 }
 
@@ -50,7 +50,7 @@ export const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
 export const DOCUMENT_CATEGORY_COLORS: Record<string, string> = {
   'Client-Submitted': 'bg-green-100 text-green-800',
   'Requested': 'bg-yellow-100 text-yellow-800',
-  'Deliverable': 'bg-blue-100 text-blue-800',
+  'Deliverable': 'bg-teal-100 text-teal-800',
 }
 
 export const ANNOUNCEMENT_CATEGORY_LABELS: Record<string, string> = {
@@ -60,7 +60,7 @@ export const ANNOUNCEMENT_CATEGORY_LABELS: Record<string, string> = {
 }
 
 export const ANNOUNCEMENT_CATEGORY_COLORS: Record<string, string> = {
-  'Project Update': 'bg-blue-100 text-blue-800',
+  'Project Update': 'bg-teal-100 text-teal-800',
   'Company News': 'bg-purple-100 text-purple-800',
   'Maintenance': 'bg-orange-100 text-orange-800',
 }

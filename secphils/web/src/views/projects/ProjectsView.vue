@@ -137,7 +137,7 @@ onMounted(() => {
           </div>
           <select
             v-model="selectedStatus"
-            class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
             <option value="ALL">All Status</option>
             <option value="Not Started">Not Started</option>
@@ -188,7 +188,7 @@ onMounted(() => {
             </div>
             <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
               <div
-                class="bg-blue-600 h-2 rounded-full transition-all"
+                class="bg-emerald-600 h-2 rounded-full transition-all"
                 :style="{ width: project.progress + '%' }"
               />
             </div>

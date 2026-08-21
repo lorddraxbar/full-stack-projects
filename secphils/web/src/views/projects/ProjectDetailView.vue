@@ -185,7 +185,7 @@ async function saveAdminChanges() {
 <template>
   <div>
     <div v-if="loading" class="flex items-center justify-center py-20">
-      <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin h-8 w-8 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
       </svg>
@@ -218,7 +218,7 @@ async function saveAdminChanges() {
         </div>
 
         <div class="mt-4 w-full bg-gray-200 rounded-full h-2">
-          <div class="bg-blue-600 h-2 rounded-full transition-all" :style="{ width: (project.progress ?? 0) + '%' }" />
+          <div class="bg-emerald-600 h-2 rounded-full transition-all" :style="{ width: (project.progress ?? 0) + '%' }" />
         </div>
         <p class="text-sm text-gray-600 mt-1">{{ project.progress ?? 0 }}% complete</p>
       </div>
@@ -233,7 +233,7 @@ async function saveAdminChanges() {
             :class="[
               'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors',
               activeTab === tab
-                ? 'border-blue-600 text-blue-600'
+                ? 'border-emerald-600 text-emerald-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
             ]"
           >
@@ -262,13 +262,13 @@ async function saveAdminChanges() {
             v-model="messageDraft"
             rows="3"
             placeholder="Post a progress update to the project conversation..."
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
           />
           <div class="mt-3 flex justify-end">
             <button
               @click="sendMessage"
               :disabled="sending"
-              class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
+              class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
             >
               Post Update
             </button>
@@ -288,7 +288,7 @@ async function saveAdminChanges() {
               :key="msg.id"
               class="relative pl-10 pb-6 last:pb-0"
             >
-              <span class="absolute left-1.5 top-1 w-3 h-3 rounded-full bg-blue-500 ring-4 ring-blue-100" />
+              <span class="absolute left-1.5 top-1 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-100" />
               <p class="text-xs text-gray-500">{{ formatDateTime(msg.createdAt) }} &middot; {{ msg.senderName || '—' }}</p>
               <p class="text-sm text-gray-700 mt-1">{{ msg.body }}</p>
             </div>
@@ -331,7 +331,7 @@ async function saveAdminChanges() {
               :key="member.userId"
               class="flex items-center gap-4 p-4 border border-gray-200 rounded-lg"
             >
-              <div class="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium">
+              <div class="w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center text-white font-medium">
                 {{ initials(member.fullName) }}
               </div>
               <div>
@@ -353,7 +353,7 @@ async function saveAdminChanges() {
             :key="member.userId"
             class="flex items-center gap-4 p-4 border border-gray-200 rounded-lg"
           >
-            <div class="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium">
+            <div class="w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center text-white font-medium">
               {{ initials(member.fullName) }}
             </div>
             <div>
@@ -370,7 +370,7 @@ async function saveAdminChanges() {
           <h2 class="text-lg font-semibold text-gray-900">Project Documents</h2>
           <button
             @click="openDocDialog"
-            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
           >
             <i class="fas fa-upload mr-1" /> Add Document
           </button>
@@ -394,7 +394,7 @@ async function saveAdminChanges() {
               <tr v-for="doc in documents" :key="doc.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-3">
-                    <i class="fas fa-file-lines text-blue-500 text-lg" />
+                    <i class="fas fa-file-lines text-emerald-500 text-lg" />
                     <div>
                       <span class="font-medium text-gray-900 text-sm">{{ doc.name }}</span>
                       <p v-if="doc.description" class="text-xs text-gray-500">{{ doc.description }}</p>
@@ -436,14 +436,14 @@ async function saveAdminChanges() {
             <div
               :class="[
                 'max-w-md rounded-lg p-4',
-                isMine(msg) ? 'bg-blue-600 text-white' : 'bg-gray-100',
+                isMine(msg) ? 'bg-emerald-600 text-white' : 'bg-gray-100',
               ]"
             >
               <div class="flex items-center justify-between gap-4 mb-1">
-                <p :class="['text-xs font-medium', isMine(msg) ? 'text-blue-100' : 'text-gray-600']">
+                <p :class="['text-xs font-medium', isMine(msg) ? 'text-emerald-100' : 'text-gray-600']">
                   {{ msg.senderName || '—' }}
                 </p>
-                <p :class="['text-xs', isMine(msg) ? 'text-blue-200' : 'text-gray-400']">
+                <p :class="['text-xs', isMine(msg) ? 'text-emerald-200' : 'text-gray-400']">
                   {{ formatDateTime(msg.createdAt) }}
                 </p>
               </div>
@@ -457,12 +457,12 @@ async function saveAdminChanges() {
               v-model="messageDraft"
               rows="2"
               placeholder="Type a message..."
-              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
             <button
               @click="sendMessage"
               :disabled="sending"
-              class="self-end bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
+              class="self-end bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
             >
               Send
             </button>
@@ -480,7 +480,7 @@ async function saveAdminChanges() {
             <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
               v-model="adminForm.status"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <option v-for="s in projectStatusCodes" :key="s" :value="s">{{ projectStatusLabel(s) }}</option>
             </select>
@@ -491,7 +491,7 @@ async function saveAdminChanges() {
             <input
               v-model="adminForm.dueDate"
               type="date"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
 
@@ -503,7 +503,7 @@ async function saveAdminChanges() {
               min="0"
               max="100"
               step="5"
-              class="w-full accent-blue-600"
+              class="w-full accent-emerald-600"
             />
           </div>
 
@@ -512,7 +512,7 @@ async function saveAdminChanges() {
             <textarea
               v-model="adminForm.scope"
               rows="4"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
           </div>
 
@@ -521,7 +521,7 @@ async function saveAdminChanges() {
             <textarea
               v-model="adminForm.objectives"
               rows="3"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
           </div>
         </div>
@@ -529,7 +529,7 @@ async function saveAdminChanges() {
         <div class="mt-6 flex justify-end">
           <button
             @click="saveAdminChanges"
-            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
           >
             Save Changes
           </button>
@@ -554,7 +554,7 @@ async function saveAdminChanges() {
               v-model="docForm.name"
               type="text"
               placeholder="e.g. Bottleneck Analysis — Line 3"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
           </div>
           <div class="grid grid-cols-2 gap-4">
@@ -562,7 +562,7 @@ async function saveAdminChanges() {
               <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
               <select
                 v-model="docForm.category"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
               >
                 <option v-for="c in docCategories" :key="c" :value="c">{{ c }}</option>
               </select>
@@ -573,7 +573,7 @@ async function saveAdminChanges() {
                 v-model="docForm.version"
                 type="text"
                 placeholder="v1.0"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
               />
             </div>
           </div>
@@ -583,7 +583,7 @@ async function saveAdminChanges() {
               v-model="docForm.description"
               rows="3"
               placeholder="What does this document contain?"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
           </div>
         </div>
@@ -597,7 +597,7 @@ async function saveAdminChanges() {
           <button
             @click="submitDocument"
             :disabled="docSaving"
-            class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
           >
             {{ docSaving ? 'Saving…' : 'Add Document' }}
           </button>

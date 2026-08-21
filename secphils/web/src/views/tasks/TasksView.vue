@@ -53,7 +53,7 @@ const editingTask = ref<Task | null>(null)
 
 const statusColors: Record<string, string> = {
   'todo': 'bg-yellow-100 text-yellow-800',
-  'in-progress': 'bg-blue-100 text-blue-800',
+  'in-progress': 'bg-emerald-100 text-emerald-800',
   'review': 'bg-purple-100 text-purple-800',
   'done': 'bg-green-100 text-green-800',
 }
@@ -191,7 +191,7 @@ const subtaskProgress = (task: Task) => {
             @click="filterStatus = option"
             :class="[
               'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-              filterStatus === option ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+              filterStatus === option ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
             ]"
           >
             {{ option === 'ALL' ? 'All' : STATUS_LABELS[option as Task['status']] }}
@@ -200,7 +200,7 @@ const subtaskProgress = (task: Task) => {
         <div class="flex flex-wrap gap-2 ml-auto">
           <select
             v-model="filterPriority"
-            class="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            class="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           >
             <option value="ALL">All Priorities</option>
             <option v-for="(label, key) in PRIORITY_LABELS" :key="key" :value="key">
@@ -209,7 +209,7 @@ const subtaskProgress = (task: Task) => {
           </select>
           <select
             v-model="filterProject"
-            class="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            class="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           >
             <option value="ALL">All Projects</option>
             <option v-for="project in projectsStore.projects" :key="project.id" :value="String(project.id)">
@@ -236,7 +236,7 @@ const subtaskProgress = (task: Task) => {
                 :checked="task.status === 'done'"
                 @click.stop
                 @change="toggleComplete(task)"
-                class="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                class="mt-1 w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
               />
               <div class="min-w-0">
                 <h3 :class="[

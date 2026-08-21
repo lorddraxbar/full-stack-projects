@@ -226,7 +226,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
     </div>
 
     <div v-if="loading" class="flex items-center justify-center py-20">
-      <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin h-8 w-8 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
       </svg>
@@ -245,8 +245,8 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
               <p class="text-sm text-gray-600">Assigned Projects</p>
               <p class="text-2xl font-bold text-gray-900 mt-1">{{ clientStats.assignedProjects }}</p>
             </div>
-            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-folder-open text-blue-600 text-xl"></i>
+            <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <i class="fas fa-folder-open text-emerald-600 text-xl"></i>
             </div>
           </div>
         </div>
@@ -289,7 +289,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
         <div class="bg-white rounded-lg shadow">
           <div class="p-6 border-b border-gray-200 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900">Your Projects</h2>
-            <RouterLink to="/projects" class="text-sm text-blue-600 hover:text-blue-700 font-medium">View all</RouterLink>
+            <RouterLink to="/projects" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View all</RouterLink>
           </div>
           <div class="divide-y divide-gray-200">
             <div v-if="clientProjects.length === 0" class="p-6 text-sm text-gray-500">
@@ -312,7 +312,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
                 <span>Due: {{ formatDate(project.dueDate) }}</span>
               </div>
               <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
-                <div class="bg-blue-600 h-2 rounded-full transition-all" :style="{ width: project.progress + '%' }" />
+                <div class="bg-emerald-600 h-2 rounded-full transition-all" :style="{ width: project.progress + '%' }" />
               </div>
             </div>
           </div>
@@ -329,7 +329,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
             <div v-else class="relative">
               <div class="absolute left-3 top-1 bottom-1 w-px bg-gray-200" />
               <div v-for="update in latestUpdates" :key="update.id" class="relative pl-10 pb-6 last:pb-0">
-                <span class="absolute left-1.5 top-1 w-3 h-3 rounded-full bg-blue-500 ring-4 ring-blue-100" />
+                <span class="absolute left-1.5 top-1 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-100" />
                 <p class="text-xs text-gray-500">{{ formatDateTime(update.createdAt) }} &middot; {{ update.senderName || '—' }}</p>
                 <p class="text-sm font-medium text-gray-900 mt-0.5">{{ update.projectName }}</p>
                 <p class="text-sm text-gray-600 mt-1">{{ update.body }}</p>
@@ -349,8 +349,8 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
               <p class="text-sm text-gray-600">Active Projects</p>
               <p class="text-2xl font-bold text-gray-900 mt-1">{{ userStats.activeProjects }}</p>
             </div>
-            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-folder-open text-blue-600 text-xl"></i>
+            <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <i class="fas fa-folder-open text-emerald-600 text-xl"></i>
             </div>
           </div>
         </div>
@@ -393,7 +393,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
         <div class="bg-white rounded-lg shadow">
           <div class="p-6 border-b border-gray-200 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900">Recent Tasks</h2>
-            <RouterLink to="/tasks" class="text-sm text-blue-600 hover:text-blue-700 font-medium">View all</RouterLink>
+            <RouterLink to="/tasks" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View all</RouterLink>
           </div>
           <div class="divide-y divide-gray-200">
             <div v-if="recentTasks.length === 0" class="p-6 text-sm text-gray-500">No tasks yet.</div>
@@ -417,7 +417,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
         <div class="bg-white rounded-lg shadow">
           <div class="p-6 border-b border-gray-200 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900">Recent Messages</h2>
-            <RouterLink to="/messages" class="text-sm text-blue-600 hover:text-blue-700 font-medium">Open inbox</RouterLink>
+            <RouterLink to="/messages" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">Open inbox</RouterLink>
           </div>
           <div class="divide-y divide-gray-200">
             <div v-if="pendingMessages.length === 0" class="p-6 text-sm text-gray-500">No messages yet.</div>
@@ -436,7 +436,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
         <div class="bg-white rounded-lg shadow">
           <div class="p-6 border-b border-gray-200 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900">Projects</h2>
-            <RouterLink to="/projects" class="text-sm text-blue-600 hover:text-blue-700 font-medium">View all</RouterLink>
+            <RouterLink to="/projects" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View all</RouterLink>
           </div>
           <div class="divide-y divide-gray-200">
             <div v-if="activeProjects.length === 0" class="p-6 text-sm text-gray-500">No active projects.</div>
@@ -457,7 +457,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
                 <span>Due: {{ formatDate(project.dueDate) }}</span>
               </div>
               <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
-                <div class="bg-blue-600 h-2 rounded-full transition-all" :style="{ width: project.progress + '%' }" />
+                <div class="bg-emerald-600 h-2 rounded-full transition-all" :style="{ width: project.progress + '%' }" />
               </div>
             </div>
           </div>
@@ -472,7 +472,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
             <div v-else class="relative">
               <div class="absolute left-3 top-1 bottom-1 w-px bg-gray-200" />
               <div v-for="update in projectUpdates" :key="update.id" class="relative pl-10 pb-6 last:pb-0">
-                <span class="absolute left-1.5 top-1 w-3 h-3 rounded-full bg-blue-500 ring-4 ring-blue-100" />
+                <span class="absolute left-1.5 top-1 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-100" />
                 <p class="text-xs text-gray-500">{{ formatDateTime(update.createdAt) }} &middot; {{ update.senderName || '—' }}</p>
                 <p class="text-sm font-medium text-gray-900 mt-0.5">{{ update.projectName }}</p>
                 <p class="text-sm text-gray-600 mt-1">{{ update.body }}</p>
@@ -492,8 +492,8 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
               <p class="text-sm text-gray-600">Total Clients</p>
               <p class="text-2xl font-bold text-gray-900 mt-1">{{ adminStats.totalClients }}</p>
             </div>
-            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-building text-blue-600 text-xl"></i>
+            <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <i class="fas fa-building text-emerald-600 text-xl"></i>
             </div>
           </div>
         </div>
@@ -554,14 +554,14 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
         <div class="bg-white rounded-lg shadow">
           <div class="p-6 border-b border-gray-200 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900">Recent Activity</h2>
-            <RouterLink to="/admin" class="text-sm text-blue-600 hover:text-blue-700 font-medium">Audit logs</RouterLink>
+            <RouterLink to="/admin" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">Audit logs</RouterLink>
           </div>
           <div class="divide-y divide-gray-200">
             <div v-if="recentActivity.length === 0" class="p-4 text-sm text-gray-500">No activity recorded yet.</div>
             <div v-for="log in recentActivity" :key="log.id" class="p-4 hover:bg-gray-50 transition-colors">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded">{{ log.action }}</span>
+                  <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-medium rounded">{{ log.action }}</span>
                   <span class="text-sm font-medium text-gray-900">{{ log.entityType }}</span>
                 </div>
                 <span class="text-xs text-gray-500">{{ formatDateTime(log.createdAt) }}</span>

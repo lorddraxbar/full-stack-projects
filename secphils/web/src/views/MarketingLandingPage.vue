@@ -179,6 +179,12 @@ const scrollTo = (id: string) => {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 }
 
+// "Portal Login" in the mobile menu → the authenticated portal (login route).
+const portalLogin = () => {
+  menuOpen.value = false
+  router.push({ name: 'Login' })
+}
+
 // ---------- Services (content ported from www.secphils.com) ----------
 interface ServiceTab {
   key: string
@@ -392,6 +398,15 @@ onBeforeUnmount(() => {
             Get Started
           </button>
         </div>
+        <div class="px-6 pb-4">
+          <button
+            class="flex w-full items-center justify-center gap-2 rounded-full bg-[#292E49] px-5 py-2 text-sm font-semibold text-white hover:bg-[#536976]"
+            @click="portalLogin"
+          >
+            <i class="fas fa-right-to-bracket"></i>
+            Portal Login
+          </button>
+        </div>
       </div>
     </header>
 
@@ -474,7 +489,7 @@ onBeforeUnmount(() => {
 
           <!-- Track record: 100% success rate -->
           <div class="lg:col-start-2 lg:row-start-1 lg:flex lg:flex-col">
-            <div class="flex flex-1 flex-col items-center justify-center rounded-2xl bg-white p-8 text-center shadow-sm sm:p-10" style="border: 1px solid #e8e8e8">
+            <div class="track-card flex flex-1 flex-col items-center justify-center rounded-2xl bg-white p-8 text-center shadow-sm sm:p-10" style="border: 1px solid #e8e8e8">
               <p class="text-xs font-bold uppercase tracking-[2px]" style="color: #999999">Our track record</p>
               <div class="mt-5 flex flex-col items-center">
                 <svg viewBox="0 0 160 160" class="h-36 w-36 sm:h-40 sm:w-40">
@@ -496,22 +511,12 @@ onBeforeUnmount(() => {
                     <rect x="32" y="70" width="36" height="5" rx="2" fill="url(#trophyGold)" />
                   </g>
                 </svg>
-                <span class="mt-4 text-5xl font-light" style="color: #202020">100%</span>
+                <span class="track-num mt-4 text-6xl sm:text-7xl" style="color: #202020">100%</span>
                 <span class="mt-1 text-[11px] font-bold uppercase tracking-wider" style="color: #d98d0b">Success rate</span>
               </div>
               <p class="mt-5 text-sm leading-6" style="color: #757575">
                 Every company we have helped so far has <span class="font-semibold" style="color: #202020">hit their compliance target</span> — no exceptions.
               </p>
-              <div class="mt-5 grid w-full grid-cols-2 gap-3 border-t pt-5" style="border-color: #ececec">
-                <div>
-                  <p class="text-2xl font-light" style="color: #202020">100%</p>
-                  <p class="mt-1 text-xs leading-4" style="color: #757575">of clients reached their target</p>
-                </div>
-                <div>
-                  <p class="text-2xl font-light" style="color: #202020">0</p>
-                  <p class="mt-1 text-xs leading-4" style="color: #757575">unresolved cases to date</p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -589,7 +594,7 @@ onBeforeUnmount(() => {
             </span>
             <div>
               <p class="text-sm font-semibold" style="color: #202020">Engineer-led team</p>
-              <p class="text-xs leading-5" style="color: #757575">Owned and operated by licensed Filipino engineers.</p>
+              <p class="text-xs leading-5" style="color: #757575">Owned and operated by highly competitive Filipino engineers.</p>
             </div>
           </div>
           <div class="flex items-center gap-4 rounded-2xl bg-white p-5" style="border: 1px solid #e8e8e8">
@@ -964,5 +969,20 @@ onBeforeUnmount(() => {
 }
 .section-btn:hover {
   background: #202020;
+}
+
+/* Our Track Record card — the big "100%" in an elegant display serif with a
+   soft gold gradient (echoing the trophy). Scoped to .track-num so no other
+   number on the page is affected. The inline color (#202020) stays as a
+   fallback for browsers without background-clip:text. */
+.track-num {
+  font-family: Georgia, 'Playfair Display', 'Times New Roman', serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  background: linear-gradient(135deg, #ffd76e 0%, #f5a623 55%, #d98d0b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 </style>

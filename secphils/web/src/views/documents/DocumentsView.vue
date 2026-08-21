@@ -157,7 +157,7 @@ onMounted(async () => {
         <p class="text-gray-600 mt-1">View, upload, and manage project documents</p>
       </div>
       <button
-        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+        class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
         @click="showUploadModal = true"
       >
         + Upload Document
@@ -172,19 +172,19 @@ onMounted(async () => {
             v-model="searchQuery"
             type="text"
             placeholder="Search documents..."
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
           />
         </div>
         <select
           v-model="selectedProject"
-          class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
         >
           <option value="ALL">All Projects</option>
           <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
         </select>
         <select
           v-model="selectedCategory"
-          class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
         >
           <option value="ALL">All Categories</option>
           <option v-for="(label, code) in DOCUMENT_CATEGORY_LABELS" :key="code" :value="code">{{ label }}</option>
@@ -210,8 +210,8 @@ onMounted(async () => {
         >
           <div class="flex items-start justify-between mb-3 gap-4">
             <div class="flex items-start gap-4 min-w-0">
-              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-file-lines text-blue-600"></i>
+              <div class="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-file-lines text-emerald-600"></i>
               </div>
               <div class="min-w-0">
                 <h3 class="font-medium text-gray-900 truncate">{{ doc.title }}</h3>
@@ -238,7 +238,7 @@ onMounted(async () => {
                 :href="doc.fileUrl"
                 target="_blank"
                 rel="noopener"
-                class="text-blue-600 hover:text-blue-700 font-medium"
+                class="text-emerald-600 hover:text-emerald-700 font-medium"
               >
                 Open
               </a>
@@ -273,14 +273,14 @@ onMounted(async () => {
               v-model="uploadForm.title"
               type="text"
               placeholder="e.g. Bottleneck Analysis — Line 3"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Project *</label>
             <select
               v-model="uploadForm.projectId"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <option :value="null" disabled>Select a project...</option>
               <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
@@ -290,7 +290,7 @@ onMounted(async () => {
             <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
             <select
               v-model="uploadForm.category"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <option v-for="(label, code) in DOCUMENT_CATEGORY_LABELS" :key="code" :value="code">{{ label }}</option>
             </select>
@@ -301,7 +301,7 @@ onMounted(async () => {
               v-model="uploadForm.description"
               rows="2"
               placeholder="Optional notes about this document..."
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
           </div>
           <div>
@@ -310,7 +310,7 @@ onMounted(async () => {
               v-model="uploadForm.fileUrl"
               type="url"
               placeholder="https://... (optional — link to the hosted file)"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
           </div>
           <p class="text-xs text-gray-500">
@@ -326,7 +326,7 @@ onMounted(async () => {
             Cancel
           </button>
           <button
-            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
+            class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
             :disabled="uploading"
             @click="submitUpload"
           >
