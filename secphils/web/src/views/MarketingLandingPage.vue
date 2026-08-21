@@ -612,9 +612,9 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
         Copyright &copy; {{ year }}
         <a href="#home" class="transition-colors hover:text-[#29ca8e]" style="color: #202020" @click.prevent="scrollTo('home')">{{ c.name }}</a>
         <span class="mx-1">|</span>
-        <router-link to="/legal/terms" class="transition-colors hover:text-[#29ca8e]" style="color: #202020">Terms</router-link>
+        <a href="/legal/terms" target="_blank" rel="noopener" class="transition-colors hover:text-[#29ca8e]" style="color: #202020">Terms</a>
         <span class="mx-1">|</span>
-        <router-link to="/legal/privacy" class="transition-colors hover:text-[#29ca8e]" style="color: #202020">Privacy</router-link>
+        <a href="/legal/privacy" target="_blank" rel="noopener" class="transition-colors hover:text-[#29ca8e]" style="color: #202020">Privacy</a>
       </p>
     </footer>
 
@@ -747,6 +747,9 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
   min-height: 100vh;
   min-height: 100svh;
 }
+
+/* 3) Slim scrollbar — see src/style.css (must be global: `html` selectors do
+      not survive scoped-style attribute rewriting). */
 
 /* Section eyebrow label above headings */
 .section-eyebrow {

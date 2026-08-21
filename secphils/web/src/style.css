@@ -105,6 +105,29 @@
   }
 }
 
+/* Slim, unobtrusive scrollbar (global — `html` selectors do not work inside
+   scoped <style> blocks). On phones with a space-reserving scrollbar, the
+   native ~15-20px gutter on the right reads as a stray margin beside the
+   full-bleed landing sections; 8px shrinks that noticeably without hurting
+   usability. iOS Safari ignores these rules and uses overlay indicators. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #c9c9c9 transparent;
+}
+html::-webkit-scrollbar {
+  width: 8px;
+}
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+html::-webkit-scrollbar-thumb {
+  background: #c9c9c9;
+  border-radius: 8px;
+}
+html::-webkit-scrollbar-thumb:hover {
+  background: #b3b3b3;
+}
+
 @theme inline {
   --font-sans: 'Raleway', sans-serif;
   --font-heading: var(--font-sans);
