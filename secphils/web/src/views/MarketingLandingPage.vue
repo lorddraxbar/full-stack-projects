@@ -263,7 +263,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
   <div class="min-h-screen" style="background: #f9f9f9; font-family: 'Open Sans', ui-sans-serif, system-ui, sans-serif">
     <!-- ================= NAVBAR ================= -->
     <header
-      class="fixed inset-x-0 top-0 z-50 transition-all duration-300"
+      class="header-anim fixed inset-x-0 top-0 z-50"
       :class="scrolled ? 'bg-white py-2.5 shadow-[0_1px_30px_rgba(0,0,0,0.1)]' : 'bg-transparent py-6'"
     >
       <div class="mx-auto max-w-[1140px] px-4">
@@ -338,7 +338,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
     </header>
 
     <!-- ================= HERO ================= -->
-    <section id="home" class="relative flex min-h-screen items-center justify-center text-center">
+    <section id="home" class="min-h-viewport relative flex items-center justify-center text-center">
       <img src="/images/landing/home-bg.jpg" alt="" class="absolute inset-0 h-full w-full object-cover" />
       <div class="absolute inset-0" style="background: linear-gradient(to right, #292E49, #536976); opacity: 0.9" />
       <div class="relative z-10 mx-auto max-w-3xl px-4 pb-16 pt-28">
@@ -730,6 +730,23 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,600,700');
+
+/* ---- Rotate / dynamic-viewport flicker fixes ----
+   1) The fixed header used `transition: all` (incl. its py-6/py-2.5 height).
+      On a real phone, rotating to landscape collapses the browser URL bar,
+      which re-baselines scrollY and fires scroll -> `scrolled` flips mid-rotate,
+      and the header animating its own height made the whole bar lag/jump.
+      Animate ONLY paint properties (never layout) so it can't lag a reflow. */
+.header-anim {
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+/* 2) `100vh` = the LARGE viewport (URL bar hidden), so any collapse/expand on
+      rotate made min-h-screen elements visibly jump. Use the stable SMALL
+      viewport (svh) with a 100vh fallback so the hero never resizes on rotate. */
+.min-h-viewport {
+  min-height: 100vh;
+  min-height: 100svh;
+}
 
 /* Section eyebrow label above headings */
 .section-eyebrow {
