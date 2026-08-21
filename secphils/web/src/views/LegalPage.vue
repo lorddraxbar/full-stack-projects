@@ -7,6 +7,29 @@ const props = defineProps<{ kind: 'terms' | 'privacy' }>()
 const company = ref<any>(null)
 const loading = ref(true)
 
+const toHex = (v: string | undefined, fb: string) =>
+  typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v.trim()) ? v.trim() : fb
+const hexToRgb = (hex: string): [number, number, number] => {
+  const n = parseInt(hex.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+const shade = (hex: string, pct: number): string => {
+  const [r, g, b] = hexToRgb(hex)
+  const t = pct < 0 ? 0 : 255
+  const m = Math.abs(pct)
+  const f = (x: number) => Math.round(x + (t - x) * m)
+  return `#${[f(r), f(g), f(b)].map((x) => x.toString(16).padStart(2, '0')).join('')}`
+}
+const brandStyle = computed<Record<string, string>>(() => {
+  const primary = toHex(company.value?.brandPrimary, '#29ca8e')
+  return {
+    '--bsp': primary,
+    '--bsp-soft': `rgba(${hexToRgb(primary).join(', ')}, 0.12)`,
+    '--bsp-link': shade(primary, -0.2),
+    '--bsp-link-hover': shade(primary, -0.4),
+  }
+})
+
 const contactEmail = computed(() => {
   const raw: string = company.value?.email ?? 'manager@secphils.com'
   return raw.split(/[,;\s]+/).map(s => s.trim()).find(s => s.includes('@')) || 'manager@secphils.com'
@@ -28,7 +51,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="legal-page">
+  <div class="legal-page" :style="brandStyle">
     <header class="legal-header">
       <a class="legal-logo" href="/" aria-label="Home — Strategic Engineering Consultancy">
         <img src="/images/landing/seclogo.png" alt="Strategic Engineering Consultancy" />
@@ -299,7 +322,7 @@ onMounted(async () => {
   letter-spacing: 0.14em;
   font-size: 12px;
   font-weight: 700;
-  color: #29ca8e;
+  color: var(--bsp);
   margin: 0 0 10px;
 }
 
@@ -315,7 +338,7 @@ onMounted(async () => {
   width: 56px;
   height: 3px;
   border-radius: 2px;
-  background: #29ca8e;
+  background: var(--bsp);
   margin: 14px 0 16px;
 }
 
@@ -364,7 +387,7 @@ onMounted(async () => {
   width: 4px;
   height: 18px;
   border-radius: 2px;
-  background: #29ca8e;
+  background: var(--bsp);
 }
 
 .legal-body ul {
@@ -390,7 +413,7 @@ onMounted(async () => {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #29ca8e;
+  background: var(--bsp);
 }
 
 .legal-body ul li:last-child {
@@ -399,13 +422,13 @@ onMounted(async () => {
 }
 
 .legal-body a {
-  color: #1f8a70;
+  color: var(--bsp-link);
   font-weight: 600;
   text-decoration: none;
   border-bottom: 1px solid rgba(31, 138, 112, 0.35);
 }
 
-.legal-body a:hover { color: #166a55; }
+.legal-body a:hover { color: var(--bsp-link-hover); }
 
 .legal-copy {
   margin: 44px 0 0;

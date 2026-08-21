@@ -145,6 +145,42 @@ const c = computed(() => ({
   description: company.value?.description?.trim() || fallback.description,
 }))
 
+// ---------- Brand color scheme (Admin Panel > Company Settings > Company Profile) ----------
+// The primary/secondary brand colors saved in the Admin profile drive the public
+// site's accents. Fallbacks match the original www.secphils.com palette.
+const toHex = (v: string | undefined, fb: string) =>
+  typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v.trim()) ? v.trim() : fb
+const hexToRgb = (hex: string): [number, number, number] => {
+  const n = parseInt(hex.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+const shade = (hex: string, pct: number): string => {
+  const [r, g, b] = hexToRgb(hex)
+  const t = pct < 0 ? 0 : 255
+  const m = Math.abs(pct)
+  const f = (x: number) => Math.round(x + (t - x) * m)
+  return `#${[f(r), f(g), f(b)].map((x) => x.toString(16).padStart(2, '0')).join('')}`
+}
+const brandTheme = computed<Record<string, string>>(() => {
+  const primary = toHex(company.value?.brandPrimary, '#29ca8e')
+  const secondary = toHex(company.value?.brandSecondary, '#536976')
+  const [pr, pg, pb] = hexToRgb(primary)
+  return {
+    '--bsp': primary,
+    '--bsp-hover': shade(primary, -0.22),
+    '--bsp-deep': shade(primary, -0.2),
+    '--bsp-soft': `rgba(${pr}, ${pg}, ${pb}, 0.12)`,
+    '--bsp-ring': `rgba(${pr}, ${pg}, ${pb}, 0.16)`,
+    '--bss': secondary,
+    '--bss-dark': shade(secondary, -0.55),
+  }
+})
+const rootStyle = computed<Record<string, string>>(() => ({
+  background: '#f9f9f9',
+  fontFamily: "'Open Sans', ui-sans-serif, system-ui, sans-serif",
+  ...brandTheme.value,
+}))
+
 const year = new Date().getFullYear()
 
 // ---------- Page title (Admin Panel > Company Settings drives the profile, title is fixed per brand) ----------
@@ -324,7 +360,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="min-h-viewport" style="background: #f9f9f9; font-family: 'Open Sans', ui-sans-serif, system-ui, sans-serif">
+  <div class="min-h-viewport" :style="rootStyle">
     <!-- ================= NAVBAR ================= -->
     <header
       class="header-anim fixed inset-x-0 top-0 z-50"
@@ -349,7 +385,7 @@ onBeforeUnmount(() => {
               :key="l.id"
               href="#"
               class="px-5 py-2 text-[15px] transition-colors"
-              :class="scrolled ? 'text-[#575757] hover:text-[#29ca8e]' : 'text-[#f0f0f0] hover:text-[#29ca8e]'"
+              :class="scrolled ? 'text-[#575757] hover:text-[color:var(--bsp)]' : 'text-[#f0f0f0] hover:text-[color:var(--bsp)]'"
               @click.prevent="scrollTo(l.id)"
             >
               {{ l.label }}
@@ -358,7 +394,7 @@ onBeforeUnmount(() => {
               class="ml-4 rounded-full border-2 px-5 py-2 text-sm font-semibold transition-colors"
               :class="
                 scrolled
-                  ? 'border-[#29ca8e] text-[#29ca8e] hover:bg-[#29ca8e] hover:text-white'
+                  ? 'border-[color:var(--bsp)] text-[color:var(--bsp)] hover:bg-[color:var(--bsp)] hover:text-white'
                   : 'border-white text-white hover:bg-white hover:text-[#252525]'
               "
               @click="openContact"
@@ -385,14 +421,14 @@ onBeforeUnmount(() => {
           v-for="l in navLinks"
           :key="l.id"
           href="#"
-          class="block px-6 py-3 text-[#575757] hover:text-[#29ca8e]"
+          class="block px-6 py-3 text-[#575757] hover:text-[color:var(--bsp)]"
           @click.prevent="scrollTo(l.id)"
         >
           {{ l.label }}
         </a>
         <div class="px-6 py-3">
           <button
-            class="w-full rounded-full border-2 border-[#29ca8e] px-5 py-2 text-sm font-semibold text-[#29ca8e]"
+            class="w-full rounded-full border-2 border-[color:var(--bsp)] px-5 py-2 text-sm font-semibold text-[color:var(--bsp)]"
             @click="openContact"
           >
             Get Started
@@ -400,7 +436,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="px-6 pb-4">
           <button
-            class="flex w-full items-center justify-center gap-2 rounded-full bg-[#292E49] px-5 py-2 text-sm font-semibold text-white hover:bg-[#536976]"
+            class="flex w-full items-center justify-center gap-2 rounded-full bg-[color:var(--bss-dark)] px-5 py-2 text-sm font-semibold text-white hover:bg-[color:var(--bss)]"
             @click="portalLogin"
           >
             <i class="fas fa-right-to-bracket"></i>
@@ -413,7 +449,7 @@ onBeforeUnmount(() => {
     <!-- ================= HERO ================= -->
     <section id="home" class="min-h-viewport relative flex items-center justify-center text-center">
       <img src="/images/landing/home-bg.jpg" alt="" class="absolute inset-0 h-full w-full object-cover" />
-      <div class="absolute inset-0" style="background: linear-gradient(to right, #292E49, #536976); opacity: 0.9" />
+      <div class="absolute inset-0" style="background: linear-gradient(to right, var(--bss-dark), var(--bss)); opacity: 0.9" />
       <div class="relative z-10 mx-auto max-w-3xl px-4 pb-16 pt-28">
         <h3 class="my-2.5 text-[11px] font-bold uppercase tracking-[4px] text-[#f0f0f0]">
           Highest level of service you can rely on
@@ -456,7 +492,7 @@ onBeforeUnmount(() => {
 
               <div class="mt-6">
               <h2 class="mb-1.5 font-light text-2xl sm:text-3xl" style="color: #353535">{{ activeTab.title }}</h2>
-              <p class="mb-4 text-base leading-6" style="color: #29ca8e; font-weight: 600">{{ activeTab.short }}</p>
+              <p class="mb-4 text-base leading-6" style="color: var(--bsp); font-weight: 600">{{ activeTab.short }}</p>
               <template v-if="activeTab.paras">
                 <p
                   v-for="(p, i) in activeTab.paras"
@@ -561,7 +597,7 @@ onBeforeUnmount(() => {
         <div class="grid items-stretch gap-10 lg:grid-cols-2">
           <!-- Left: description -->
           <div class="flex flex-col rounded-2xl border bg-white p-8 sm:p-10" style="border-color: #e8e8e8">
-            <i class="fa-solid fa-building-columns mb-4 block text-2xl" style="color: #29ca8e"></i>
+            <i class="fa-solid fa-building-columns mb-4 block text-2xl" style="color: var(--bsp)"></i>
             <h2 class="mb-3 font-light text-2xl sm:text-3xl" style="color: #353535">{{ c.name }}</h2>
             <p class="text-base leading-7" style="color: #757575">{{ c.description }}</p>
           </div>
@@ -634,18 +670,18 @@ onBeforeUnmount(() => {
             @click="openContact"
             title="Open the contact form"
           >
-            <i class="fas fa-envelope mb-3 text-2xl" style="color: #29ca8e" />
+            <i class="fas fa-envelope mb-3 text-2xl" style="color: var(--bsp)" />
             <p class="mb-1 text-sm font-semibold" style="color: #202020">Email</p>
             <p class="break-all text-sm" style="color: #757575">{{ primaryEmail }}</p>
-            <p class="mt-2 text-xs font-semibold" style="color: #29ca8e">Send us a message →</p>
+            <p class="mt-2 text-xs font-semibold" style="color: var(--bsp)">Send us a message →</p>
           </button>
           <a :href="`tel:${primaryPhone.replace(/\s/g, '')}`" class="contact-card">
-            <i class="fas fa-phone mb-3 text-2xl" style="color: #29ca8e" />
+            <i class="fas fa-phone mb-3 text-2xl" style="color: var(--bsp)" />
             <p class="mb-1 text-sm font-semibold" style="color: #202020">Phone</p>
             <p v-for="p in phones" :key="p" class="text-sm" style="color: #757575">{{ p }}</p>
           </a>
           <div class="contact-card">
-            <i :class="socialLinks[0]?.icon || 'fa-brands fa-facebook-f'" class="mb-3 text-2xl" style="color: #29ca8e" />
+            <i :class="socialLinks[0]?.icon || 'fa-brands fa-facebook-f'" class="mb-3 text-2xl" style="color: var(--bsp)" />
             <p class="mb-1 text-sm font-semibold" style="color: #202020">Follow us</p>
             <div class="mt-1 flex flex-wrap items-center justify-center gap-2.5">
               <a
@@ -673,11 +709,11 @@ onBeforeUnmount(() => {
     <footer class="py-10 text-center" style="background: #ffffff; border-top: 1px solid #ececec">
       <p class="text-sm" style="color: #757575">
         Copyright &copy; {{ year }}
-        <a href="#home" class="transition-colors hover:text-[#29ca8e]" style="color: #202020" @click.prevent="scrollTo('home')">{{ c.name }}</a>
+        <a href="#home" class="transition-colors hover:text-[color:var(--bsp)]" style="color: #202020" @click.prevent="scrollTo('home')">{{ c.name }}</a>
         <span class="mx-1">|</span>
-        <a href="/legal/terms" target="_blank" rel="noopener" class="transition-colors hover:text-[#29ca8e]" style="color: #202020">Terms</a>
+        <a href="/legal/terms" target="_blank" rel="noopener" class="transition-colors hover:text-[color:var(--bsp)]" style="color: #202020">Terms</a>
         <span class="mx-1">|</span>
-        <a href="/legal/privacy" target="_blank" rel="noopener" class="transition-colors hover:text-[#29ca8e]" style="color: #202020">Privacy</a>
+        <a href="/legal/privacy" target="_blank" rel="noopener" class="transition-colors hover:text-[color:var(--bsp)]" style="color: #202020">Privacy</a>
       </p>
     </footer>
 
@@ -699,7 +735,7 @@ onBeforeUnmount(() => {
                 <input
                   v-model="form.firstName"
                   type="text"
-                  class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#29ca8e] focus:outline-none focus:ring-1 focus:ring-[#29ca8e]"
+                  class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[color:var(--bsp)] focus:outline-none focus:ring-1 focus:ring-[color:var(--bsp)]"
                   placeholder="Juan"
                 />
                 <p v-if="fieldErrors.firstName" class="mt-1 text-xs text-red-500">{{ fieldErrors.firstName }}</p>
@@ -709,7 +745,7 @@ onBeforeUnmount(() => {
                 <input
                   v-model="form.lastName"
                   type="text"
-                  class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#29ca8e] focus:outline-none focus:ring-1 focus:ring-[#29ca8e]"
+                  class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[color:var(--bsp)] focus:outline-none focus:ring-1 focus:ring-[color:var(--bsp)]"
                   placeholder="Dela Cruz"
                 />
                 <p v-if="fieldErrors.lastName" class="mt-1 text-xs text-red-500">{{ fieldErrors.lastName }}</p>
@@ -720,7 +756,7 @@ onBeforeUnmount(() => {
               <input
                 v-model="form.email"
                 type="email"
-                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#29ca8e] focus:outline-none focus:ring-1 focus:ring-[#29ca8e]"
+                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[color:var(--bsp)] focus:outline-none focus:ring-1 focus:ring-[color:var(--bsp)]"
                 placeholder="you@company.com"
               />
               <p v-if="fieldErrors.email" class="mt-1 text-xs text-red-500">{{ fieldErrors.email }}</p>
@@ -730,7 +766,7 @@ onBeforeUnmount(() => {
               <input
                 v-model="form.phone"
                 type="tel"
-                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#29ca8e] focus:outline-none focus:ring-1 focus:ring-[#29ca8e]"
+                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[color:var(--bsp)] focus:outline-none focus:ring-1 focus:ring-[color:var(--bsp)]"
                 placeholder="+63 917 000 0000"
               />
               <p v-if="fieldErrors.phone" class="mt-1 text-xs text-red-500">{{ fieldErrors.phone }}</p>
@@ -740,7 +776,7 @@ onBeforeUnmount(() => {
               <textarea
                 v-model="form.message"
                 rows="4"
-                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#29ca8e] focus:outline-none focus:ring-1 focus:ring-[#29ca8e]"
+                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[color:var(--bsp)] focus:outline-none focus:ring-1 focus:ring-[color:var(--bsp)]"
                 placeholder="Briefly describe your project or requirement…"
               ></textarea>
               <p v-if="fieldErrors.message" class="mt-1 text-xs text-red-500">{{ fieldErrors.message }}</p>
@@ -758,7 +794,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="button"
-              class="rounded-full bg-[#29ca8e] px-6 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#1fa774] disabled:cursor-not-allowed disabled:opacity-60"
+              class="rounded-full bg-[color:var(--bsp)] px-6 py-2 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--bsp-hover)] disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="sending"
               @click="submitContact"
             >
@@ -769,7 +805,7 @@ onBeforeUnmount(() => {
 
         <template v-else>
           <div class="flex flex-col items-center py-8 text-center">
-            <span class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#29ca8e]/10 text-2xl" style="color: #29ca8e">
+            <span class="mb-4 flex h-14 w-14 items-center justify-center rounded-full" style="background: var(--bsp-soft); color: var(--bsp)">
               <i class="fa-solid fa-circle-check"></i>
             </span>
             <h3 class="mb-2 text-xl font-semibold" style="color: #202020">Message sent!</h3>
@@ -779,7 +815,7 @@ onBeforeUnmount(() => {
             </p>
             <button
               type="button"
-              class="rounded-full bg-[#29ca8e] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1fa774]"
+              class="rounded-full bg-[color:var(--bsp)] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--bsp-hover)]"
               @click="contactOpen = false"
             >
               Close
@@ -820,7 +856,7 @@ onBeforeUnmount(() => {
   letter-spacing: 0.12em;
   font-size: 12px;
   font-weight: 700;
-  color: #29ca8e;
+  color: var(--bsp);
   margin: 0 0 6px;
 }
 
@@ -838,13 +874,13 @@ onBeforeUnmount(() => {
 }
 .hero-btn:hover {
   background: transparent;
-  border-color: #29ca8e;
-  color: #29ca8e;
+  border-color: var(--bsp);
+  color: var(--bsp);
 }
 
 /* Smaller CTA used inside service tabs */
 .hero-btn-sm {
-  background: #29ca8e;
+  background: var(--bsp);
   border: 0;
   border-radius: 14px;
   color: #ffffff;
@@ -855,7 +891,7 @@ onBeforeUnmount(() => {
   transition: 0.3s;
 }
 .hero-btn-sm:hover {
-  background: #1fa774;
+  background: var(--bsp-hover);
 }
 
 /* Modernized service tab buttons */
@@ -870,14 +906,14 @@ onBeforeUnmount(() => {
   transition: all 0.25s;
 }
 .svc-tab:hover {
-  border-color: #29ca8e;
+  border-color: var(--bsp);
   color: #202020;
 }
 .svc-tab.is-active {
-  border-color: #29ca8e;
+  border-color: var(--bsp);
   background: #f0fbf7;
-  color: #147a55;
-  box-shadow: 0 4px 14px rgba(41, 202, 142, 0.16);
+  color: var(--bsp-deep);
+  box-shadow: 0 4px 14px var(--bsp-ring);
 }
 
 /* Check bullets inside the "Other Services" list */
@@ -889,8 +925,8 @@ onBeforeUnmount(() => {
   height: 22px;
   flex: 0 0 22px;
   border-radius: 50%;
-  background: rgba(41, 202, 142, 0.12);
-  color: #29ca8e;
+  background: var(--bsp-soft);
+  color: var(--bsp);
   font-size: 11px;
   margin-top: 4px;
 }
@@ -903,14 +939,14 @@ onBeforeUnmount(() => {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(41, 202, 142, 0.12);
-  color: #29ca8e;
+  background: var(--bsp-soft);
+  color: var(--bsp);
   font-size: 17px;
   text-decoration: none;
   transition: all 0.2s;
 }
 .social-dot:hover {
-  background: #29ca8e;
+  background: var(--bsp);
   color: #ffffff;
 }
 .contact-card .social-dot {
@@ -928,8 +964,8 @@ onBeforeUnmount(() => {
   height: 46px;
   flex: 0 0 46px;
   border-radius: 12px;
-  background: rgba(41, 202, 142, 0.12);
-  color: #29ca8e;
+  background: var(--bsp-soft);
+  color: var(--bsp);
   font-size: 19px;
 }
 
@@ -958,7 +994,7 @@ onBeforeUnmount(() => {
 
 /* Green pill button (template .section-btn) */
 .section-btn {
-  background: #29ca8e;
+  background: var(--bsp);
   border: 0;
   border-radius: 50px;
   color: #ffffff;

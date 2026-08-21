@@ -313,6 +313,23 @@ const companyProfileLoaded = ref(false)
 const companyProfileError = ref('')
 const savingCompanyProfile = ref(false)
 
+// Color scheme presets — each sets primary + secondary brand colors together.
+const colorSchemes = [
+  { name: 'Emerald', primary: '#29ca8e', secondary: '#536976' },
+  { name: 'Indigo', primary: '#4f46f5', secondary: '#1f2d4d' },
+  { name: 'Ocean', primary: '#0e7dd1', secondary: '#123a5e' },
+  { name: 'Teal', primary: '#0d9488', secondary: '#1f3f44' },
+  { name: 'Violet', primary: '#7b5cd6', secondary: '#3a2f63' },
+  { name: 'Slate', primary: '#4b7fdb', secondary: '#1f2a38' },
+]
+const applyColorScheme = (s: { primary: string; secondary: string }) => {
+  companyProfile.value.brandPrimary = s.primary
+  companyProfile.value.brandSecondary = s.secondary
+}
+const activeScheme = (s: { primary: string; secondary: string }) =>
+  companyProfile.value.brandPrimary?.toLowerCase() === s.primary.toLowerCase() &&
+  companyProfile.value.brandSecondary?.toLowerCase() === s.secondary.toLowerCase()
+
 const loadProviderCompanyProfile = async () => {
   companyProfileError.value = ''
   try {
@@ -928,10 +945,6 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             <textarea v-model="companyProfile.description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
           </div>
           <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Industry Sector(s)</label>
-            <input v-model="companyProfile.industrySectors" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Headquarters Address</label>
             <input v-model="companyProfile.headquarters" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
@@ -952,25 +965,43 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             <label class="block text-sm font-medium text-gray-700 mb-1">Social Media Links</label>
             <input v-model="companyProfile.socialLinks" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Tax / Registration Number</label>
-            <input v-model="companyProfile.taxNumber" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Banking / Payment Details</label>
-            <input v-model="companyProfile.bankingDetails" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Operational Data Fields</label>
-            <input v-model="companyProfile.operationalFields" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Primary Brand Color</label>
-            <input v-model="companyProfile.brandPrimary" type="color" class="w-16 h-9 border border-gray-300 rounded-lg cursor-pointer bg-white" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Secondary Brand Color</label>
-            <input v-model="companyProfile.brandSecondary" type="color" class="w-16 h-9 border border-gray-300 rounded-lg cursor-pointer bg-white" />
+
+          <!-- Color Scheme (brand colors) -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Color Scheme</label>
+            <p class="text-sm text-gray-500 mb-3">Brand colors shown on your public website and legal pages.</p>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <button
+                v-for="s in colorSchemes"
+                :key="s.name"
+                type="button"
+                :title="s.name"
+                :class="['flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors', activeScheme(s) ? 'border-emerald-600 bg-emerald-50' : 'border-gray-300 hover:border-gray-400']"
+                @click="applyColorScheme(s)"
+              >
+                <span class="w-5 h-5 rounded-full" :style="{ background: s.primary }"></span>
+                <span class="w-5 h-5 rounded-full" :style="{ background: s.secondary }"></span>
+                <span class="text-xs font-medium text-gray-700">{{ s.name }}</span>
+              </button>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Primary Brand Color</label>
+                <div class="flex items-center gap-2">
+                  <input v-model="companyProfile.brandPrimary" type="color" class="w-12 h-9 border border-gray-300 rounded-lg cursor-pointer bg-white p-1" />
+                  <input v-model="companyProfile.brandPrimary" type="text" class="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm uppercase" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Secondary Brand Color</label>
+                <div class="flex items-center gap-2">
+                  <input v-model="companyProfile.brandSecondary" type="color" class="w-12 h-9 border border-gray-300 rounded-lg cursor-pointer bg-white p-1" />
+                  <input v-model="companyProfile.brandSecondary" type="text" class="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm uppercase" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
