@@ -1,5 +1,6 @@
 package com.secphils.controller;
 
+import com.secphils.dto.LandingContactRequest;
 import com.secphils.entity.Company;
 import com.secphils.entity.Review;
 import com.secphils.entity.SystemSettings;
@@ -8,11 +9,16 @@ import com.secphils.repository.CompanyRepository;
 import com.secphils.repository.ReviewRepository;
 import com.secphils.repository.SystemSettingsRepository;
 import com.secphils.repository.UserRepository;
+import com.secphils.service.MailService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Public landing-page data (no auth). Serves the portal name, the provider's
  * company profile (Admin Panel > Company Settings > Company Profile) and the
  * approved client reviews, so the marketing landing page can be populated
- * entirely from the admin-managed profile.
+ * entirely from the admin-managed profile. Also accepts the public contact
+ * form and emails it to the company profile's Email Addresses.
  */
 @RestController
 @RequestMapping("/api/v1/landing")
@@ -33,15 +40,18 @@ public class LandingController {
     private final CompanyRepository companyRepository;
     private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
+    private final MailService mailService;
 
     public LandingController(SystemSettingsRepository settingsRepository,
                              CompanyRepository companyRepository,
                              ReviewRepository reviewRepository,
-                             UserRepository userRepository) {
+                             UserRepository userRepository,
+                             MailService mailService) {
         this.settingsRepository = settingsRepository;
         this.companyRepository = companyRepository;
         this.reviewRepository = reviewRepository;
         this.userRepository = userRepository;
+        this.mailService = mailService;
     }
 
     @GetMapping
@@ -63,19 +73,21 @@ public class LandingController {
      * Resolve the provider's company: the company an ADMIN user belongs to,
      * falling back to the first existing company record.
      */
-    private Map<String, Object> companyProfile() {
-        Company company = null;
+    private Company resolveProviderCompany() {
         Long companyId = userRepository.findAll().stream()
                 .filter(u -> "ADMIN".equalsIgnoreCase(u.getRole()))
                 .map(User::getCompanyId)
                 .filter(Objects::nonNull)
                 .findFirst().orElse(null);
         if (companyId != null) {
-            company = companyRepository.findById(companyId).orElse(null);
+            Company company = companyRepository.findById(companyId).orElse(null);
+            if (company != null) return company;
         }
-        if (company == null) {
-            company = companyRepository.findAll().stream().findFirst().orElse(null);
-        }
+        return companyRepository.findAll().stream().findFirst().orElse(null);
+    }
+
+    private Map<String, Object> companyProfile() {
+        Company company = resolveProviderCompany();
         if (company == null) {
             return Map.of();
         }
@@ -98,8 +110,91 @@ public class LandingController {
         return m;
     }
 
+    /**
+     * Public contact form. Emails the submission to every address in the
+     * provider's Company Profile "Email Addresses" (comma- or space-separated),
+     * falling back to a single profile email, then to a hard default. Mail
+     * failures are logged by MailService and never block the response — the
+     * form always reports success so a visitor's inquiry is never lost to a
+     * transient SMTP outage at the relay.
+     */
+    @PostMapping("/contact")
+    public ResponseEntity<Map<String, Object>> contact(@Valid @RequestBody LandingContactRequest request) {
+        Company company = resolveProviderCompany();
+        String replyTo = request.email().trim();
+
+        List<String> recipients = new ArrayList<>();
+        String raw = company != null ? company.getEmail() : null;
+        if (raw != null) {
+            for (String part : raw.split("[,;\\s]+")) {
+                String p = part.trim();
+                if (p.toLowerCase().contains("@")) recipients.add(p);
+            }
+        }
+        if (recipients.isEmpty()) {
+            recipients.add("manager@secphils.com");
+        }
+
+        String subject = "Landing page inquiry from " + request.firstName().trim() + " " + request.lastName().trim();
+        String html = contactEmailHtml(request, replyTo);
+
+        for (String to : recipients) {
+            mailService.sendHtml(to, subject, html, null, replyTo);
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("status", "ok");
+        out.put("recipients", recipients.size());
+        return ResponseEntity.ok(out);
+    }
+
+    private String contactEmailHtml(LandingContactRequest r, String replyTo) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+                  <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 0;">
+                    <tr><td align="center">
+                      <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+                             style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+                        <tr><td style="background:#29ca8e;padding:24px 32px;">
+                          <span style="color:#ffffff;font-size:20px;font-weight:bold;">New Website Inquiry</span>
+                        </td></tr>
+                        <tr><td style="padding:32px;">
+                          <p style="margin:0 0 20px;font-size:14px;line-height:1.6;">
+                            Someone submitted the contact form on your website. Details below.
+                          </p>
+                          <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;">
+                            <tr><td style="padding:12px 16px;font-size:14px;"><strong>Full name:</strong> %FULLNAME%</td></tr>
+                            <tr><td style="padding:12px 16px;font-size:14px;background:#f9fafb;border-top:1px solid #e5e7eb;"><strong>Email:</strong> %EMAIL%</td></tr>
+                            <tr><td style="padding:12px 16px;font-size:14px;border-top:1px solid #e5e7eb;"><strong>Phone:</strong> %PHONE%</td></tr>
+                            <tr><td style="padding:12px 16px;font-size:14px;background:#f9fafb;border-top:1px solid #e5e7eb;"><strong>How can we help?</strong><br>%MESSAGE%</td></tr>
+                          </table>
+                          <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">
+                            Reply directly to reach this visitor: <a href="mailto:%EMAIL%" style="color:#29ca8e;">%EMAIL%</a>
+                          </p>
+                        </td></tr>
+                        <tr><td style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;">
+                          <p style="margin:0;font-size:12px;color:#9ca3af;">Received via the SECPhils website contact form.</p>
+                        </td></tr>
+                      </table>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
+                """.replace("%FULLNAME%", escape(r.firstName().trim()) + " " + escape(r.lastName().trim()))
+                   .replace("%EMAIL%", escape(replyTo))
+                   .replace("%PHONE%", escape(r.phone().trim()))
+                   .replace("%MESSAGE%", escape(r.message().trim()).replace("\n", "<br>"));
+    }
+
+    private static String escape(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
     private List<Map<String, Object>> approvedReviews() {
-        return reviewRepository.findByStatus("Approved").stream()
+        return reviewRepository.findByStatus("APPROVED").stream()
                 .map(r -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("id", r.getId());

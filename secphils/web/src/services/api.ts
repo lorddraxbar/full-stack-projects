@@ -346,3 +346,16 @@ export async function useGetLanding(): Promise<LandingPayload> {
   const response = await api.get('/landing')
   return response.data
 }
+
+export interface LandingContactPayload {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  message: string
+}
+
+export async function usePostLandingContact(payload: LandingContactPayload): Promise<{ status: string; recipients: number }> {
+  const response = await api.post('/landing/contact', payload)
+  return response.data
+}

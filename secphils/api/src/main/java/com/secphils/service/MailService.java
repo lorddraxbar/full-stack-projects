@@ -27,12 +27,23 @@ public class MailService {
     }
 
     public void sendHtml(String to, String subject, String htmlBody, String link) {
+        sendHtml(to, subject, htmlBody, link, null);
+    }
+
+    /**
+     * HTML mail with an optional Reply-To, so recipients can reply straight to
+     * the sender (e.g. a website visitor). {@code replyTo} null = no Reply-To.
+     */
+    public void sendHtml(String to, String subject, String htmlBody, String link, String replyTo) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
             helper.setFrom(fromAddress);
             helper.setTo(to);
             helper.setSubject(subject);
+            if (replyTo != null && !replyTo.isBlank()) {
+                helper.setReplyTo(replyTo);
+            }
             helper.setText(htmlBody, true);
             mailSender.send(message);
             log.info("Mail sent to {} — {} (link: {})", to, subject, link);

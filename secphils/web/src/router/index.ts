@@ -5,7 +5,21 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'MarketingLanding',
     component: () => import('@/views/MarketingLandingPage.vue'),
-    meta: { public: true },
+    meta: { public: true, title: 'Strategic Engineering Consultancy - Philippines' },
+  },
+  {
+    path: '/legal/terms',
+    name: 'LegalTerms',
+    component: () => import('@/views/LegalPage.vue'),
+    props: { kind: 'terms' },
+    meta: { public: true, title: 'Terms of Service - Strategic Engineering Consultancy' },
+  },
+  {
+    path: '/legal/privacy',
+    name: 'LegalPrivacy',
+    component: () => import('@/views/LegalPage.vue'),
+    props: { kind: 'privacy' },
+    meta: { public: true, title: 'Privacy Policy - Strategic Engineering Consultancy' },
   },
   {
     path: '/auth',
@@ -115,6 +129,10 @@ router.beforeEach((to, _from, next) => {
   } else {
     next()
   }
+})
+
+router.afterEach((to) => {
+  document.title = (to.meta.title as string) || 'SECPhils Portal'
 })
 
 export default router
