@@ -105,11 +105,23 @@
   }
 }
 
-/* Slim, unobtrusive scrollbar (global — `html` selectors do not work inside
-   scoped <style> blocks). On phones with a space-reserving scrollbar, the
-   native ~15-20px gutter on the right reads as a stray margin beside the
-   full-bleed landing sections; 8px shrinks that noticeably without hurting
-   usability. iOS Safari ignores these rules and uses overlay indicators. */
+/* Touch devices: many mobile browsers reserve a persistent scrollbar
+   gutter (~15-20px) that reads as a white strip beside full-bleed sections
+   (the "gap" seen on phones in landscape). A touch scrollbar is cosmetic —
+   the user scrolls with a finger — so on coarse pointers we render no
+   scrollbar and no reserved gutter (overlay-style behavior). Desktop keeps
+   the slim scrollbar below. */
+@media (pointer: coarse) {
+  html {
+    scrollbar-width: none; /* Firefox */
+  }
+  html::-webkit-scrollbar {
+    display: none; /* Chromium / Safari */
+  }
+}
+
+/* Slim, unobtrusive scrollbar for desktop (global — `html` selectors do not
+   work inside scoped <style> blocks). */
 html {
   scrollbar-width: thin;
   scrollbar-color: #c9c9c9 transparent;

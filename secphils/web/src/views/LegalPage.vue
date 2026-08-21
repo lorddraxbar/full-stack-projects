@@ -30,13 +30,10 @@ onMounted(async () => {
 <template>
   <div class="legal-page">
     <header class="legal-header">
-      <a class="legal-back" href="/">
-        <i class="fa-solid fa-arrow-left"></i> Back to home
-      </a>
-      <div class="legal-brand">
-        <span class="legal-badge">SEC</span>
+      <a class="legal-logo" href="/" aria-label="Home — Strategic Engineering Consultancy">
+        <img src="/images/landing/seclogo.png" alt="Strategic Engineering Consultancy" />
         <span class="legal-name">Strategic Engineering Consultancy</span>
-      </div>
+      </a>
     </header>
 
     <main class="legal-main">
@@ -243,63 +240,42 @@ onMounted(async () => {
   font-family: 'Raleway', 'Open Sans', ui-sans-serif, system-ui, sans-serif;
 }
 
-/* ---------- Simple header: no logo image, just a slim bar ---------- */
+/* ---------- Header: logo + company name (mirrors the landing navbar) ---------- */
 .legal-header {
   background: #ffffff;
   border-bottom: 1px solid #ececec;
-  padding: 14px 24px;
+  padding: 12px 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
-.legal-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #29ca8e;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.legal-back:hover { color: #1fa774; }
-
-.legal-brand {
+.legal-logo {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
+  gap: 12px;
+  text-decoration: none;
 }
 
-/* Tiny brand badge echoing the SEC mark — text only, no image */
-.legal-badge {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 22px;
-  border-radius: 5px;
-  background: #1f8a70;
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+.legal-logo img {
+  height: 52px;
+  width: auto;
+  display: block;
 }
 
 .legal-name {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #374151;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: #252525;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+@media (max-width: 1023px) {
+  .legal-name { display: none; }
+  .legal-logo img { height: 44px; }
 }
 
 /* ---------- Document ---------- */
