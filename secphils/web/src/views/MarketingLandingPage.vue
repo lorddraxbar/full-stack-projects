@@ -364,23 +364,24 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
           </p>
         </div>
 
-        <div class="flex flex-col gap-10 lg:flex-row">
+        <div class="flex flex-col gap-10 lg:grid lg:grid-cols-[58%_42%] lg:gap-10">
           <!-- Tabs + content -->
-          <div class="lg:w-[58%]">
-            <div class="grid grid-cols-3 gap-3">
-              <button
-                v-for="tab in serviceTabs"
-                :key="tab.key"
-                class="svc-tab"
-                :class="activeTab.key === tab.key ? 'is-active' : ''"
-                @click="activeTab = tab"
-              >
-                <i :class="tab.icon" class="mb-2 block text-lg"></i>
-                <span class="text-sm font-semibold">{{ tab.label }}</span>
-              </button>
-            </div>
+          <div class="lg:col-start-1 lg:row-start-1">
+            <div class="h-full rounded-2xl border p-6 sm:p-8" style="border-color: #e8e8e8; background: #ffffff">
+              <div class="grid grid-cols-3 gap-3">
+                <button
+                  v-for="tab in serviceTabs"
+                  :key="tab.key"
+                  class="svc-tab"
+                  :class="activeTab.key === tab.key ? 'is-active' : ''"
+                  @click="activeTab = tab"
+                >
+                  <i :class="tab.icon" class="mb-2 block text-lg"></i>
+                  <span class="text-sm font-semibold">{{ tab.label }}</span>
+                </button>
+              </div>
 
-            <div class="mt-6 min-h-[300px] rounded-2xl border p-8 sm:p-10" style="border-color: #e8e8e8; background: #ffffff">
+              <div class="mt-6">
               <h2 class="mb-1.5 font-light text-2xl sm:text-3xl" style="color: #353535">{{ activeTab.title }}</h2>
               <p class="mb-4 text-base leading-6" style="color: #29ca8e; font-weight: 600">{{ activeTab.short }}</p>
               <template v-if="activeTab.paras">
@@ -409,31 +410,41 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
               <div class="mt-8">
                 <button class="hero-btn-sm" @click="openContact">Get Started</button>
               </div>
+              </div>
             </div>
           </div>
 
           <!-- Track record: 100% success rate -->
-          <div class="flex items-center lg:w-[42%]">
-            <div class="rounded-2xl bg-white p-8 text-center shadow-sm sm:p-10" style="border: 1px solid #e8e8e8">
+          <div class="lg:col-start-2 lg:row-start-1 lg:flex lg:flex-col">
+            <div class="flex flex-1 flex-col items-center justify-center rounded-2xl bg-white p-8 text-center shadow-sm sm:p-10" style="border: 1px solid #e8e8e8">
               <p class="text-xs font-bold uppercase tracking-[2px]" style="color: #999999">Our track record</p>
-              <div class="relative mx-auto mt-6 flex h-40 w-40 items-center justify-center sm:h-44 sm:w-44">
-                <svg viewBox="0 0 120 120" class="h-full w-full">
-                  <circle cx="60" cy="60" r="52" fill="none" stroke="#e8f6f1" stroke-width="12" />
-                  <circle
-                    cx="60" cy="60" r="52" fill="none" stroke="#29ca8e" stroke-width="12"
-                    stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="0"
-                    transform="rotate(-90 60 60)"
-                  />
+              <div class="mt-5 flex flex-col items-center">
+                <svg viewBox="0 0 160 160" class="h-36 w-36 sm:h-40 sm:w-40">
+                  <defs>
+                    <linearGradient id="trophyGold" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#ffd76e" />
+                      <stop offset="100%" stop-color="#f5a623" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="80" cy="80" r="74" fill="#f9f1de" />
+                  <circle cx="80" cy="80" r="74" fill="none" stroke="url(#trophyGold)" stroke-width="3" />
+                  <circle cx="80" cy="80" r="66" fill="none" stroke="#f5a623" stroke-width="1.5" opacity="0.5" />
+                  <g transform="translate(5 4.25) scale(1.5)">
+                    <path d="M30 26 L70 26 L70 36 A20 20 0 0 1 30 36 Z" fill="url(#trophyGold)" />
+                    <path d="M30 30 h-9 a11 11 0 0 0 11 20" fill="none" stroke="url(#trophyGold)" stroke-width="4" />
+                    <path d="M70 30 h9 a11 11 0 0 1 -11 20" fill="none" stroke="url(#trophyGold)" stroke-width="4" />
+                    <rect x="44" y="56" width="12" height="8" fill="url(#trophyGold)" />
+                    <rect x="37" y="64" width="26" height="6" rx="2" fill="url(#trophyGold)" />
+                    <rect x="32" y="70" width="36" height="5" rx="2" fill="url(#trophyGold)" />
+                  </g>
                 </svg>
-                <div class="absolute inset-0 flex flex-col items-center justify-center">
-                  <span class="text-4xl font-light sm:text-5xl" style="color: #202020">100%</span>
-                  <span class="mt-1 text-[11px] font-bold uppercase tracking-wider" style="color: #29ca8e">Success rate</span>
-                </div>
+                <span class="mt-4 text-5xl font-light" style="color: #202020">100%</span>
+                <span class="mt-1 text-[11px] font-bold uppercase tracking-wider" style="color: #d98d0b">Success rate</span>
               </div>
-              <p class="mt-6 text-sm leading-6" style="color: #757575">
+              <p class="mt-5 text-sm leading-6" style="color: #757575">
                 Every company we have helped so far has <span class="font-semibold" style="color: #202020">hit their compliance target</span> — no exceptions.
               </p>
-              <div class="mt-6 grid grid-cols-2 gap-3 border-t pt-6" style="border-color: #ececec">
+              <div class="mt-5 grid w-full grid-cols-2 gap-3 border-t pt-5" style="border-color: #ececec">
                 <div>
                   <p class="text-2xl font-light" style="color: #202020">100%</p>
                   <p class="mt-1 text-xs leading-4" style="color: #757575">of clients reached their target</p>
