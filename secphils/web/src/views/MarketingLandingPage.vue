@@ -260,7 +260,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
 </script>
 
 <template>
-  <div class="min-h-screen" style="background: #f9f9f9; font-family: 'Open Sans', ui-sans-serif, system-ui, sans-serif">
+  <div class="min-h-viewport" style="background: #f9f9f9; font-family: 'Open Sans', ui-sans-serif, system-ui, sans-serif">
     <!-- ================= NAVBAR ================= -->
     <header
       class="header-anim fixed inset-x-0 top-0 z-50"
