@@ -23,7 +23,13 @@ public class Service {
     private String description;
 
     @Column(length = 50)
-    private String category = "ENGINEERING";
+    private String category = "ECC";
+
+    @Column(length = 255)
+    private String icon = "fa-solid fa-briefcase";
+
+    @Column(name = "sort_order", nullable = false)
+    private Integer sortOrder = 0;
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;

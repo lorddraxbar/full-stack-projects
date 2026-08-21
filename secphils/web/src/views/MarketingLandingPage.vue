@@ -16,7 +16,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useGetLanding, usePostLandingContact, type LandingCompany, type LandingReview } from '@/services/api'
+import { useGetLanding, usePostLandingContact, type LandingCompany, type LandingReview, type LandingService } from '@/services/api'
 
 const router = useRouter()
 
@@ -221,57 +221,37 @@ const portalLogin = () => {
   router.push({ name: 'Login' })
 }
 
-// ---------- Services (content ported from www.secphils.com) ----------
-interface ServiceTab {
+// ---------- Services (dynamic from the admin-managed Service Catalog) ----------
+const services = ref<LandingService[]>([])
+
+interface ServiceCategory {
   key: string
   label: string
   icon: string
-  title: string
-  short: string
-  paras?: string[]
-  list?: string[]
+  items: LandingService[]
 }
-const serviceTabs: ServiceTab[] = [
-  {
-    key: 'ecc',
-    label: 'ECC',
-    icon: 'fa-solid fa-leaf',
-    title: 'Environmental Compliance Certificate (ECC)',
-    short:
-      'The DENR/EMB clearance that lets your project move on to the next stage of planning and implementation.',
-    paras: [
-      'The Environmental Compliance Certificate or ECC refers to the document issued by the DENR/Environmental Management Board (EMB) that allows the project to proceed to the next stage of project planning, which is the acquisition of approvals from other government agencies and LGUs, after which the project can start implementation.',
-      'It certifies that the proponent has complied with the requirements of the Environmental Impact Statement (EIS) system and that the proposed project will not cause a significant negative impact on the environment. It also certifies that the proponent is committed to implement its approved Environment Management Plan. Requirements for ECC application depend on the type and location of project being developed.',
-    ],
-  },
-  {
-    key: 'cnc',
-    label: 'CNC',
-    icon: 'fa-solid fa-circle-check',
-    title: 'Certificate of Non-Coverage (CNC)',
-    short:
-      'Proof that your project is not covered by the EIS system and is not required to secure an ECC.',
-    paras: [
-      'The Certificate of Non-Coverage is a document issued by the DENR/Environmental Management Board (EMB) certifying that, based on the submitted project description, the project is not covered by the EIS (Environmental Impact Statement) system and is not required to secure an ECC. This covers projects which are not critical to the environment.',
-    ],
-  },
-  {
-    key: 'other',
-    label: 'Other Services',
-    icon: 'fa-solid fa-toolbox',
-    title: 'Other Services',
-    short:
-      'A wider portfolio of environmental and business compliance engagements, scoped to what your project needs.',
-    list: [
-      'Environmental Impact Assessment (EIA)',
-      'Discharge Permit (DP)',
-      'Permit for Operation of Air Pollutant Sources and Central Installation',
-      'Hazardous Waste Generator ID',
-      'Feasibility Studies for Businesses',
-    ],
-  },
-]
-const activeTab = ref<ServiceTab>(serviceTabs[0])
+
+const serviceCategories = computed<ServiceCategory[]>(() => {
+  const map = new Map<string, LandingService[]>()
+  for (const s of services.value) {
+    const cat = (s.category || 'Services').trim()
+    if (!map.has(cat)) map.set(cat, [])
+    map.get(cat)!.push(s)
+  }
+  return Array.from(map.entries()).map(([label, items]) => ({
+    key: label,
+    label,
+    icon: items.find(i => i.icon)?.icon || 'fa-solid fa-briefcase',
+    items,
+  }))
+})
+
+const activeKey = ref('')
+const activeCategory = computed<ServiceCategory | undefined>(() =>
+  serviceCategories.value.find(c => c.key === activeKey.value) || serviceCategories.value[0]
+)
+// Keep the first category selected even before the API resolves.
+if (activeKey.value === '') activeKey.value = 'ECC'
 
 // ---------- Reviews (approved only, from the API) ----------
 const reviews = ref<LandingReview[]>([])
@@ -345,6 +325,7 @@ onMounted(() => {
     .then((data) => {
       if (data.company && Object.keys(data.company).length > 0) company.value = data.company
       reviews.value = data.reviews || []
+      services.value = data.services || []
     })
     .catch(() => {
       // Public page degrades gracefully to fallback copy on API failure
@@ -479,46 +460,43 @@ onBeforeUnmount(() => {
             <div class="h-full rounded-2xl border p-6 sm:p-8" style="border-color: #e8e8e8; background: #ffffff">
               <div class="grid grid-cols-3 gap-3">
                 <button
-                  v-for="tab in serviceTabs"
-                  :key="tab.key"
+                  v-for="cat in serviceCategories"
+                  :key="cat.key"
                   class="svc-tab"
-                  :class="activeTab.key === tab.key ? 'is-active' : ''"
-                  @click="activeTab = tab"
+                  :class="activeCategory?.key === cat.key ? 'is-active' : ''"
+                  @click="activeKey = cat.key"
                 >
-                  <i :class="tab.icon" class="mb-2 block text-lg"></i>
-                  <span class="text-sm font-semibold">{{ tab.label }}</span>
+                  <i :class="cat.icon" class="mb-2 block text-lg"></i>
+                  <span class="text-sm font-semibold">{{ cat.label }}</span>
                 </button>
               </div>
 
-              <div class="mt-6">
-              <h2 class="mb-1.5 font-light text-2xl sm:text-3xl" style="color: #353535">{{ activeTab.title }}</h2>
-              <p class="mb-4 text-base leading-6" style="color: var(--bsp); font-weight: 600">{{ activeTab.short }}</p>
-              <template v-if="activeTab.paras">
-                <p
-                  v-for="(p, i) in activeTab.paras"
-                  :key="i"
-                  class="mb-2.5 text-sm leading-6"
-                  style="color: #757575"
-                >
-                  {{ p }}
-                </p>
-              </template>
-              <ul v-if="activeTab.list" class="space-y-3 pt-1">
-                <li
-                  v-for="item in activeTab.list"
-                  :key="item"
-                  class="flex items-start gap-3 font-light text-lg sm:text-xl"
-                  style="color: #353535"
-                >
-                  <span class="svc-check">
-                    <i class="fa-solid fa-check"></i>
-                  </span>
-                  {{ item }}
-                </li>
-              </ul>
-              <div class="mt-8">
-                <button class="hero-btn-sm" @click="openContact">Get Started</button>
-              </div>
+              <div v-if="activeCategory" class="mt-6">
+                <h2 class="mb-1.5 font-light text-2xl sm:text-3xl" style="color: #353535" v-if="activeCategory.items.length === 1">
+                  {{ activeCategory.items[0].name }}
+                </h2>
+                <h2 v-else class="mb-4 font-light text-2xl sm:text-3xl" style="color: #353535">{{ activeCategory.label }}</h2>
+
+                <div v-for="svc in activeCategory.items" :key="svc.id" class="mb-5 last:mb-0">
+                  <div v-if="activeCategory.items.length > 1" class="mb-1 flex items-center gap-2.5">
+                    <span class="svc-check"><i class="fa-solid fa-check"></i></span>
+                    <h3 class="font-semibold text-base" style="color: #353535">{{ svc.name }}</h3>
+                  </div>
+                  <template v-if="svc.description">
+                    <p
+                      v-for="(p, i) in svc.description.split(/\n{2,}/)"
+                      :key="i"
+                      class="mt-1 text-sm leading-6 first:mt-0"
+                      style="color: #757575"
+                    >
+                      {{ p }}
+                    </p>
+                  </template>
+                </div>
+
+                <div class="mt-8">
+                  <button class="hero-btn-sm" @click="openContact">Get Started</button>
+                </div>
               </div>
             </div>
           </div>

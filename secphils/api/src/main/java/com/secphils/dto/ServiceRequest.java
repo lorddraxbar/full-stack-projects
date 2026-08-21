@@ -6,5 +6,7 @@ public record ServiceRequest(
         @NotBlank String name,
         String description,
         String category,
-        Boolean isActive
+        Boolean isActive,
+        String icon,
+        Integer sortOrder
 ) {}

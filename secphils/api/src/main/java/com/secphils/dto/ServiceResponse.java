@@ -10,10 +10,12 @@ public record ServiceResponse(
         String description,
         String category,
         Boolean isActive,
+        String icon,
+        Integer sortOrder,
         LocalDateTime createdAt
 ) {
     public static ServiceResponse from(Service s) {
         return new ServiceResponse(s.getId(), s.getName(), s.getDescription(),
-                s.getCategory(), s.getIsActive(), s.getCreatedAt());
+                s.getCategory(), s.getIsActive(), s.getIcon(), s.getSortOrder(), s.getCreatedAt());
     }
 }

@@ -33,9 +33,11 @@ public class ServiceController {
     @GetMapping
     @Transactional(readOnly = true)
     public ResponseEntity<List<ServiceResponse>> list(@RequestParam(required = false) String category) {
-        List<Service> items = (category != null && !category.isBlank())
-                ? serviceRepository.findAll().stream().filter(s -> category.equalsIgnoreCase(s.getCategory())).toList()
-                : serviceRepository.findAll();
+        List<Service> items = serviceRepository.findAll().stream()
+                .filter(s -> category == null || category.isBlank() || category.equalsIgnoreCase(s.getCategory()))
+                .sorted(java.util.Comparator.comparing(Service::getSortOrder, java.util.Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(Service::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
         return ResponseEntity.ok(items.stream().map(ServiceResponse::from).toList());
     }
 
@@ -83,10 +85,23 @@ public class ServiceController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/activate")
+    @Transactional
+    public ResponseEntity<ServiceResponse> activate(@PathVariable Long id, HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        Service service = serviceRepository.findById(id).orElseThrow(() -> ApiException.notFound("Service"));
+        service.setIsActive(true);
+        serviceRepository.save(service);
+        auditService.audit(actor, "SERVICE_ACTIVATE", "Service", service.getId(), "Name: " + service.getName(), http);
+        return ResponseEntity.ok(ServiceResponse.from(service));
+    }
+
     private void apply(Service service, ServiceRequest req) {
         service.setName(req.name());
         service.setDescription(req.description());
         if (req.category() != null && !req.category().isBlank()) service.setCategory(req.category());
+        if (req.icon() != null && !req.icon().isBlank()) service.setIcon(req.icon());
+        if (req.sortOrder() != null) service.setSortOrder(req.sortOrder());
         if (req.isActive() != null) service.setIsActive(req.isActive());
     }
 }

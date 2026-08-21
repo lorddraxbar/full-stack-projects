@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, type ServiceItem, type ServicePayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 
@@ -289,6 +289,7 @@ onMounted(async () => {
   loadSystemSettings()
   loadProviderCompanyProfile()
   loadRoles()
+  loadServices()
 })
 
 // ---------- Company Settings: Company Profile ----------
@@ -559,29 +560,107 @@ const roleRowActions = (role: RoleItem): RowAction[] => {
   return actions
 }
 
-// ---------- Service Catalog ----------
-const services = ref([
-  { id: 1, name: 'Energy Audit', description: 'Comprehensive facility energy assessment and optimization roadmap.', category: 'Consulting', status: 'Active', rate: 'Php 150,000 flat' },
-  { id: 2, name: 'ISO 9001 Certification', description: 'Gap analysis, implementation support, and audit preparation.', category: 'Compliance', status: 'Active', rate: 'Php 1,200 / hr' },
-  { id: 3, name: 'Market Research Study', description: 'Market sizing, competitor benchmarking, and entry strategy.', category: 'Research', status: 'Active', rate: 'Php 250,000 flat' },
-  { id: 4, name: 'Legacy Systems Review', description: 'Archived. Replaced by Digital Transformation Assessment.', category: 'Consulting', status: 'Archived', rate: '—' },
-])
-const newServiceForm = ref({ name: '', description: '', category: 'Consulting', rate: '' })
-const addService = () => {
-  if (!newServiceForm.value.name.trim()) return
-  services.value.push({
-    id: Date.now(),
-    name: newServiceForm.value.name,
-    description: newServiceForm.value.description,
-    category: newServiceForm.value.category,
-    status: 'Active',
-    rate: newServiceForm.value.rate || '—',
-  })
-  newServiceForm.value = { name: '', description: '', category: 'Consulting', rate: '' }
-  alert('Service added to catalog.')
+// ---------- Service Catalog (wired to the backend) ----------
+const services = ref<ServiceItem[]>([])
+const serviceListLoaded = ref(false)
+const serviceListError = ref('')
+
+// Service categories map to the "Our Services" tabs on the landing page.
+const serviceCategories = ref(['ECC', 'CNC', 'Other Services'])
+
+const loadServices = async () => {
+  serviceListError.value = ''
+  try {
+    services.value = await useGetServices()
+  } catch (err: any) {
+    serviceListError.value = err.response?.data?.message || 'Failed to load services'
+  } finally {
+    serviceListLoaded.value = true
+  }
 }
-const toggleServiceStatus = (s: (typeof services.value)[0]) => {
-  s.status = s.status === 'Active' ? 'Archived' : 'Active'
+
+const showServiceForm = ref(false)
+const editingService = ref<ServiceItem | null>(null)
+const serviceForm = ref<ServicePayload>({ name: '', description: '', category: 'ECC', icon: 'fa-solid fa-briefcase', sortOrder: 0 })
+const serviceFormMessage = ref<{ ok: boolean; text: string } | null>(null)
+const serviceFormSaving = ref(false)
+
+const openAddService = () => {
+  editingService.value = null
+  serviceForm.value = { name: '', description: '', category: 'ECC', icon: 'fa-solid fa-briefcase', sortOrder: 0 }
+  serviceFormMessage.value = null
+  showServiceForm.value = true
+}
+const openEditService = (s: ServiceItem) => {
+  editingService.value = s
+  serviceForm.value = {
+    name: s.name,
+    description: s.description || '',
+    category: s.category || 'ECC',
+    icon: s.icon || 'fa-solid fa-briefcase',
+    sortOrder: s.sortOrder ?? 0,
+  }
+  serviceFormMessage.value = null
+  showServiceForm.value = true
+}
+const closeServiceForm = () => {
+  showServiceForm.value = false
+  editingService.value = null
+  serviceFormMessage.value = null
+}
+const saveService = async () => {
+  const f = serviceForm.value
+  if (!f.name.trim()) return
+  serviceFormSaving.value = true
+  serviceFormMessage.value = null
+  try {
+    const payload: ServicePayload = {
+      name: f.name.trim(),
+      description: (f.description || '').trim(),
+      category: f.category,
+      icon: f.icon || undefined,
+      sortOrder: f.sortOrder ?? 0,
+    }
+    if (editingService.value) {
+      payload.isActive = editingService.value.isActive
+      await useUpdateService(editingService.value.id, payload)
+    } else {
+      payload.isActive = true
+      await useCreateService(payload)
+    }
+    closeServiceForm()
+    await loadServices()
+  } catch (err: any) {
+    serviceFormMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save service' }
+  } finally {
+    serviceFormSaving.value = false
+  }
+}
+const archiveService = async (s: ServiceItem) => {
+  try {
+    await useDeactivateService(s.id)
+    await loadServices()
+  } catch (err: any) {
+    alert(err.response?.data?.message || 'Failed to archive service')
+  }
+}
+const restoreService = async (s: ServiceItem) => {
+  try {
+    await useActivateService(s.id)
+    await loadServices()
+  } catch (err: any) {
+    alert(err.response?.data?.message || 'Failed to restore service')
+  }
+}
+const serviceRowActions = (s: ServiceItem): RowAction[] => {
+  const actions: RowAction[] = [{ label: 'Edit', onClick: () => openEditService(s) }]
+  actions.push({ divider: true, label: '', onClick: () => {} })
+  if (s.isActive) {
+    actions.push({ label: 'Archive', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => archiveService(s) })
+  } else {
+    actions.push({ label: 'Restore', color: 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => restoreService(s) })
+  }
+  return actions
 }
 
 // ---------- Project Configuration ----------
@@ -1208,43 +1287,61 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
     <!-- ================= SERVICE CATALOG ================= -->
     <div v-if="isActiveTab('services')" class="space-y-6">
       <div class="bg-white rounded-lg shadow">
-        <div class="p-6 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-900">Service Catalog</h2>
-          <p class="text-sm text-gray-600 mt-1">Services offered to clients. Archived services are hidden from project setup.</p>
+        <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Service Catalog</h2>
+            <p class="text-sm text-gray-600 mt-1">Services offered to clients on the public site. Archived services are hidden from the landing page.</p>
+          </div>
+          <button
+            @click="openAddService"
+            class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors whitespace-nowrap shrink-0"
+          >
+            + Add Service
+          </button>
         </div>
+
+        <div v-if="serviceListError" class="p-4 mb-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 mx-5">
+          {{ serviceListError }}
+        </div>
+
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead class="bg-gray-50">
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price / Rate</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
               <tr v-for="service in services" :key="service.id" class="hover:bg-gray-50">
-                <td class="px-6 py-4 font-medium text-gray-900">{{ service.name }}</td>
-                <td class="px-6 py-4 text-sm text-gray-600 max-w-xs">{{ service.description }}</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-2.5 font-medium text-gray-900">
+                    <i v-if="service.icon" :class="service.icon" class="w-4 text-center text-gray-400"></i>
+                    {{ service.name }}
+                  </div>
+                </td>
                 <td class="px-6 py-4">
                   <span class="px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded">{{ service.category }}</span>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ service.rate }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600 max-w-xs line-clamp-2">{{ service.description || '—' }}</td>
                 <td class="px-6 py-4">
                   <span :class="[
                     'px-2 py-1 text-xs font-medium rounded-full',
-                    service.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    service.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                   ]">
-                    {{ service.status }}
+                    {{ service.isActive ? 'Active' : 'Archived' }}
                   </span>
                 </td>
                 <td class="px-3 py-4 text-right whitespace-nowrap">
-                  <RowActionsMenu :actions="[
-                    { label: 'Edit', color: 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50', onClick: () => {} },
-                    { label: service.status === 'Active' ? 'Archive' : 'Restore', color: service.status === 'Active' ? 'text-red-600 hover:text-red-700 hover:bg-red-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => toggleServiceStatus(service) }
-                  ]" />
+                  <RowActionsMenu :actions="serviceRowActions(service)" />
+                </td>
+              </tr>
+              <tr v-if="services.length === 0">
+                <td colspan="5" class="px-6 py-10 text-center text-sm text-gray-500">
+                  {{ serviceListLoaded ? 'No services in the catalog yet. Use "+ Add Service" to create one.' : 'Loading services…' }}
                 </td>
               </tr>
             </tbody>
@@ -1252,35 +1349,69 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
         </div>
       </div>
 
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Add Service</h2>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Service Name</label>
-            <input v-model="newServiceForm.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+      <!-- Add / Edit Service modal -->
+      <div v-if="showServiceForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+          <h3 class="text-lg font-semibold text-gray-900">
+            <i class="fas fa-briefcase text-emerald-600 mr-2" />{{ editingService ? 'Edit Service' : 'Add Service' }}
+          </h3>
+          <p class="mt-1 text-sm text-gray-500">
+            {{ editingService
+              ? 'Update the service listed under its category on the landing page.'
+              : 'Add a service to the catalog. It appears on the landing page under the chosen category tab.' }}
+          </p>
+          <div class="mt-4 space-y-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Service Name *</label>
+              <input v-model="serviceForm.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="e.g. Environmental Compliance Certificate (ECC)" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <div class="relative">
+                <select v-model="serviceForm.category" class="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none">
+                  <option v-for="c in serviceCategories" :key="c" :value="c">{{ c }}</option>
+                </select>
+                <i class="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-xs transition-colors pointer-events-none"></i>
+              </div>
+              <p class="mt-1 text-xs text-gray-500">The category drives which tab the service shows under on the landing page.</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea v-model="serviceForm.description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"></textarea>
+              <p class="mt-1 text-xs text-gray-500">Shown under the service name on the landing page. Use multiple lines for longer write-ups.</p>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Icon (Font Awesome)</label>
+                <input v-model="serviceForm.icon" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="fa-solid fa-leaf" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Display Order</label>
+                <input v-model.number="serviceForm.sortOrder" type="number" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+            </div>
+            <div v-if="serviceFormMessage" :class="[
+              'p-3 rounded-lg text-sm',
+              serviceFormMessage.ok ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
+            ]">
+              {{ serviceFormMessage.text }}
+            </div>
           </div>
-          <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <input v-model="newServiceForm.description" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          <div class="mt-5 flex justify-end gap-3">
+            <button
+              @click="closeServiceForm"
+              class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
+            >
+              Close
+            </button>
+            <button
+              @click="saveService"
+              :disabled="serviceFormSaving || !serviceForm.name.trim()"
+              class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {{ serviceFormSaving ? 'Saving…' : editingService ? 'Save Changes' : 'Add Service' }}
+            </button>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <select v-model="newServiceForm.category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-              <option>Consulting</option>
-              <option>Compliance</option>
-              <option>Research</option>
-              <option>Engineering</option>
-            </select>
-          </div>
-          <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Price / Rate (optional)</label>
-            <input v-model="newServiceForm.rate" type="text" placeholder="e.g. Php 1,000 / hr or Php 150,000 flat" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-        </div>
-        <div class="mt-4 flex justify-end">
-          <button @click="addService" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
-            + Add Service
-          </button>
         </div>
       </div>
     </div>

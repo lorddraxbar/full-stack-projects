@@ -7,6 +7,7 @@ import com.secphils.entity.SystemSettings;
 import com.secphils.entity.User;
 import com.secphils.repository.CompanyRepository;
 import com.secphils.repository.ReviewRepository;
+import com.secphils.repository.ServiceRepository;
 import com.secphils.repository.SystemSettingsRepository;
 import com.secphils.repository.UserRepository;
 import com.secphils.service.MailService;
@@ -40,17 +41,20 @@ public class LandingController {
     private final CompanyRepository companyRepository;
     private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
+    private final ServiceRepository serviceRepository;
     private final MailService mailService;
 
     public LandingController(SystemSettingsRepository settingsRepository,
                              CompanyRepository companyRepository,
                              ReviewRepository reviewRepository,
                              UserRepository userRepository,
+                             ServiceRepository serviceRepository,
                              MailService mailService) {
         this.settingsRepository = settingsRepository;
         this.companyRepository = companyRepository;
         this.reviewRepository = reviewRepository;
         this.userRepository = userRepository;
+        this.serviceRepository = serviceRepository;
         this.mailService = mailService;
     }
 
@@ -66,6 +70,7 @@ public class LandingController {
         payload.put("maintenanceMode", Boolean.TRUE.equals(settings.getMaintenanceMode()));
         payload.put("company", companyProfile());
         payload.put("reviews", approvedReviews());
+        payload.put("services", activeServices());
         return ResponseEntity.ok(payload);
     }
 
@@ -191,6 +196,23 @@ public class LandingController {
     private static String escape(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
+    private List<Map<String, Object>> activeServices() {
+        return serviceRepository.findByIsActiveTrue().stream()
+                .sorted(java.util.Comparator.comparing(com.secphils.entity.Service::getSortOrder,
+                                java.util.Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(com.secphils.entity.Service::getName, String.CASE_INSENSITIVE_ORDER))
+                .map(s -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", s.getId());
+                    m.put("name", s.getName());
+                    m.put("description", s.getDescription());
+                    m.put("category", s.getCategory());
+                    m.put("icon", s.getIcon());
+                    m.put("sortOrder", s.getSortOrder());
+                    return m;
+                }).toList();
     }
 
     private List<Map<String, Object>> approvedReviews() {

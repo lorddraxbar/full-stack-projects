@@ -340,6 +340,16 @@ export interface LandingPayload {
   maintenanceMode: boolean
   company?: LandingCompany
   reviews?: LandingReview[]
+  services?: LandingService[]
+}
+
+export interface LandingService {
+  id: number
+  name: string
+  description?: string
+  category?: string
+  icon?: string
+  sortOrder?: number
 }
 
 export async function useGetLanding(): Promise<LandingPayload> {
@@ -357,5 +367,50 @@ export interface LandingContactPayload {
 
 export async function usePostLandingContact(payload: LandingContactPayload): Promise<{ status: string; recipients: number }> {
   const response = await api.post('/landing/contact', payload)
+  return response.data
+}
+
+// ---------- Service Catalog (admin) ----------
+export interface ServiceItem {
+  id: number
+  name: string
+  description?: string
+  category?: string
+  isActive?: boolean
+  icon?: string
+  sortOrder?: number
+  createdAt?: string
+}
+
+export interface ServicePayload {
+  name: string
+  description?: string
+  category?: string
+  isActive?: boolean
+  icon?: string
+  sortOrder?: number
+}
+
+export async function useGetServices(): Promise<ServiceItem[]> {
+  const response = await api.get('/services')
+  return response.data
+}
+
+export async function useCreateService(data: ServicePayload): Promise<ServiceItem> {
+  const response = await api.post('/services', data)
+  return response.data
+}
+
+export async function useUpdateService(id: number, data: ServicePayload): Promise<ServiceItem> {
+  const response = await api.put(`/services/${id}`, data)
+  return response.data
+}
+
+export async function useDeactivateService(id: number): Promise<void> {
+  await api.delete(`/services/${id}`)
+}
+
+export async function useActivateService(id: number): Promise<ServiceItem> {
+  const response = await api.post(`/services/${id}/activate`)
   return response.data
 }
