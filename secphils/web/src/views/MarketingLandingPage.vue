@@ -412,9 +412,38 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
             </div>
           </div>
 
-          <!-- Logo image -->
-          <div class="flex items-center justify-center lg:w-[42%]">
-            <img src="/images/landing/seclogo.png" alt="Services" class="w-auto max-h-[420px]" />
+          <!-- Track record: 100% success rate -->
+          <div class="flex items-center lg:w-[42%]">
+            <div class="rounded-2xl bg-white p-8 text-center shadow-sm sm:p-10" style="border: 1px solid #e8e8e8">
+              <p class="text-xs font-bold uppercase tracking-[2px]" style="color: #999999">Our track record</p>
+              <div class="relative mx-auto mt-6 flex h-40 w-40 items-center justify-center sm:h-44 sm:w-44">
+                <svg viewBox="0 0 120 120" class="h-full w-full">
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="#e8f6f1" stroke-width="12" />
+                  <circle
+                    cx="60" cy="60" r="52" fill="none" stroke="#29ca8e" stroke-width="12"
+                    stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="0"
+                    transform="rotate(-90 60 60)"
+                  />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span class="text-4xl font-light sm:text-5xl" style="color: #202020">100%</span>
+                  <span class="mt-1 text-[11px] font-bold uppercase tracking-wider" style="color: #29ca8e">Success rate</span>
+                </div>
+              </div>
+              <p class="mt-6 text-sm leading-6" style="color: #757575">
+                Every company we have helped so far has <span class="font-semibold" style="color: #202020">hit their compliance target</span> — no exceptions.
+              </p>
+              <div class="mt-6 grid grid-cols-2 gap-3 border-t pt-6" style="border-color: #ececec">
+                <div>
+                  <p class="text-2xl font-light" style="color: #202020">100%</p>
+                  <p class="mt-1 text-xs leading-4" style="color: #757575">of clients reached their target</p>
+                </div>
+                <div>
+                  <p class="text-2xl font-light" style="color: #202020">0</p>
+                  <p class="mt-1 text-xs leading-4" style="color: #757575">unresolved cases to date</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -456,29 +485,11 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
         </div>
 
         <div class="grid items-stretch gap-10 lg:grid-cols-2">
-          <!-- Left: description + socials -->
+          <!-- Left: description -->
           <div class="flex flex-col rounded-2xl border bg-white p-8 sm:p-10" style="border-color: #e8e8e8">
             <i class="fa-solid fa-building-columns mb-4 block text-2xl" style="color: #29ca8e"></i>
             <h2 class="mb-3 font-light text-2xl sm:text-3xl" style="color: #353535">{{ c.name }}</h2>
-            <p class="mb-8 text-base leading-7" style="color: #757575">{{ c.description }}</p>
-
-            <div class="mt-auto border-t pt-6" style="border-color: #ececec">
-              <p class="mb-3 text-xs font-bold uppercase tracking-[2px]" style="color: #999999">Follow us</p>
-              <div class="flex flex-wrap gap-3">
-                <a
-                  v-for="s in socialLinks"
-                  :key="s.url"
-                  :href="s.url"
-                  target="_blank"
-                  rel="noopener"
-                  class="social-chip"
-                  :title="s.label"
-                >
-                  <i :class="s.icon"></i>
-                  <span>{{ s.label }}</span>
-                </a>
-              </div>
-            </div>
+            <p class="text-base leading-7" style="color: #757575">{{ c.description }}</p>
           </div>
 
           <!-- Right: team photo collage -->
@@ -488,40 +499,15 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
               alt="Our team at work"
               class="rounded-2xl object-cover shadow-sm lg:col-span-2 lg:aspect-[21/9]"
             />
-            <div class="rounded-2xl bg-white p-6 text-center shadow-sm">
-              <h3 class="mb-1.5 text-lg font-light" style="color: #353535">Visit us on</h3>
-              <div class="mb-3 flex justify-center gap-3">
-                <a
-                  v-for="s in socialLinks"
-                  :key="s.url"
-                  :href="s.url"
-                  target="_blank"
-                  rel="noopener"
-                  class="social-dot"
-                  :title="s.label"
-                >
-                  <i :class="s.icon"></i>
-                </a>
-              </div>
-              <a
-                :href="`mailto:${primaryEmail}`"
-                class="block truncate text-sm font-semibold"
-                style="color: #202020"
-              >
-                {{ primaryEmail }}
-              </a>
-              <a
-                :href="`tel:${primaryPhone.replace(/\s/g, '')}`"
-                class="block text-sm"
-                style="color: #757575"
-              >
-                {{ primaryPhone }}
-              </a>
-            </div>
             <img
               src="/images/landing/team-image2.jpg"
               alt="On site"
-              class="rounded-2xl object-cover shadow-sm lg:aspect-auto"
+              class="rounded-2xl object-cover shadow-sm"
+            />
+            <img
+              src="/images/landing/team-image3.jpg"
+              alt="At a client site"
+              class="rounded-2xl object-cover shadow-sm"
             />
           </div>
         </div>
@@ -584,20 +570,23 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
             <p class="mb-1 text-sm font-semibold" style="color: #202020">Phone</p>
             <p v-for="p in phones" :key="p" class="text-sm" style="color: #757575">{{ p }}</p>
           </a>
-          <a
-            v-for="s in socialLinks.slice(0, 1)"
-            :key="s.url"
-            :href="s.url"
-            target="_blank"
-            rel="noopener"
-            class="contact-card"
-          >
-            <i :class="s.icon" class="mb-3 text-2xl" style="color: #29ca8e" />
-            <p class="mb-1 text-sm font-semibold" style="color: #202020">{{ s.label }}</p>
-            <p class="text-sm leading-snug" style="color: #757575">
-              {{ c.name || 'See our page' }}
-            </p>
-          </a>
+          <div class="contact-card">
+            <i :class="socialLinks[0]?.icon || 'fa-brands fa-facebook-f'" class="mb-3 text-2xl" style="color: #29ca8e" />
+            <p class="mb-1 text-sm font-semibold" style="color: #202020">Follow us</p>
+            <div class="mt-1 flex flex-wrap items-center justify-center gap-2.5">
+              <a
+                v-for="sl in socialLinks"
+                :key="sl.url"
+                :href="sl.url"
+                target="_blank"
+                rel="noopener"
+                class="social-dot"
+                :title="sl.label"
+              >
+                <i :class="sl.icon"></i>
+              </a>
+            </div>
+          </div>
         </div>
 
         <div class="mt-10">
@@ -812,32 +801,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
   margin-top: 4px;
 }
 
-/* Social pills (About) */
-.social-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid #e8e8e8;
-  border-radius: 999px;
-  padding: 8px 16px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #353535;
-  text-decoration: none;
-  background: #ffffff;
-  transition: all 0.2s;
-}
-.social-chip:hover {
-  border-color: #29ca8e;
-  color: #147a55;
-  background: #f0fbf7;
-}
-.social-chip i {
-  color: #29ca8e;
-  font-size: 15px;
-}
-
-/* Round social dots (About collage) */
+/* Round social dots (Say hello card) */
 .social-dot {
   display: inline-flex;
   align-items: center;
@@ -854,6 +818,11 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
 .social-dot:hover {
   background: #29ca8e;
   color: #ffffff;
+}
+.contact-card .social-dot {
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
 }
 
 /* About badges */
