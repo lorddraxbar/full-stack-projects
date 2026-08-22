@@ -172,7 +172,7 @@ async function setStatus(id: number, status: string) {
       <Button v-if="isCustomer && projectsWithoutReview.length > 0" @click="openForm">
         + Submit Review
       </Button>
-      <Button v-if="isUser && projects.length > 0" @click="openForm">
+      <Button v-if="isUser" @click="openForm">
         + Add Review
       </Button>
     </div>
@@ -308,7 +308,9 @@ async function setStatus(id: number, status: string) {
               </SelectContent>
             </Select>
             <p v-if="projectsWithoutReview.length === 0" class="text-sm text-muted-foreground">
-              You have already submitted a review for all your projects.
+              {{ isUser
+                ? 'No completed projects available yet. Complete a project first, then you can attach a review to it.'
+                : 'You have already submitted a review for all your projects.' }}
             </p>
           </div>
 
