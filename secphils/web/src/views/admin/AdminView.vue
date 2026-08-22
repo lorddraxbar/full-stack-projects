@@ -704,15 +704,18 @@ const confirmServiceHardDelete = async () => {
     serviceHardDeleteBusy.value = false
   }
 }
+// Mirrors the Users Management row menu: Edit, then state-dependent
+// Archive/Restore, then Delete (always available — active rows delete
+// immediately with the admin's password, archived rows after 7 days).
 const serviceRowActions = (s: ServiceItem): RowAction[] => {
   const actions: RowAction[] = [{ label: 'Edit', onClick: () => openEditService(s) }]
-  actions.push({ divider: true, label: '', onClick: () => {} })
   if (s.isActive) {
     actions.push({ label: 'Archive', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => archiveService(s) })
   } else {
     actions.push({ label: 'Restore', color: 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => restoreService(s) })
-    actions.push({ label: 'Hard Delete', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => openServiceHardDelete(s) })
   }
+  actions.push({ divider: true, label: '', onClick: () => {} })
+  actions.push({ label: 'Delete', color: 'text-red-700 hover:text-red-800 hover:bg-red-50', onClick: () => openServiceHardDelete(s) })
   return actions
 }
 
@@ -1665,24 +1668,27 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
     <div v-if="serviceHardDeleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
         <h3 class="text-lg font-semibold text-gray-900">
-          <i class="fas fa-trash text-red-600 mr-2" />Delete {{ serviceHardDeleteTarget.name }} permanently?
+          <i class="fas fa-triangle-exclamation text-red-600 mr-2" />Delete {{ serviceHardDeleteTarget.name }} permanently?
         </h3>
         <p class="mt-2 text-sm text-gray-600">
           This removes the service from the database and the landing page. This action cannot be undone.
         </p>
         <div v-if="serviceHardDeleteTarget.isActive" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-          This service is currently active. It will be removed from the landing page immediately.
+          This service is still <strong>active</strong> — no 7-day deactivation period applies. Enter your admin password to delete immediately.
         </div>
         <div v-else-if="!isServiceEligibleForHardDelete(serviceHardDeleteTarget)" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
           Deactivated only {{ daysSinceDeactivated(serviceHardDeleteTarget) }} day(s) ago — the 7-day window has not elapsed. Enter your admin password to delete immediately.
         </div>
+        <div v-else class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          Deactivated {{ daysSinceDeactivated(serviceHardDeleteTarget) }} days ago — eligible for permanent deletion.
+        </div>
         <div class="mt-4">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Admin Password</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Your admin password</label>
           <input
             v-model="serviceHardDeletePassword"
             type="password"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="Enter your admin password"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            placeholder="Confirm with your password"
             @keyup.enter="confirmServiceHardDelete"
           />
           <div v-if="serviceHardDeleteError" class="mt-2 text-sm text-red-600">{{ serviceHardDeleteError }}</div>
