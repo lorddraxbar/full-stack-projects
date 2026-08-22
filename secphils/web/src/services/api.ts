@@ -411,7 +411,7 @@ export async function useUpdateService(id: number, data: ServicePayload): Promis
 }
 
 export async function useDeactivateService(id: number): Promise<void> {
-  await api.delete(`/services/${id}`)
+  await api.post(`/services/${id}/deactivate`)
 }
 
 export async function useActivateService(id: number): Promise<ServiceItem> {
