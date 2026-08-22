@@ -206,17 +206,26 @@ async function setStatus(id: number, status: string) {
           </div>
           <p v-if="review.body" class="text-gray-700">{{ review.body }}</p>
           <div v-if="isUser" class="flex gap-2 mt-4">
+            <template v-if="review.status === 'PENDING'">
+              <button
+                @click="setStatus(review.id, 'APPROVED')"
+                class="px-3 py-1.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700"
+              >
+                Approve
+              </button>
+              <button
+                @click="setStatus(review.id, 'REJECTED')"
+                class="px-3 py-1.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700"
+              >
+                Reject
+              </button>
+            </template>
             <button
-              @click="setStatus(review.id, 'APPROVED')"
-              class="px-3 py-1.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700"
+              v-else
+              @click="setStatus(review.id, 'PENDING')"
+              class="px-3 py-1.5 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
             >
-              Approve
-            </button>
-            <button
-              @click="setStatus(review.id, 'REJECTED')"
-              class="px-3 py-1.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700"
-            >
-              Reject
+              Re-open
             </button>
           </div>
         </CardContent>

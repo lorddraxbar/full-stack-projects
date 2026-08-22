@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAdminStats, useGetAuditLogs, useGetReviews, useUpdateReviewStatus, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAdminStats, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 
@@ -348,7 +348,6 @@ onMounted(async () => {
   loadServiceCategories()
   loadDashboard()
   loadAuditLogs()
-  loadReviews()
   loadAnnouncements()
   loadProjects()
   loadDropdowns()
@@ -965,55 +964,6 @@ const renameDropdownValue = async (v: DropdownValueItem) => {
   }
 }
 
-// ---------- Reviews & Ratings ----------
-interface ReviewRow {
-  id: number
-  customer: string
-  project: string
-  rating: number
-  title: string
-  body: string
-  status: 'Pending' | 'Approved' | 'Rejected'
-  approvedDate: string | null
-}
-const reviews = ref<ReviewRow[]>([])
-const reviewsLoading = ref(false)
-const loadReviews = async () => {
-  reviewsLoading.value = true
-  try {
-    const raw = (await useGetReviews()) as any[]
-    reviews.value = (raw || []).map((r) => ({
-      id: Number(r.id),
-      customer: r.customerName || '—',
-      project: r.projectName || '—',
-      rating: Number(r.rating) || 0,
-      title: r.title || '',
-      body: r.body || '',
-      status: (String(r.status || 'PENDING').toLowerCase() as any),
-      approvedDate: (r.status === 'APPROVED' || r.status === 'REJECTED')
-        ? new Date(r.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-        : null,
-    }))
-  } catch {
-    reviews.value = []
-  } finally {
-    reviewsLoading.value = false
-  }
-}
-const setReviewStatus = async (r: ReviewRow, target: 'Approved' | 'Rejected' | 'Pending') => {
-  const prev = r.status
-  r.status = target
-  try {
-    await useUpdateReviewStatus(r.id, target.toUpperCase())
-    r.approvedDate = target === 'Approved'
-      ? new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-      : null
-  } catch (e) {
-    r.status = prev
-    alert('Failed to update review status: ' + ((e as any)?.response?.data?.message || (e as Error).message))
-  }
-}
-
 // ---------- Communication Center ----------
 interface AnnouncementRow {
   id: number
@@ -1223,14 +1173,12 @@ const tabItems = [
   { id: 'company', label: 'Company Settings' },
   { id: 'services', label: 'Service Catalog' },
   { id: 'projectConfig', label: 'Project Config' },
-  { id: 'reviews', label: 'Reviews' },
   { id: 'communications', label: 'Communications' },
   { id: 'system', label: 'System' },
   { id: 'audit', label: 'Audit Logs' },
 ]
 const isActiveTab = (tab: string) => activeTab.value === tab
 
-const starRating = (n: number) => '★'.repeat(n) + '☆'.repeat(5 - n)
 const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLink', 'updateText'].map(v => '{{' + v + '}}')
 
 // Health badge color by status value.
@@ -2193,59 +2141,6 @@ const timeOfDay = (ts: string) => {
       </div>
     </div>
 
-    <!-- ================= REVIEWS ================= -->
-    <div v-if="isActiveTab('reviews')" class="bg-white rounded-lg shadow">
-      <div class="p-6 border-b border-gray-200">
-        <h2 class="text-lg font-semibold text-gray-900">Reviews &amp; Ratings</h2>
-        <p class="text-sm text-gray-600 mt-1">Moderate client reviews before they are published.</p>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rating</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Review</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Approved Date</th>
-              <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200">
-            <tr v-for="review in reviews" :key="review.id" class="hover:bg-gray-50 align-top">
-              <td class="px-6 py-4 font-medium text-gray-900">{{ review.customer }}</td>
-              <td class="px-6 py-4 text-sm text-gray-600">{{ review.project }}</td>
-              <td class="px-6 py-4 text-amber-500 text-sm whitespace-nowrap">{{ starRating(review.rating) }}</td>
-              <td class="px-6 py-4 max-w-xs">
-                <p class="text-sm font-medium text-gray-900">{{ review.title }}</p>
-                <p class="text-sm text-gray-600 mt-1">{{ review.body }}</p>
-              </td>
-              <td class="px-6 py-4">
-                <span :class="[
-                  'px-2 py-1 text-xs font-medium rounded-full',
-                  review.status === 'Approved' ? 'bg-green-100 text-green-800'
-                  : review.status === 'Rejected' ? 'bg-red-100 text-red-800'
-                  : 'bg-yellow-100 text-yellow-800'
-                ]">
-                  {{ review.status }}
-                </span>
-              </td>
-              <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ review.approvedDate || '—' }}</td>
-              <td class="px-3 py-4 text-right whitespace-nowrap">
-                <RowActionsMenu v-if="review.status === 'Pending'" :actions="[
-                  { label: 'Approve', color: 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => setReviewStatus(review, 'Approved') },
-                  { label: 'Reject', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => setReviewStatus(review, 'Rejected') }
-                ]" />
-                <RowActionsMenu v-else :actions="[
-                  { label: 'Re-open', color: 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50', onClick: () => setReviewStatus(review, 'Pending') }
-                ]" />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
 
     <!-- ================= COMMUNICATION CENTER ================= -->
     <div v-if="isActiveTab('communications')" class="space-y-6">
