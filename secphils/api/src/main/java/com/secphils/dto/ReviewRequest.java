@@ -8,5 +8,6 @@ public record ReviewRequest(
         @NotNull Long projectId,
         @NotNull @Min(1) @Max(5) Integer rating,
         String title,
-        String body
+        String body,
+        Long customerUserId
 ) {}

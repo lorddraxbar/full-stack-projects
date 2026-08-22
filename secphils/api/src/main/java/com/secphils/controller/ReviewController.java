@@ -69,8 +69,18 @@ public class ReviewController {
                     throw ApiException.conflict("A review already exists for this project");
                 });
         Review review = new Review();
-        review.setCustomerUser(userRepository.findById(actor.id())
-                .orElseThrow(() -> ApiException.notFound("User")));
+        if (req.customerUserId() != null) {
+            // Staff adding a review manually on behalf of a customer.
+            if (!actor.isUserOrAdmin()) {
+                throw ApiException.forbidden("Only staff can assign a review to another customer");
+            }
+            User customer = userRepository.findById(req.customerUserId())
+                    .orElseThrow(() -> ApiException.notFound("Customer"));
+            review.setCustomerUser(customer);
+        } else {
+            review.setCustomerUser(userRepository.findById(actor.id())
+                    .orElseThrow(() -> ApiException.notFound("User")));
+        }
         review.setProject(project);
         review.setRating(req.rating());
         review.setTitle(req.title());

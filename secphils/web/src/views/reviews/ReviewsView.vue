@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRole } from '@/composables/useRole'
-import { useGetReviews, useSubmitReview, useUpdateReviewStatus, useGetProjects } from '@/services/api'
+import { useGetReviews, useSubmitReview, useUpdateReviewStatus, useGetProjects, useGetUsers } from '@/services/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -33,6 +33,7 @@ const projects = ref<{ id: number; name: string }[]>([])
 const loading = ref(true)
 const error = ref('')
 const selectedStatus = ref('ALL')
+const customers = ref<{ id: number; name: string }[]>([])
 
 const projectById = (id: number) => projects.value.find(p => p.id === id)
 
@@ -51,6 +52,15 @@ async function load() {
     reviews.value = (revRes as Review[]) || []
     const projList = Array.isArray(projRes) ? projRes : ((projRes as any)?.content ?? [])
     projects.value = (projList as { id: number; name: string }[]).map(p => ({ id: p.id, name: p.name }))
+    // Staff can add reviews manually and attribute the testimonial to a real customer.
+    if (isUser.value) {
+      const usersRes = await useGetUsers()
+      const userList = Array.isArray(usersRes) ? usersRes : ((usersRes as any)?.content ?? [])
+      customers.value = (userList as { id: number; fullName: string; role: string }[])
+        .filter(u => u.role === 'CLIENT')
+        .map(u => ({ id: u.id, name: u.fullName }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    }
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } }; message?: string }
     error.value = err.response?.data?.message || err.message || 'Failed to load reviews'
@@ -83,6 +93,7 @@ const showForm = ref(false)
 const stars = [1, 2, 3, 4, 5]
 const form = ref({
   projectId: '' as string,
+  customerUserId: '' as string,
   rating: 0,
   title: '',
   body: '',
@@ -97,7 +108,7 @@ const projectsWithoutReview = computed(() => {
 })
 
 function openForm() {
-  form.value = { projectId: '', rating: 0, title: '', body: '' }
+  form.value = { projectId: '', customerUserId: isUser.value ? 'self' : '', rating: 0, title: '', body: '' }
   saveError.value = ''
   showForm.value = true
 }
@@ -118,12 +129,17 @@ async function submitReview() {
   saving.value = true
   saveError.value = ''
   try {
-    await useSubmitReview({
+    const payload: Record<string, unknown> = {
       projectId: Number(form.value.projectId),
       rating: form.value.rating,
       title: form.value.title.trim(),
       body: form.value.body.trim() || null,
-    })
+    }
+    // Staff can attribute the review to a chosen customer; 'self' (or unset) means the current user.
+    if (isUser.value && form.value.customerUserId && form.value.customerUserId !== 'self') {
+      payload.customerUserId = Number(form.value.customerUserId)
+    }
+    await useSubmitReview(payload)
     showForm.value = false
     await load()
   } catch (e: unknown) {
@@ -155,6 +171,9 @@ async function setStatus(id: number, status: string) {
       </div>
       <Button v-if="isCustomer && projectsWithoutReview.length > 0" @click="openForm">
         + Submit Review
+      </Button>
+      <Button v-if="isUser && projects.length > 0" @click="openForm">
+        + Add Review
       </Button>
     </div>
 
@@ -243,11 +262,33 @@ async function setStatus(id: number, status: string) {
     <Dialog v-model:open="showForm">
       <DialogContent class="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Submit Review</DialogTitle>
+          <DialogTitle>{{ isUser ? 'Add a Review' : 'Submit Review' }}</DialogTitle>
           <DialogDescription>Share your experience with a completed project</DialogDescription>
         </DialogHeader>
 
         <div class="flex-1 overflow-y-auto space-y-6">
+          <div v-if="isUser" class="space-y-2">
+            <Label for="reviewCustomer">Customer</Label>
+            <Select v-model="form.customerUserId">
+              <SelectTrigger id="reviewCustomer">
+                <SelectValue placeholder="Select a customer…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="self">Use my account (signs as you)</SelectItem>
+                  <SelectItem
+                    v-for="c in customers"
+                    :key="c.id"
+                    :value="String(c.id)"
+                  >
+                    {{ c.name }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <p class="text-sm text-muted-foreground">Attribute the testimonial to a customer.</p>
+          </div>
+
           <div class="space-y-2">
             <Label for="reviewProject">Project</Label>
             <Select v-model="form.projectId">
@@ -320,7 +361,7 @@ async function setStatus(id: number, status: string) {
         <DialogFooter>
           <Button variant="outline" @click="showForm = false">Cancel</Button>
           <Button @click="submitReview" :disabled="saving">
-            {{ saving ? 'Submitting…' : 'Submit Review' }}
+            {{ saving ? 'Saving…' : (isUser ? 'Add Review' : 'Submit Review') }}
           </Button>
         </DialogFooter>
       </DialogContent>
