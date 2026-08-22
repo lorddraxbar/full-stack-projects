@@ -16,7 +16,11 @@ public record UserResponse(
         String companyName,
         LocalDateTime deactivatedAt,
         LocalDateTime createdAt,
-        LocalDateTime lastLogin
+        LocalDateTime lastLogin,
+        String phone,
+        String avatar,
+        Boolean twoFactorEnabled,
+        Boolean emailVerified
 ) {
     public static UserResponse from(User u) {
         return from(u, null);
@@ -25,6 +29,7 @@ public record UserResponse(
     public static UserResponse from(User u, String companyName) {
         return new UserResponse(u.getId(), u.getEmail(), u.getFirstName(), u.getLastName(),
                 u.getFullName(), u.getRole(), u.getIsActive(), u.getCompanyId(), companyName,
-                u.getDeactivatedAt(), u.getCreatedAt(), u.getLastLogin());
+                u.getDeactivatedAt(), u.getCreatedAt(), u.getLastLogin(),
+                u.getPhone(), u.getAvatar(), u.getTwoFactorEnabled(), u.getEmailVerified());
     }
 }

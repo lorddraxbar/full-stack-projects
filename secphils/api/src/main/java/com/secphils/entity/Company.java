@@ -67,6 +67,9 @@ public class Company {
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 
+    @Column(name = "contact_details", length = 500)
+    private String contactDetails;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "authorized_rep_user_id")
     private User authorizedRep;

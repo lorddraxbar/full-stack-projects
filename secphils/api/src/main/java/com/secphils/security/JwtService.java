@@ -14,23 +14,30 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-    public enum TokenType { ACCESS, REFRESH }
+    public enum TokenType { ACCESS, REFRESH, PENDING_2FA }
 
     private final SecretKey key;
     private final Duration accessTtl;
     private final Duration refreshTtl;
+    private final Duration pendingTfaTtl;
 
     public JwtService(
             @Value("${app.jwt.secret}") String secret,
             @Value("${app.jwt.access-token-ttl}") Duration accessTtl,
-            @Value("${app.jwt.refresh-token-ttl}") Duration refreshTtl) {
+            @Value("${app.jwt.refresh-token-ttl}") Duration refreshTtl,
+            @Value("${app.jwt.pending-2fa-token-ttl:5m}") Duration pendingTfaTtl) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessTtl = accessTtl;
         this.refreshTtl = refreshTtl;
+        this.pendingTfaTtl = pendingTfaTtl;
     }
 
     public String generate(Long userId, String email, String role, TokenType type) {
-        Duration ttl = type == TokenType.ACCESS ? accessTtl : refreshTtl;
+        Duration ttl = switch (type) {
+            case ACCESS -> accessTtl;
+            case REFRESH -> refreshTtl;
+            case PENDING_2FA -> pendingTfaTtl;
+        };
         Date now = new Date();
         return Jwts.builder()
                 .subject(String.valueOf(userId))

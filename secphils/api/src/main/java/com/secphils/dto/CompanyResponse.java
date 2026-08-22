@@ -24,6 +24,7 @@ public record CompanyResponse(
         String brandPrimary,
         String brandSecondary,
         String logoUrl,
+        String contactDetails,
         Long authorizedRepId,
         String authorizedRepName,
         LocalDateTime createdAt,
@@ -35,7 +36,7 @@ public record CompanyResponse(
                 c.getDescription(), c.getTagline(), c.getIndustrySectors(), c.getHeadquarters(),
                 c.getPhone(), c.getEmail(), c.getWebsite(), c.getSocialLinks(), c.getTaxNumber(),
                 c.getBankingDetails(), c.getOperationalFields(), c.getBrandPrimary(),
-                c.getBrandSecondary(), c.getLogoUrl(),
+                c.getBrandSecondary(), c.getLogoUrl(), c.getContactDetails(),
                 rep != null ? rep.getId() : null,
                 rep != null ? rep.getFullName() : null,
                 c.getCreatedAt(), c.getUpdatedAt());

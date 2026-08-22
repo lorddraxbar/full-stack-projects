@@ -9,5 +9,7 @@ public record UpdateUserRequest(
         String role,
         String password,
         Long companyId,
-        Boolean isActive
+        Boolean isActive,
+        String phone,
+        String avatar
 ) {}

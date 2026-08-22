@@ -3,6 +3,8 @@ package com.secphils.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -48,6 +50,25 @@ public class User {
 
     @Column(name = "password_reset_requested_at")
     private LocalDateTime passwordResetRequestedAt;
+
+    @Column(nullable = false, length = 30)
+    private String phone = "";
+
+    @Column(columnDefinition = "TEXT")
+    private String avatar;
+
+    @Column(name = "two_factor_secret", length = 64)
+    private String twoFactorSecret;
+
+    @Column(name = "two_factor_enabled", nullable = false)
+    private Boolean twoFactorEnabled = false;
+
+    @Column(name = "email_verified", nullable = false)
+    private Boolean emailVerified = false;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "communication_prefs", columnDefinition = "JSONB")
+    private String communicationPrefs;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

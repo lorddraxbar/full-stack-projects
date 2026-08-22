@@ -3,9 +3,16 @@ package com.secphils.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
+/**
+ * Per-user notification preferences, stored per channel as JSONB blobs
+ * ({@code in_app} and {@code email}). Key sets are owned by the Settings UI,
+ * so the schema stays column-free.
+ */
 @Entity
 @Table(name = "notification_preferences")
 @Getter
@@ -16,37 +23,23 @@ public class NotificationPreference {
     @Column(name = "user_id")
     private Long userId;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @MapsId
-    @JoinColumn(name = "user_id")
-    private User user;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "JSONB")
+    private String inApp;
 
-    @Column(name = "task_assigned")
-    private Boolean taskAssigned = true;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "JSONB")
+    private String email;
 
-    @Column(name = "project_created")
-    private Boolean projectCreated = true;
-
-    @Column(name = "new_message")
-    private Boolean newMessage = true;
-
-    @Column(name = "document_request")
-    private Boolean documentRequest = true;
-
-    @Column(name = "review_submitted")
-    private Boolean reviewSubmitted = true;
-
-    @Column(name = "announcement")
-    private Boolean announcement = true;
-
-    @Column(name = "status_change")
-    private Boolean statusChange = true;
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @PrePersist
     void onCreate() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
         if (updatedAt == null) updatedAt = LocalDateTime.now();
     }
 

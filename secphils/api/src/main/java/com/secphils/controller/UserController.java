@@ -40,6 +40,7 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
     private final MailService mailService;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
     private final String inviteBaseUrl;
     private final Duration inviteTtl;
 
@@ -67,6 +68,56 @@ public class UserController {
         return ResponseEntity.ok(UserResponse.from(user, companyName(user)));
     }
 
+    /** Communication settings for the USER-role admin app (stored as jsonb on the user row). */
+    @GetMapping("/me/communication")
+    @Transactional(readOnly = true)
+    public ResponseEntity<Map<String, Object>> myCommunication() {
+        AuthUser me = CurrentUser.require();
+        User user = userRepository.findById(me.id())
+                .orElseThrow(() -> ApiException.notFound("User"));
+        return ResponseEntity.ok(readCommunication(user));
+    }
+
+    @PutMapping("/me/communication")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> updateMyCommunication(
+            @RequestBody Map<String, Object> body, HttpServletRequest http) {
+        AuthUser me = CurrentUser.require();
+        User user = userRepository.findById(me.id())
+                .orElseThrow(() -> ApiException.notFound("User"));
+        Map<String, Object> current = readCommunication(user);
+        current.putAll(body); // partial updates merge over stored values
+        try {
+            user.setCommunicationPrefs(objectMapper.writeValueAsString(current));
+        } catch (Exception e) {
+            throw ApiException.badRequest("Could not serialize communication settings");
+        }
+        userRepository.save(user);
+        auditService.audit(me, "USER_COMMUNICATION_UPDATE", "User", user.getId(), null, http);
+        return ResponseEntity.ok(readCommunication(user));
+    }
+
+    private Map<String, Object> readCommunication(User user) {
+        Map<String, Object> defaults = new java.util.LinkedHashMap<>();
+        defaults.put("emailSignature", true);
+        defaults.put("autoReply", true);
+        defaults.put("autoReplyText", "Thank you for your message. Our team will respond within one business day.");
+        defaults.put("callNotifications", true);
+        defaults.put("messageNotifications", true);
+        defaults.put("quietHours", false);
+        if (user.getCommunicationPrefs() == null || user.getCommunicationPrefs().isBlank()) {
+            return defaults;
+        }
+        try {
+            Map<String, Object> parsed = objectMapper.readValue(user.getCommunicationPrefs(),
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+            defaults.putAll(parsed);
+        } catch (Exception e) {
+            // malformed stored JSON — fall back to defaults
+        }
+        return defaults;
+    }
+
     @PutMapping("/me")
     @Transactional
     public ResponseEntity<UserResponse> updateMe(@Valid @RequestBody UpdateUserRequest req,
@@ -83,11 +134,10 @@ public class UserController {
                     });
             user.setEmail(req.email());
         }
-        if (req.password() != null && !req.password().isBlank()) {
-            user.setPasswordHash(passwordEncoder.encode(req.password()));
-        }
         if (req.firstName() != null && !req.firstName().isBlank()) user.setFirstName(req.firstName());
         if (req.lastName() != null && !req.lastName().isBlank()) user.setLastName(req.lastName());
+        if (req.phone() != null) user.setPhone(req.phone());
+        if (req.avatar() != null) user.setAvatar(req.avatar());
         // Self may link/unlink their own company (used by the Company Settings tab).
         if (req.companyId() != null) {
             if (companyRepository.findById(req.companyId()).isEmpty()) {

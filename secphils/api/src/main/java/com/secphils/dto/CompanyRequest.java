@@ -20,5 +20,6 @@ public record CompanyRequest(
         String brandPrimary,
         String brandSecondary,
         String logoUrl,
+        String contactDetails,
         Long authorizedRepId
 ) {}

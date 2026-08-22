@@ -37,7 +37,47 @@ export { api }
 // ---------- Auth ----------
 export async function useLogin(credentials: { email: string; password: string }) {
   const response = await api.post('/auth/login', credentials)
-  return response.data
+  return response.data as LoginResult
+}
+
+export interface LoginResult {
+  requires2fa?: boolean
+  pendingToken?: string | null
+  accessToken?: string | null
+  refreshToken?: string | null
+  tokenType?: string | null
+  expiresIn?: number | null
+  user?: {
+    id: number
+    role: string
+    fullName: string
+    twoFactorEnabled?: boolean
+  } | null
+}
+
+export async function useVerify2faLogin(pendingToken: string, code: string) {
+  const response = await api.post('/auth/2fa/verify', { pendingToken, code })
+  return response.data as LoginResult
+}
+
+export async function useEnable2fa() {
+  const response = await api.post('/auth/2fa/enable')
+  return response.data as { secret: string; otpauthUri: string }
+}
+
+export async function useVerify2faEnable(secret: string, code: string) {
+  const response = await api.post('/auth/2fa/verify-enable', { secret, code })
+  return response.data as { enabled: string }
+}
+
+export async function useDisable2fa(code: string) {
+  const response = await api.post('/auth/2fa/disable', { code })
+  return response.data as { disabled: string }
+}
+
+export async function useChangePassword(currentPassword: string, newPassword: string) {
+  const response = await api.post('/auth/change-password', { currentPassword, newPassword })
+  return response.data as { message: string }
 }
 
 export async function useSSOCallback(provider: string, identity: { email: string; firstName: string; lastName: string }) {
@@ -135,6 +175,35 @@ export async function useRemoveProjectTeamMember(projectId: number, userId: numb
 // ---------- Companies ----------
 export async function useGetCompanies() {
   const response = await api.get('/companies')
+  return response.data
+}
+
+export async function useGetMyCompany() {
+  const response = await api.get('/companies/me')
+  return response.data
+}
+
+export async function useUpdateMyCompany(data: Record<string, unknown>) {
+  const response = await api.put('/companies/me', data)
+  return response.data
+}
+
+export interface CompanyTeamMember {
+  id: number
+  name: string
+  email: string
+  role: string
+  status: string
+  lastLogin?: string | null
+}
+
+export async function useGetCompanyTeam() {
+  const response = await api.get('/companies/me/team')
+  return response.data as CompanyTeamMember[]
+}
+
+export async function useInviteTeamMember(data: { name: string; email: string; role?: string }) {
+  const response = await api.post('/companies/me/team/invite', data)
   return response.data
 }
 
@@ -287,6 +356,40 @@ export async function useMarkNotificationRead(id: number) {
 export async function useMarkAllNotificationsRead() {
   const response = await api.patch('/notifications/read-all')
   return response.data
+}
+
+export interface NotificationPreferences {
+  email: Record<string, boolean>
+  inApp: Record<string, boolean>
+}
+
+export async function useGetNotificationPreferences() {
+  const response = await api.get('/notifications/preferences')
+  return response.data as NotificationPreferences
+}
+
+export async function useUpdateNotificationPreferences(data: Partial<NotificationPreferences>) {
+  const response = await api.put('/notifications/preferences', data)
+  return response.data as NotificationPreferences
+}
+
+export interface CommunicationSettings {
+  emailSignature: boolean
+  autoReply: boolean
+  autoReplyText: string
+  callNotifications: boolean
+  messageNotifications: boolean
+  quietHours: boolean
+}
+
+export async function useGetCommunicationSettings() {
+  const response = await api.get('/users/me/communication')
+  return response.data as CommunicationSettings
+}
+
+export async function useUpdateCommunicationSettings(data: Partial<CommunicationSettings>) {
+  const response = await api.put('/users/me/communication', data)
+  return response.data as CommunicationSettings
 }
 
 // ---------- Admin ----------

@@ -1,5 +1,7 @@
 package com.secphils.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.secphils.common.AuditService;
 import com.secphils.common.ApiException;
 import com.secphils.dto.NotificationResponse;
@@ -13,7 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +27,22 @@ public class NotificationController {
     private final NotificationRepository notificationRepository;
     private final NotificationPreferenceRepository preferenceRepository;
     private final AuditService auditService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private static final Map<String, Boolean> DEFAULT_EMAIL = new LinkedHashMap<>();
+    private static final Map<String, Boolean> DEFAULT_IN_APP = new LinkedHashMap<>();
+    static {
+        // Keys owned by the Settings UI (email-handles panel).
+        for (String k : new String[]{"projectCreated", "newMessage", "projectUpdate",
+                "documentUploaded", "documentRequested", "taskAssigned", "taskStatusChanged",
+                "projectStatusChanged", "announcement", "teamInvitation"}) {
+            DEFAULT_EMAIL.put(k, true);
+        }
+        for (String k : new String[]{"newMessage", "documentUploaded", "taskAssigned",
+                "projectStatusChanged", "announcement"}) {
+            DEFAULT_IN_APP.put(k, true);
+        }
+    }
 
     public NotificationController(NotificationRepository notificationRepository,
                                   NotificationPreferenceRepository preferenceRepository,
@@ -73,50 +91,65 @@ public class NotificationController {
 
     @GetMapping("/preferences")
     @Transactional(readOnly = true)
-    public ResponseEntity<Map<String, Object>> getPreferences() {
+    public ResponseEntity<Map<String, Map<String, Boolean>>> getPreferences() {
         AuthUser me = CurrentUser.require();
-        NotificationPreference pref = preferenceRepository.findByUserId(me.id()).orElseGet(() -> {
-            NotificationPreference p = new NotificationPreference();
-            p.setUserId(me.id());
-            return p;
-        });
+        NotificationPreference pref = preferenceRepository.findByUserId(me.id()).orElse(null);
         return ResponseEntity.ok(Map.of(
-                "taskAssigned", pref.getTaskAssigned(),
-                "projectCreated", pref.getProjectCreated(),
-                "newMessage", pref.getNewMessage(),
-                "documentRequest", pref.getDocumentRequest(),
-                "reviewSubmitted", pref.getReviewSubmitted(),
-                "announcement", pref.getAnnouncement(),
-                "statusChange", pref.getStatusChange()));
+                "email", merged(DEFAULT_EMAIL, pref == null ? null : pref.getEmail()),
+                "inApp", merged(DEFAULT_IN_APP, pref == null ? null : pref.getInApp())));
     }
 
     @PutMapping("/preferences")
     @Transactional
-    public ResponseEntity<Map<String, Object>> updatePreferences(@RequestBody Map<String, Boolean> body,
-                                                                 HttpServletRequest http) {
+    public ResponseEntity<Map<String, Map<String, Boolean>>> updatePreferences(
+            @RequestBody Map<String, Map<String, Boolean>> body, HttpServletRequest http) {
         AuthUser me = CurrentUser.require();
+        Map<String, Boolean> email = body.get("email");
+        Map<String, Boolean> inApp = body.get("inApp");
+        if (email == null && inApp == null) {
+            throw ApiException.badRequest("Provide an 'email' and/or 'inApp' preferences object");
+        }
         NotificationPreference pref = preferenceRepository.findByUserId(me.id()).orElseGet(() -> {
             NotificationPreference p = new NotificationPreference();
             p.setUserId(me.id());
             return p;
         });
-        if (body.containsKey("taskAssigned")) pref.setTaskAssigned(body.get("taskAssigned"));
-        if (body.containsKey("projectCreated")) pref.setProjectCreated(body.get("projectCreated"));
-        if (body.containsKey("newMessage")) pref.setNewMessage(body.get("newMessage"));
-        if (body.containsKey("documentRequest")) pref.setDocumentRequest(body.get("documentRequest"));
-        if (body.containsKey("reviewSubmitted")) pref.setReviewSubmitted(body.get("reviewSubmitted"));
-        if (body.containsKey("announcement")) pref.setAnnouncement(body.get("announcement"));
-        if (body.containsKey("statusChange")) pref.setStatusChange(body.get("statusChange"));
-        pref.setUpdatedAt(LocalDateTime.now());
+        if (email != null) pref.setEmail(writeJson(mergeMaps(DEFAULT_EMAIL, email)));
+        if (inApp != null) pref.setInApp(writeJson(mergeMaps(DEFAULT_IN_APP, inApp)));
         preferenceRepository.save(pref);
         auditService.audit(me, "NOTIFICATION_PREF_UPDATE", "NotificationPreference", me.id(), null, http);
         return ResponseEntity.ok(Map.of(
-                "taskAssigned", pref.getTaskAssigned(),
-                "projectCreated", pref.getProjectCreated(),
-                "newMessage", pref.getNewMessage(),
-                "documentRequest", pref.getDocumentRequest(),
-                "reviewSubmitted", pref.getReviewSubmitted(),
-                "announcement", pref.getAnnouncement(),
-                "statusChange", pref.getStatusChange()));
+                "email", readJson(pref.getEmail(), DEFAULT_EMAIL),
+                "inApp", readJson(pref.getInApp(), DEFAULT_IN_APP)));
+    }
+
+    private Map<String, Boolean> merged(Map<String, Boolean> defaults, String storedJson) {
+        Map<String, Boolean> result = new LinkedHashMap<>(defaults);
+        if (storedJson != null) {
+            try {
+                result.putAll(objectMapper.readValue(storedJson, new TypeReference<Map<String, Boolean>>() {}));
+            } catch (Exception e) {
+                // malformed stored JSON — fall back to defaults
+            }
+        }
+        return result;
+    }
+
+    private Map<String, Boolean> mergeMaps(Map<String, Boolean> defaults, Map<String, Boolean> incoming) {
+        Map<String, Boolean> result = new LinkedHashMap<>(defaults);
+        if (incoming != null) result.putAll(incoming);
+        return result;
+    }
+
+    private Map<String, Boolean> readJson(String json, Map<String, Boolean> defaults) {
+        return merged(defaults, json);
+    }
+
+    private String writeJson(Map<String, Boolean> map) {
+        try {
+            return objectMapper.writeValueAsString(map);
+        } catch (Exception e) {
+            throw ApiException.badRequest("Could not serialize notification preferences");
+        }
     }
 }
