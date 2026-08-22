@@ -2,12 +2,8 @@ package com.secphils.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
-public record ServiceRequest(
+public record ServiceCategoryRequest(
         @NotBlank String name,
-        String description,
-        String category,
-        Long categoryId,
-        Boolean isActive,
         String icon,
         Integer sortOrder
 ) {}

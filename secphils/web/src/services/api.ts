@@ -348,6 +348,7 @@ export interface LandingService {
   name: string
   description?: string
   category?: string
+  categoryIcon?: string
   icon?: string
   sortOrder?: number
 }
@@ -376,9 +377,11 @@ export interface ServiceItem {
   name: string
   description?: string
   category?: string
+  categoryId?: number | null
   isActive?: boolean
   icon?: string
   sortOrder?: number
+  deactivatedAt?: string | null
   createdAt?: string
 }
 
@@ -386,6 +389,7 @@ export interface ServicePayload {
   name: string
   description?: string
   category?: string
+  categoryId?: number | null
   isActive?: boolean
   icon?: string
   sortOrder?: number
@@ -413,4 +417,43 @@ export async function useDeactivateService(id: number): Promise<void> {
 export async function useActivateService(id: number): Promise<ServiceItem> {
   const response = await api.post(`/services/${id}/activate`)
   return response.data
+}
+
+export async function useHardDeleteService(id: number, password: string): Promise<void> {
+  await api.delete(`/services/${id}/hard`, { data: { password } })
+}
+
+// ---------- Service Categories (admin) ----------
+export interface ServiceCategoryItem {
+  id: number
+  name: string
+  icon?: string
+  sortOrder?: number
+  serviceCount?: number
+  createdAt?: string
+}
+
+export interface ServiceCategoryPayload {
+  name: string
+  icon?: string
+  sortOrder?: number
+}
+
+export async function useGetServiceCategories(): Promise<ServiceCategoryItem[]> {
+  const response = await api.get('/service-categories')
+  return response.data
+}
+
+export async function useCreateServiceCategory(data: ServiceCategoryPayload): Promise<ServiceCategoryItem> {
+  const response = await api.post('/service-categories', data)
+  return response.data
+}
+
+export async function useUpdateServiceCategory(id: number, data: ServiceCategoryPayload): Promise<ServiceCategoryItem> {
+  const response = await api.put(`/service-categories/${id}`, data)
+  return response.data
+}
+
+export async function useDeleteServiceCategory(id: number): Promise<void> {
+  await api.delete(`/service-categories/${id}`)
 }

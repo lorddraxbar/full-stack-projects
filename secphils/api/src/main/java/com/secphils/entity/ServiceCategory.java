@@ -7,36 +7,23 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "services")
+@Table(name = "service_categories")
 @Getter
 @Setter
-public class Service {
+public class ServiceCategory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false, length = 100, unique = true)
     private String name;
 
-    @Column(columnDefinition = "TEXT")
-    private String description;
-
-    @ManyToOne(fetch = FetchType.EAGER, optional = true)
-    @JoinColumn(name = "category_id")
-    private ServiceCategory category;
-
-    @Column(length = 255)
+    @Column(nullable = false, length = 255)
     private String icon = "fa-solid fa-briefcase";
 
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder = 0;
-
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
-
-    @Column(name = "deactivated_at")
-    private LocalDateTime deactivatedAt;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

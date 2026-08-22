@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, type ServiceItem, type ServicePayload } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 
@@ -290,6 +290,7 @@ onMounted(async () => {
   loadProviderCompanyProfile()
   loadRoles()
   loadServices()
+  loadServiceCategories()
 })
 
 // ---------- Company Settings: Company Profile ----------
@@ -565,8 +566,10 @@ const services = ref<ServiceItem[]>([])
 const serviceListLoaded = ref(false)
 const serviceListError = ref('')
 
-// Service categories map to the "Our Services" tabs on the landing page.
-const serviceCategories = ref(['ECC', 'CNC', 'Other Services'])
+// Service categories are first-class records (service_categories table). Their
+// names/icons/order drive the "Our Services" tabs on the landing page.
+const serviceCategories = ref<ServiceCategoryItem[]>([])
+const categoryListError = ref('')
 
 const loadServices = async () => {
   serviceListError.value = ''
@@ -578,16 +581,32 @@ const loadServices = async () => {
     serviceListLoaded.value = true
   }
 }
+const loadServiceCategories = async () => {
+  categoryListError.value = ''
+  try {
+    serviceCategories.value = await useGetServiceCategories()
+  } catch (err: any) {
+    categoryListError.value = err.response?.data?.message || 'Failed to load service categories'
+  }
+}
 
+// Service form
+interface ServiceFormState {
+  name: string
+  description: string
+  categoryId: number | null
+  icon: string
+  sortOrder: number
+}
 const showServiceForm = ref(false)
 const editingService = ref<ServiceItem | null>(null)
-const serviceForm = ref<ServicePayload>({ name: '', description: '', category: 'ECC', icon: 'fa-solid fa-briefcase', sortOrder: 0 })
+const serviceForm = ref<ServiceFormState>({ name: '', description: '', categoryId: null, icon: 'fa-solid fa-briefcase', sortOrder: 0 })
 const serviceFormMessage = ref<{ ok: boolean; text: string } | null>(null)
 const serviceFormSaving = ref(false)
 
 const openAddService = () => {
   editingService.value = null
-  serviceForm.value = { name: '', description: '', category: 'ECC', icon: 'fa-solid fa-briefcase', sortOrder: 0 }
+  serviceForm.value = { name: '', description: '', categoryId: serviceCategories.value[0]?.id ?? null, icon: 'fa-solid fa-briefcase', sortOrder: 0 }
   serviceFormMessage.value = null
   showServiceForm.value = true
 }
@@ -596,7 +615,7 @@ const openEditService = (s: ServiceItem) => {
   serviceForm.value = {
     name: s.name,
     description: s.description || '',
-    category: s.category || 'ECC',
+    categoryId: s.categoryId ?? null,
     icon: s.icon || 'fa-solid fa-briefcase',
     sortOrder: s.sortOrder ?? 0,
   }
@@ -617,7 +636,7 @@ const saveService = async () => {
     const payload: ServicePayload = {
       name: f.name.trim(),
       description: (f.description || '').trim(),
-      category: f.category,
+      categoryId: f.categoryId ?? undefined,
       icon: f.icon || undefined,
       sortOrder: f.sortOrder ?? 0,
     }
@@ -652,6 +671,39 @@ const restoreService = async (s: ServiceItem) => {
     alert(err.response?.data?.message || 'Failed to restore service')
   }
 }
+
+// Hard delete — mirrors the Users Management flow: available after the 7-day
+// deactivation window, or immediately with a password-confirmed prompt.
+const serviceHardDeleteTarget = ref<ServiceItem | null>(null)
+const serviceHardDeletePassword = ref('')
+const serviceHardDeleteBusy = ref(false)
+const serviceHardDeleteError = ref('')
+const daysSinceDeactivated = (s: ServiceItem) => {
+  if (!s.deactivatedAt) return 0
+  return Math.floor((Date.now() - new Date(s.deactivatedAt).getTime()) / 86400000)
+}
+const isServiceEligibleForHardDelete = (s: ServiceItem) => s.deactivatedAt != null && daysSinceDeactivated(s) >= 7
+const openServiceHardDelete = (s: ServiceItem) => {
+  serviceHardDeleteTarget.value = s
+  serviceHardDeletePassword.value = ''
+  serviceHardDeleteError.value = ''
+}
+const confirmServiceHardDelete = async () => {
+  const s = serviceHardDeleteTarget.value
+  if (!s) return
+  serviceHardDeleteBusy.value = true
+  serviceHardDeleteError.value = ''
+  try {
+    await useHardDeleteService(s.id, serviceHardDeletePassword.value)
+    serviceHardDeleteTarget.value = null
+    await loadServices()
+    await loadServiceCategories()
+  } catch (err: any) {
+    serviceHardDeleteError.value = err.response?.data?.message || 'Failed to delete service'
+  } finally {
+    serviceHardDeleteBusy.value = false
+  }
+}
 const serviceRowActions = (s: ServiceItem): RowAction[] => {
   const actions: RowAction[] = [{ label: 'Edit', onClick: () => openEditService(s) }]
   actions.push({ divider: true, label: '', onClick: () => {} })
@@ -659,7 +711,91 @@ const serviceRowActions = (s: ServiceItem): RowAction[] => {
     actions.push({ label: 'Archive', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => archiveService(s) })
   } else {
     actions.push({ label: 'Restore', color: 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => restoreService(s) })
+    actions.push({ label: 'Hard Delete', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => openServiceHardDelete(s) })
   }
+  return actions
+}
+
+// ---------- Service Categories (admin-managed) ----------
+interface CategoryFormState {
+  name: string
+  icon: string
+  sortOrder: number
+}
+const showCategoryForm = ref(false)
+const editingCategory = ref<ServiceCategoryItem | null>(null)
+const categoryForm = ref<CategoryFormState>({ name: '', icon: 'fa-solid fa-briefcase', sortOrder: 0 })
+const categoryFormMessage = ref<{ ok: boolean; text: string } | null>(null)
+const categoryFormSaving = ref(false)
+const categoryDeleteTarget = ref<ServiceCategoryItem | null>(null)
+
+const openAddCategory = () => {
+  editingCategory.value = null
+  categoryForm.value = { name: '', icon: 'fa-solid fa-briefcase', sortOrder: (serviceCategories.value.at(-1)?.sortOrder ?? 0) + 1 }
+  categoryFormMessage.value = null
+  showCategoryForm.value = true
+}
+const openEditCategory = (c: ServiceCategoryItem) => {
+  editingCategory.value = c
+  categoryForm.value = { name: c.name, icon: c.icon || 'fa-solid fa-briefcase', sortOrder: c.sortOrder ?? 0 }
+  categoryFormMessage.value = null
+  showCategoryForm.value = true
+}
+const closeCategoryForm = () => {
+  showCategoryForm.value = false
+  editingCategory.value = null
+  categoryFormMessage.value = null
+}
+const saveCategory = async () => {
+  const f = categoryForm.value
+  if (!f.name.trim()) return
+  categoryFormSaving.value = true
+  categoryFormMessage.value = null
+  try {
+    const payload: ServiceCategoryPayload = {
+      name: f.name.trim(),
+      icon: f.icon || undefined,
+      sortOrder: f.sortOrder ?? 0,
+    }
+    if (editingCategory.value) {
+      await useUpdateServiceCategory(editingCategory.value.id, payload)
+    } else {
+      await useCreateServiceCategory(payload)
+    }
+    closeCategoryForm()
+    await loadServiceCategories()
+    await loadServices()
+  } catch (err: any) {
+    categoryFormMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save category' }
+  } finally {
+    categoryFormSaving.value = false
+  }
+}
+const deleteCategory = async () => {
+  const c = categoryDeleteTarget.value
+  if (!c) return
+  try {
+    await useDeleteServiceCategory(c.id)
+    categoryDeleteTarget.value = null
+    await loadServiceCategories()
+  } catch (err: any) {
+    alert(err.response?.data?.message || 'Failed to delete category')
+  }
+}
+const categoryRowActions = (c: ServiceCategoryItem): RowAction[] => {
+  const actions: RowAction[] = [{ label: 'Edit', onClick: () => openEditCategory(c) }]
+  actions.push({ divider: true, label: '', onClick: () => {} })
+  actions.push({
+    label: (c.serviceCount ?? 0) > 0 ? 'Delete (blocked)' : 'Delete',
+    color: 'text-red-600 hover:text-red-700 hover:bg-red-50',
+    onClick: () => {
+      if ((c.serviceCount ?? 0) > 0) {
+        alert(`Cannot delete "${c.name}": it still has ${c.serviceCount} service(s). Move or delete those first.`)
+      } else {
+        categoryDeleteTarget.value = c
+      }
+    },
+  })
   return actions
 }
 
@@ -1368,8 +1504,8 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
               <div class="relative">
-                <select v-model="serviceForm.category" class="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none">
-                  <option v-for="c in serviceCategories" :key="c" :value="c">{{ c }}</option>
+                <select v-model="serviceForm.categoryId" class="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none">
+                  <option v-for="c in serviceCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
                 <i class="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-xs transition-colors pointer-events-none"></i>
               </div>
@@ -1412,6 +1548,185 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
               {{ serviceFormSaving ? 'Saving…' : editingService ? 'Save Changes' : 'Add Service' }}
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Service Categories management -->
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Service Categories</h2>
+            <p class="text-sm text-gray-600 mt-1">These become the tabs in the "Our Services" section on the landing page. Rename a category to rename its tab; each tab can hold multiple services.</p>
+          </div>
+          <button
+            @click="openAddCategory"
+            class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors whitespace-nowrap shrink-0"
+          >
+            + Add Category
+          </button>
+        </div>
+
+        <div v-if="categoryListError" class="p-4 mb-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 mx-5">
+          {{ categoryListError }}
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Landing Tab Icon</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Display Order</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Services</th>
+                <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <tr v-for="cat in serviceCategories" :key="cat.id" class="hover:bg-gray-50">
+                <td class="px-6 py-4">
+                  <div class="font-medium text-gray-900">{{ cat.name }}</div>
+                  <p class="text-xs text-gray-500">Tab: "Our Services → {{ cat.name }}"</p>
+                </td>
+                <td class="px-6 py-4">
+                  <i v-if="cat.icon" :class="cat.icon" class="w-5 text-center text-gray-500"></i>
+                  <span v-else class="text-xs text-gray-400">Default</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-700">{{ cat.sortOrder }}</td>
+                <td class="px-6 py-4">
+                  <span class="px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded">{{ cat.serviceCount }}</span>
+                </td>
+                <td class="px-3 py-4 text-right whitespace-nowrap">
+                  <RowActionsMenu :actions="categoryRowActions(cat)" />
+                </td>
+              </tr>
+              <tr v-if="serviceCategories.length === 0">
+                <td colspan="5" class="px-6 py-10 text-center text-sm text-gray-500">
+                  No service categories yet. Use "+ Add Category" to create the first landing tab.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add / Edit Category modal -->
+    <div v-if="showCategoryForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900">
+          <i class="fas fa-layer-group text-emerald-600 mr-2" />{{ editingCategory ? 'Edit Category' : 'Add Category' }}
+        </h3>
+        <p class="mt-1 text-sm text-gray-500">
+          {{ editingCategory
+            ? 'Renaming updates the landing "Our Services" tab for every service in this category.'
+            : 'Creates a new landing "Our Services" tab. Assign services to it from the Service Catalog.' }}
+        </p>
+        <div class="mt-4 space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Category Name *</label>
+            <input v-model="categoryForm.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="e.g. Environmental Consulting" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Tab Icon (Font Awesome)</label>
+              <input v-model="categoryForm.icon" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="fa-solid fa-leaf" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Display Order</label>
+              <input v-model.number="categoryForm.sortOrder" type="number" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+          </div>
+          <div v-if="categoryFormMessage" :class="[
+            'p-3 rounded-lg text-sm',
+            categoryFormMessage.ok ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
+          ]">
+            {{ categoryFormMessage.text }}
+          </div>
+        </div>
+        <div class="mt-5 flex justify-end gap-3">
+          <button
+            @click="closeCategoryForm"
+            class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            @click="saveCategory"
+            :disabled="categoryFormSaving || !categoryForm.name.trim()"
+            class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ categoryFormSaving ? 'Saving…' : editingCategory ? 'Save Changes' : 'Add Category' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hard delete service modal (mirrors Users Management) -->
+    <div v-if="serviceHardDeleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold text-gray-900">
+          <i class="fas fa-trash text-red-600 mr-2" />Delete {{ serviceHardDeleteTarget.name }} permanently?
+        </h3>
+        <p class="mt-2 text-sm text-gray-600">
+          This removes the service from the database and the landing page. This action cannot be undone.
+        </p>
+        <div v-if="serviceHardDeleteTarget.isActive" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          This service is currently active. It will be removed from the landing page immediately.
+        </div>
+        <div v-else-if="!isServiceEligibleForHardDelete(serviceHardDeleteTarget)" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          Deactivated only {{ daysSinceDeactivated(serviceHardDeleteTarget) }} day(s) ago — the 7-day window has not elapsed. Enter your admin password to delete immediately.
+        </div>
+        <div class="mt-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Admin Password</label>
+          <input
+            v-model="serviceHardDeletePassword"
+            type="password"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            placeholder="Enter your admin password"
+            @keyup.enter="confirmServiceHardDelete"
+          />
+          <div v-if="serviceHardDeleteError" class="mt-2 text-sm text-red-600">{{ serviceHardDeleteError }}</div>
+        </div>
+        <div class="mt-5 flex justify-end gap-3">
+          <button
+            @click="serviceHardDeleteTarget = null"
+            class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            @click="confirmServiceHardDelete"
+            :disabled="serviceHardDeleteBusy || !serviceHardDeletePassword"
+            class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ serviceHardDeleteBusy ? 'Deleting…' : 'Delete Permanently' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete category confirmation modal -->
+    <div v-if="categoryDeleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold text-gray-900">
+          <i class="fas fa-trash text-red-600 mr-2" />Delete "{{ categoryDeleteTarget.name }}"?
+        </h3>
+        <p class="mt-2 text-sm text-gray-600">
+          This category has no services. Deleting it removes its landing tab. This action cannot be undone.
+        </p>
+        <div class="mt-5 flex justify-end gap-3">
+          <button
+            @click="categoryDeleteTarget = null"
+            class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            @click="deleteCategory"
+            class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>

@@ -56,6 +56,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/services", "/api/v1/dropdowns/**").hasAnyRole("ADMIN", "USER")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/services/**", "/api/v1/dropdowns/**").hasAnyRole("ADMIN", "USER")
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/services/**", "/api/v1/dropdowns/**").hasAnyRole("ADMIN", "USER")
+                // service category management is admin-only (categories drive the public landing tabs)
+                .requestMatchers(HttpMethod.POST, "/api/v1/service-categories").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/v1/service-categories/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/service-categories/**").hasRole("ADMIN")
                 // everything else requires authentication
                 .anyRequest().authenticated()
             )

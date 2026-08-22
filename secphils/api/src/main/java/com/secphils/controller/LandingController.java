@@ -199,20 +199,24 @@ public class LandingController {
     }
 
     private List<Map<String, Object>> activeServices() {
-        return serviceRepository.findByIsActiveTrue().stream()
-                .sorted(java.util.Comparator.comparing(com.secphils.entity.Service::getSortOrder,
-                                java.util.Comparator.nullsLast(Integer::compareTo))
+        List<com.secphils.entity.Service> active = serviceRepository.findByIsActiveTrue().stream()
+                .sorted(java.util.Comparator
+                        .comparing((com.secphils.entity.Service s) ->
+                                s.getCategory() != null ? s.getCategory().getSortOrder() : Integer.MAX_VALUE)
+                        .thenComparing(s -> s.getSortOrder() != null ? s.getSortOrder() : Integer.MAX_VALUE)
                         .thenComparing(com.secphils.entity.Service::getName, String.CASE_INSENSITIVE_ORDER))
-                .map(s -> {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("id", s.getId());
-                    m.put("name", s.getName());
-                    m.put("description", s.getDescription());
-                    m.put("category", s.getCategory());
-                    m.put("icon", s.getIcon());
-                    m.put("sortOrder", s.getSortOrder());
-                    return m;
-                }).toList();
+                .toList();
+        return active.stream().map(s -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", s.getId());
+            m.put("name", s.getName());
+            m.put("description", s.getDescription());
+            m.put("category", s.getCategory() != null ? s.getCategory().getName() : null);
+            m.put("categoryIcon", s.getCategory() != null ? s.getCategory().getIcon() : null);
+            m.put("icon", s.getIcon());
+            m.put("sortOrder", s.getSortOrder());
+            return m;
+        }).toList();
     }
 
     private List<Map<String, Object>> approvedReviews() {

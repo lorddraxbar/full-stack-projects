@@ -232,6 +232,13 @@ interface ServiceCategory {
 }
 
 const serviceCategories = computed<ServiceCategory[]>(() => {
+  // The category's own icon drives each landing tab (so renaming/re-iconing a
+  // category in the admin panel updates the tab without touching services).
+  const iconByCategory = new Map<string, string>()
+  for (const s of services.value) {
+    const cat = (s.category || 'Services').trim()
+    if (s.categoryIcon && !iconByCategory.has(cat)) iconByCategory.set(cat, s.categoryIcon)
+  }
   const map = new Map<string, LandingService[]>()
   for (const s of services.value) {
     const cat = (s.category || 'Services').trim()
@@ -241,7 +248,7 @@ const serviceCategories = computed<ServiceCategory[]>(() => {
   return Array.from(map.entries()).map(([label, items]) => ({
     key: label,
     label,
-    icon: items.find(i => i.icon)?.icon || 'fa-solid fa-briefcase',
+    icon: iconByCategory.get(label) || items.find(i => i.icon)?.icon || 'fa-solid fa-briefcase',
     items,
   }))
 })
