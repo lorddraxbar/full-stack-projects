@@ -13,7 +13,7 @@ const allNavItems = [
   { name: 'Documents', path: '/documents', icon: 'fas fa-file-alt', roles: ['CLIENT', 'USER', 'ADMIN'] },
   { name: 'Messages', path: '/messages', icon: 'fas fa-comment-dots', roles: ['CLIENT', 'USER', 'ADMIN'] },
   { name: 'Announcements', path: '/announcements', icon: 'fas fa-bullhorn', roles: ['CLIENT', 'USER', 'ADMIN'] },
-  { name: 'Reviews', path: '/reviews', icon: 'fas fa-star', roles: ['ADMIN'] },
+  { name: 'Reviews', path: '/reviews', icon: 'fas fa-star', roles: ['USER', 'ADMIN'] },
 ]
 
 const navItems = computed(() =>
