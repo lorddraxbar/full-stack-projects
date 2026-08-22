@@ -290,6 +290,22 @@ export async function useMarkAllNotificationsRead() {
 }
 
 // ---------- Admin ----------
+export interface AdminStats {
+  totalClients: number
+  activeProjects: number
+  completedProjects: number
+  totalRevenue: number
+  pendingReviews: number
+  backendStatus: string
+  database?: { status: string; detail?: string }
+  lastSettingsUpdate?: string | null
+}
+
+export async function useGetAdminStats(): Promise<AdminStats> {
+  const response = await api.get('/admin/stats')
+  return response.data
+}
+
 export async function useGetAuditLogs(params?: { action?: string; userId?: number; limit?: number }) {
   const response = await api.get('/admin/audit-logs', { params })
   return response.data
@@ -456,4 +472,57 @@ export async function useUpdateServiceCategory(id: number, data: ServiceCategory
 
 export async function useDeleteServiceCategory(id: number): Promise<void> {
   await api.delete(`/service-categories/${id}`)
+}
+
+// ---------- Dropdowns (Project Config, admin) ----------
+export interface DropdownValueItem {
+  id: number
+  value: string
+  displayLabel: string
+  sortOrder: number
+}
+
+export interface DropdownCategoryItem {
+  id: number
+  name: string
+  description?: string | null
+  values?: DropdownValueItem[]
+}
+
+export async function useGetDropdowns(): Promise<DropdownCategoryItem[]> {
+  const response = await api.get('/dropdowns')
+  return response.data
+}
+
+export async function useGetDropdownValues(categoryId?: number): Promise<DropdownValueItem[]> {
+  const response = await api.get('/dropdowns/values', { params: categoryId ? { categoryId } : {} })
+  return response.data
+}
+
+export async function useCreateDropdownCategory(data: { name: string; description?: string }): Promise<DropdownCategoryItem> {
+  const response = await api.post('/dropdowns', data)
+  return response.data
+}
+
+export async function useUpdateDropdownCategory(id: number, data: { name?: string; description?: string }): Promise<DropdownCategoryItem> {
+  const response = await api.put(`/dropdowns/${id}`, data)
+  return response.data
+}
+
+export async function useDeleteDropdownCategory(id: number): Promise<void> {
+  await api.delete(`/dropdowns/${id}`)
+}
+
+export async function useCreateDropdownValue(data: { categoryId: number; value: string; displayLabel?: string; sortOrder?: number }): Promise<DropdownValueItem> {
+  const response = await api.post('/dropdowns/values', data)
+  return response.data
+}
+
+export async function useUpdateDropdownValue(id: number, data: { value?: string; displayLabel?: string; sortOrder?: number }): Promise<DropdownValueItem> {
+  const response = await api.put(`/dropdowns/values/${id}`, data)
+  return response.data
+}
+
+export async function useDeleteDropdownValue(id: number): Promise<void> {
+  await api.delete(`/dropdowns/values/${id}`)
 }

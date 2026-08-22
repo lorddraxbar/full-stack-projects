@@ -98,4 +98,83 @@ public class DropdownController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(DropdownCategoryResponse.DropdownValueResponse.from(dv));
     }
+
+    @PutMapping("/{categoryId}")
+    @Transactional
+    public ResponseEntity<DropdownCategoryResponse> updateCategory(
+            @PathVariable Long categoryId, @RequestBody Map<String, String> body,
+            HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        DropdownCategory category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> ApiException.notFound("Dropdown category"));
+        if (body.containsKey("name") && body.get("name") != null && !body.get("name").isBlank()) {
+            String name = body.get("name");
+            Long selfId = category.getId();
+            categoryRepository.findByName(name).ifPresent(existing -> {
+                if (!existing.getId().equals(selfId)) {
+                    throw ApiException.conflict("Dropdown category already exists");
+                }
+            });
+            category.setName(name);
+        }
+        if (body.containsKey("description")) category.setDescription(body.get("description"));
+        category = categoryRepository.save(category);
+        auditService.audit(actor, "DROPDOWN_CATEGORY_UPDATE", "DropdownCategory", category.getId(),
+                "Name: " + category.getName(), http);
+        return ResponseEntity.ok(DropdownCategoryResponse.from(category));
+    }
+
+    @DeleteMapping("/{categoryId}")
+    @Transactional
+    public ResponseEntity<Void> deleteCategory(@PathVariable Long categoryId, HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        DropdownCategory category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> ApiException.notFound("Dropdown category"));
+        categoryRepository.delete(category); // cascades to its values
+        auditService.audit(actor, "DROPDOWN_CATEGORY_DELETE", "DropdownCategory", categoryId,
+                "Name: " + category.getName(), http);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/values/{valueId}")
+    @Transactional
+    public ResponseEntity<DropdownCategoryResponse.DropdownValueResponse> updateValue(
+            @PathVariable Long valueId, @RequestBody Map<String, Object> body,
+            HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        DropdownValue dv = valueRepository.findById(valueId)
+                .orElseThrow(() -> ApiException.notFound("Dropdown value"));
+        String value = (String) body.get("value");
+        if (value != null && !value.isBlank()) {
+            Long selfId = dv.getId();
+            Long categoryId = dv.getCategory().getId();
+            valueRepository.findByCategoryIdAndValue(categoryId, value)
+                    .ifPresent(existing -> {
+                        if (!existing.getId().equals(selfId)) {
+                            throw ApiException.conflict("This value already exists in the category");
+                        }
+                    });
+            dv.setValue(value);
+        }
+        if (body.get("displayLabel") != null) dv.setDisplayLabel((String) body.get("displayLabel"));
+        if (body.get("sortOrder") != null) {
+            dv.setSortOrder(Integer.valueOf(String.valueOf(body.get("sortOrder"))));
+        }
+        dv = valueRepository.save(dv);
+        auditService.audit(actor, "DROPDOWN_VALUE_UPDATE", "DropdownValue", dv.getId(),
+                "Category: " + dv.getCategory().getId() + ", value: " + dv.getValue(), http);
+        return ResponseEntity.ok(DropdownCategoryResponse.DropdownValueResponse.from(dv));
+    }
+
+    @DeleteMapping("/values/{valueId}")
+    @Transactional
+    public ResponseEntity<Void> deleteValue(@PathVariable Long valueId, HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        DropdownValue dv = valueRepository.findById(valueId)
+                .orElseThrow(() -> ApiException.notFound("Dropdown value"));
+        valueRepository.delete(dv);
+        auditService.audit(actor, "DROPDOWN_VALUE_DELETE", "DropdownValue", valueId,
+                "Category: " + dv.getCategory().getId() + ", value: " + dv.getValue(), http);
+        return ResponseEntity.noContent().build();
+    }
 }

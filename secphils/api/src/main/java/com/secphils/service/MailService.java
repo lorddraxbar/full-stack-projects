@@ -1,5 +1,9 @@
 package com.secphils.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.secphils.entity.SystemSettings;
+import com.secphils.repository.SystemSettingsRepository;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,10 +24,15 @@ public class MailService {
 
     private final JavaMailSender mailSender;
     private final String fromAddress;
+    private final SystemSettingsRepository settingsRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public MailService(JavaMailSender mailSender, @Value("${spring.mail.from}") String fromAddress) {
+    public MailService(JavaMailSender mailSender,
+                       @Value("${spring.mail.from}") String fromAddress,
+                       SystemSettingsRepository settingsRepository) {
         this.mailSender = mailSender;
         this.fromAddress = fromAddress;
+        this.settingsRepository = settingsRepository;
     }
 
     public void sendHtml(String to, String subject, String htmlBody, String link) {
@@ -52,7 +61,75 @@ public class MailService {
         }
     }
 
+    /**
+     * Invite email. Prefers the admin-editable "Team Invitation" template from
+     * system_settings.email_templates (subject + body with {{placeholders}});
+     * falls back to the built-in branded HTML if the template is absent,
+     * malformed, or empty.
+     */
     public String inviteEmail(String firstName, String fullName, String link) {
+        return renderInvite(firstName, fullName, link, null, null);
+    }
+
+    /**
+     * Invite email with an optional inviter and company name, so the template
+     * can fill {{inviter}} and {{company}}.
+     */
+    public String inviteEmail(String firstName, String fullName, String link, String inviter, String company) {
+        return renderInvite(firstName, fullName, link, inviter, company);
+    }
+
+    private String renderInvite(String firstName, String fullName, String link, String inviter, String company) {
+        JsonNode template = findInviteTemplate();
+        if (template != null) {
+            String body = template.path("body").asText("");
+            if (!body.isBlank()) {
+                String rendered = body
+                        .replace("{{name}}", firstNonBlank(firstName, fullName))
+                        .replace("{{fullName}}", firstNonBlank(fullName, firstName))
+                        .replace("{{inviter}}", inviter != null ? inviter : "A member")
+                        .replace("{{company}}", company != null ? company : "the SECPhils Portal")
+                        .replace("{{setupLink}}", link);
+                // Simple text -> HTML so it reads well in an HTML mailbox.
+                return "<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f4f5f7;"
+                        + "font-family:Arial,Helvetica,sans-serif;color:#1f2937;\">"
+                        + "<div style=\"max-width:560px;margin:32px auto;padding:32px;background:#ffffff;"
+                        + "border-radius:12px;border:1px solid #e5e7eb;\">"
+                        + "<p style=\"font-size:14px;line-height:1.6;\">"
+                        + rendered.replace("\n", "<br>")
+                        + "</p></div></body></html>";
+            }
+        }
+        return defaultInviteEmail(firstName, fullName, link);
+    }
+
+    /** Locate the admin-editable invite template in system_settings.email_templates. */
+    private JsonNode findInviteTemplate() {
+        try {
+            SystemSettings settings = settingsRepository.findAll().stream().findFirst().orElse(null);
+            if (settings == null || settings.getEmailTemplates() == null || settings.getEmailTemplates().isBlank()) {
+                return null;
+            }
+            JsonNode root = objectMapper.readTree(settings.getEmailTemplates());
+            if (root.isArray()) {
+                for (JsonNode node : root) {
+                    String name = node.path("name").asText("");
+                    if (name.equalsIgnoreCase("Team Invitation") || name.equalsIgnoreCase("Invite")) {
+                        return node;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not read email_templates; using default invite email: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    private static String firstNonBlank(String a, String b) {
+        return a != null && !a.isBlank() ? a : (b != null ? b : "");
+    }
+
+    private String defaultInviteEmail(String firstName, String fullName, String link) {
         return """
                 <!DOCTYPE html>
                 <html>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAdminStats, useGetAuditLogs, useGetReviews, useUpdateReviewStatus, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 
@@ -27,21 +27,76 @@ const activeTab = ref('dashboard')
 
 // ---------- Dashboard ----------
 const dashboardStats = ref({
-  totalClients: 24,
-  activeProjects: 18,
-  totalRevenue: 2400000,
-  projectedRevenue: 3200000,
-  backendStatus: 'HEALTHY',
-  databaseStatus: 'HEALTHY',
-  lastBackup: '2026-08-15 02:00:00',
+  totalClients: 0,
+  activeProjects: 0,
+  completedProjects: 0,
+  totalRevenue: 0,
+  pendingReviews: 0,
+  backendStatus: 'UNKNOWN',
+  databaseStatus: 'UNKNOWN',
+  lastBackup: '—',
 })
+const loadDashboard = async () => {
+  try {
+    const s = await useGetAdminStats()
+    dashboardStats.value = {
+      totalClients: s.totalClients ?? 0,
+      activeProjects: s.activeProjects ?? 0,
+      completedProjects: s.completedProjects ?? 0,
+      totalRevenue: s.totalRevenue ?? 0,
+      pendingReviews: s.pendingReviews ?? 0,
+      backendStatus: s.backendStatus || 'UNKNOWN',
+      databaseStatus: s.database?.status || 'UNKNOWN',
+      lastBackup: s.lastSettingsUpdate || '—',
+    }
+  } catch {
+    // leave defaults on error; health is already UNKNOWN
+  }
+}
 
-const auditLogs = ref([
-  { id: 1, timestamp: '2026-08-15 10:30:00', user: 'Jane Smith', action: 'LOGIN', entity: 'USER', details: 'User logged in', ipAddress: '192.168.1.100' },
-  { id: 2, timestamp: '2026-08-15 10:25:00', user: 'John Doe', action: 'CREATE', entity: 'PROJECT', details: 'Created project "Energy Audit"', ipAddress: '192.168.1.101' },
-  { id: 3, timestamp: '2026-08-15 10:20:00', user: 'Jane Smith', action: 'UPDATE', entity: 'DOCUMENT', details: 'Updated document v2.1', ipAddress: '192.168.1.100' },
-  { id: 4, timestamp: '2026-08-15 10:15:00', user: 'Bob Wilson', action: 'DELETE', entity: 'TASK', details: 'Deleted task #45', ipAddress: '192.168.1.102' },
-])
+interface AuditLogRow {
+  id: number
+  timestamp: string
+  user: string
+  action: string
+  entity: string
+  details: string
+  ipAddress: string
+}
+const auditLogs = ref<AuditLogRow[]>([])
+const auditLoading = ref(false)
+const auditSearch = ref('')
+
+// Newest 200 are loaded in one shot; the audit tab filters them client-side
+// (the backend filter is exact-match, which is clunky for free search).
+const loadAuditLogs = async () => {
+  auditLoading.value = true
+  try {
+    const raw = await useGetAuditLogs({ limit: 200 }) as any[]
+    auditLogs.value = (raw || []).map((l) => ({
+      id: Number(l.id),
+      timestamp: String(l.createdAt ?? ''),
+      user: l.userName || l.userId || '—',
+      action: l.action || '—',
+      entity: l.entityType || '—',
+      details: l.details || '',
+      ipAddress: l.ipAddress || '—',
+    }))
+  } catch {
+    auditLogs.value = []
+  } finally {
+    auditLoading.value = false
+  }
+}
+
+const filteredAuditLogs = computed(() => {
+  const q = auditSearch.value.trim().toLowerCase()
+  if (!q) return auditLogs.value
+  return auditLogs.value.filter((l) =>
+    [l.action, l.entity, l.user, l.details, l.ipAddress]
+      .some((f) => String(f).toLowerCase().includes(q))
+  )
+})
 
 // ---------- User Management (real API) ----------
 interface PortalUser {
@@ -291,6 +346,12 @@ onMounted(async () => {
   loadRoles()
   loadServices()
   loadServiceCategories()
+  loadDashboard()
+  loadAuditLogs()
+  loadReviews()
+  loadAnnouncements()
+  loadProjects()
+  loadDropdowns()
 })
 
 // ---------- Company Settings: Company Profile ----------
@@ -803,11 +864,13 @@ const categoryRowActions = (c: ServiceCategoryItem): RowAction[] => {
 }
 
 // ---------- Project Configuration ----------
+// Workflow steps + status config are presentation-only (colors/labels have no
+// persistence endpoint) and stay session-scoped.
 const workflowSteps = ref(['Not Started', 'In Progress', 'On Hold', 'Completed'])
 const newStep = ref('')
 const addWorkflowStep = () => {
   if (!newStep.value.trim()) return
-  workflowSteps.value.push(newStep.value)
+  workflowSteps.value.push(newStep.value.trim())
   newStep.value = ''
 }
 const removeWorkflowStep = (step: string) => {
@@ -821,56 +884,231 @@ const statusConfig = ref([
   { name: 'Completed', color: '#10b981', description: 'All deliverables approved' },
 ])
 
-const dropdownCategories = ref([
-  { name: 'Project Status', values: ['Not Started', 'In Progress', 'On Hold', 'Completed'] },
-  { name: 'Document Category', values: ['Deliverable', 'Client-Submitted', 'Requested'] },
-  { name: 'Announcement Category', values: ['Project Update', 'Company News', 'Maintenance'] },
-  { name: 'Task Status', values: ['To Do', 'In Progress', 'Done'] },
-  { name: 'Priority', values: ['Low', 'Medium', 'High'] },
-  { name: 'Service Category', values: ['Consulting', 'Compliance', 'Research', 'Engineering'] },
-  { name: 'Audience', values: ['Project', 'Company'] },
-])
-const addDropdownValue = (category: (typeof dropdownCategories.value)[0], value: string) => {
-  if (value.trim() && !category.values.includes(value)) {
-    category.values.push(value)
+// Dropdown categories are persisted via /dropdowns (full CRUD).
+const dropdownCategories = ref<DropdownCategoryItem[]>([])
+const dropdownLoading = ref(false)
+const loadDropdowns = async () => {
+  dropdownLoading.value = true
+  try {
+    dropdownCategories.value = await useGetDropdowns()
+  } catch {
+    dropdownCategories.value = []
+  } finally {
+    dropdownLoading.value = false
   }
 }
-const removeDropdownValue = (category: (typeof dropdownCategories.value)[0], value: string) => {
-  category.values = category.values.filter(v => v !== value)
+const newDropdownValues: Record<number, string> = {}
+const addDropdownCategory = (category: DropdownCategoryItem) => {
+  dropdownCategories.value.push(category)
 }
-const newDropdownValues: Record<string, string> = {}
+const newDropdownCategory = ref({ name: '', description: '' })
+const creatingDropdownCategory = ref(false)
+const addNewDropdownCategory = async () => {
+  const name = newDropdownCategory.value.name.trim()
+  if (!name) return
+  creatingDropdownCategory.value = true
+  try {
+    const created = await useCreateDropdownCategory({ name, description: newDropdownCategory.value.description.trim() || undefined })
+    addDropdownCategory(created)
+    newDropdownCategory.value = { name: '', description: '' }
+  } catch (e) {
+    alert('Failed to create category: ' + ((e as any)?.response?.data?.message || (e as Error).message))
+  } finally {
+    creatingDropdownCategory.value = false
+  }
+}
+const removeDropdownCategory = async (category: DropdownCategoryItem) => {
+  try {
+    await useDeleteDropdownCategory(category.id)
+    await loadDropdowns()
+  } catch (e) {
+    alert('Failed to delete category: ' + ((e as any)?.response?.data?.message || (e as Error).message))
+  }
+}
+const addDropdownValue = async (category: DropdownCategoryItem, value: string) => {
+  const v = value.trim()
+  if (!v) return
+  try {
+    await useCreateDropdownValue({ categoryId: category.id, value: v, sortOrder: (category.values?.length ?? 0) })
+    await loadDropdowns()
+  } catch (e) {
+    alert('Failed to add value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
+  }
+}
+const removeDropdownValue = async (_category: DropdownCategoryItem, dv: DropdownValueItem) => {
+  try {
+    await useDeleteDropdownValue(dv.id)
+    await loadDropdowns()
+  } catch (e) {
+    alert('Failed to delete value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
+  }
+}
+// Inline rename (the "Update" half of full CRUD) — no extra UI state.
+const renameDropdownCategory = async (cat: DropdownCategoryItem) => {
+  const name = prompt('Rename category', cat.name)?.trim()
+  if (!name || name === cat.name) return
+  try {
+    await useUpdateDropdownCategory(cat.id, { name })
+    await loadDropdowns()
+  } catch (e) {
+    alert('Failed to rename category: ' + ((e as any)?.response?.data?.message || (e as Error).message))
+  }
+}
+const renameDropdownValue = async (v: DropdownValueItem) => {
+  const value = prompt('Rename value', v.displayLabel || v.value)?.trim()
+  if (!value) return
+  try {
+    await useUpdateDropdownValue(v.id, { value })
+    await loadDropdowns()
+  } catch (e) {
+    alert('Failed to rename value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
+  }
+}
 
 // ---------- Reviews & Ratings ----------
-const reviews = ref([
-  { id: 1, customer: 'ABC Manufacturing', project: 'Energy Audit', rating: 5, title: 'Excellent energy savings', body: 'The audit identified 18% potential savings. Clear reporting and responsive team.', status: 'Approved', approvedDate: '2026-07-28 14:20' },
-  { id: 2, customer: 'Globex Philippines', project: 'Market Research Study', rating: 4, title: 'Solid research, good pacing', body: 'Deliverables were thorough. Slight delay on the mid-point report but recovered well.', status: 'Pending', approvedDate: null },
-  { id: 3, customer: 'Initech Corp', project: 'ISO 9001 Certification', rating: 5, title: 'Passed first audit attempt', body: 'The implementation support was top-notch. We passed the certification audit with zero major nonconformities.', status: 'Pending', approvedDate: null },
-  { id: 4, customer: 'Umbrella Health', project: 'Compliance Review', rating: 2, title: 'Communication gaps', body: 'Final report quality was fine but mid-project communication was lacking.', status: 'Pending', approvedDate: null },
-])
-const setReviewStatus = (r: (typeof reviews.value)[0], status: string) => {
-  r.status = status
-  r.approvedDate = status === 'Approved' ? new Date().toISOString().slice(0, 16).replace('T', ' ') : null
+interface ReviewRow {
+  id: number
+  customer: string
+  project: string
+  rating: number
+  title: string
+  body: string
+  status: 'Pending' | 'Approved' | 'Rejected'
+  approvedDate: string | null
+}
+const reviews = ref<ReviewRow[]>([])
+const reviewsLoading = ref(false)
+const loadReviews = async () => {
+  reviewsLoading.value = true
+  try {
+    const raw = (await useGetReviews()) as any[]
+    reviews.value = (raw || []).map((r) => ({
+      id: Number(r.id),
+      customer: r.customerName || '—',
+      project: r.projectName || '—',
+      rating: Number(r.rating) || 0,
+      title: r.title || '',
+      body: r.body || '',
+      status: (String(r.status || 'PENDING').toLowerCase() as any),
+      approvedDate: (r.status === 'APPROVED' || r.status === 'REJECTED')
+        ? new Date(r.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+        : null,
+    }))
+  } catch {
+    reviews.value = []
+  } finally {
+    reviewsLoading.value = false
+  }
+}
+const setReviewStatus = async (r: ReviewRow, target: 'Approved' | 'Rejected' | 'Pending') => {
+  const prev = r.status
+  r.status = target
+  try {
+    await useUpdateReviewStatus(r.id, target.toUpperCase())
+    r.approvedDate = target === 'Approved'
+      ? new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+      : null
+  } catch (e) {
+    r.status = prev
+    alert('Failed to update review status: ' + ((e as any)?.response?.data?.message || (e as Error).message))
+  }
 }
 
 // ---------- Communication Center ----------
-const announcementForm = ref({ title: '', body: '', audience: 'Company' })
-const communicationLogs = ref([
-  { id: 1, title: 'Quarterly maintenance window', audience: 'Company', date: '2026-08-10', author: 'Jane Smith', channel: 'Email + In-App' },
-  { id: 2, title: 'Energy Audit kickoff confirmed', audience: 'Project: Energy Audit', date: '2026-08-05', author: 'John Doe', channel: 'In-App' },
-  { id: 3, title: 'New document retention policy', audience: 'Company', date: '2026-07-22', author: 'Jane Smith', channel: 'Email' },
-])
-const publishAnnouncement = () => {
-  if (!announcementForm.value.title.trim() || !announcementForm.value.body.trim()) return
-  communicationLogs.value.unshift({
-    id: Date.now(),
-    title: announcementForm.value.title,
-    audience: announcementForm.value.audience,
-    date: new Date().toISOString().slice(0, 10),
-    author: 'You',
-    channel: 'Email + In-App',
-  })
-  announcementForm.value = { title: '', body: '', audience: 'Company' }
-  alert('Announcement published.')
+interface AnnouncementRow {
+  id: number
+  title: string
+  audience: string
+  date: string
+  author: string
+  channel: string
+  category: string
+  isPublished: boolean
+  projectId: number | null
+}
+const announcementForm = ref({ title: '', body: '', audience: 'COMPANY', category: 'PROJECT_UPDATE', projectId: null as number | null })
+const publishing = ref(false)
+const communicationLogs = ref<AnnouncementRow[]>([])
+const communicationLoading = ref(false)
+const projectOptions = ref<{ id: number; name: string }[]>([])
+
+const fmtAnnDate = (s: string | null | undefined) => {
+  if (!s) return '—'
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? String(s).slice(0, 10)
+    : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+const audienceDisplay = (a: string | null | undefined) => {
+  if (a === 'COMPANY') return 'Company'
+  if (a === 'PROJECT') return 'Project'
+  return a || 'Company'
+}
+
+const loadProjects = async () => {
+  try {
+    const data = (await useGetProjects()) as any[]
+    projectOptions.value = (data || []).map((p) => ({ id: Number(p.id), name: p.name || `Project #${p.id}` }))
+  } catch {
+    projectOptions.value = []
+  }
+}
+
+const loadAnnouncements = async () => {
+  communicationLoading.value = true
+  try {
+    const raw = (await useGetAnnouncements()) as any[]
+    communicationLogs.value = (raw || []).map((a) => ({
+      id: Number(a.id),
+      title: a.title || '',
+      audience: a.audience || 'COMPANY',
+      date: fmtAnnDate(a.createdAt),
+      author: a.createdByName || '—',
+      channel: a.isPublished === false ? 'Draft' : 'Email + In-App',
+      category: a.category || '',
+      isPublished: a.isPublished !== false,
+      projectId: a.projectId ? Number(a.projectId) : null,
+    })).sort((x, y) => y.id - x.id)
+  } catch {
+    communicationLogs.value = []
+  } finally {
+    communicationLoading.value = false
+  }
+}
+
+const publishAnnouncement = async () => {
+  const { title, body, audience, category, projectId } = announcementForm.value
+  if (!title.trim() || !body.trim()) return
+  if (audience === 'PROJECT' && !projectId) {
+    alert('Please select a project for a project announcement.')
+    return
+  }
+  publishing.value = true
+  try {
+    await useCreateAnnouncement({
+      title: title.trim(),
+      body: body.trim(),
+      audience,
+      category,
+      ...(audience === 'PROJECT' ? { projectId } : {}),
+      isPublished: true,
+    })
+    announcementForm.value = { title: '', body: '', audience: 'COMPANY', category: 'PROJECT_UPDATE', projectId: null }
+    await loadAnnouncements()
+  } catch (e) {
+    alert('Failed to publish announcement: ' + ((e as any)?.response?.data?.message || (e as Error).message))
+  } finally {
+    publishing.value = false
+  }
+}
+
+const deleteAnnouncement = async (log: AnnouncementRow) => {
+  if (!confirm(`Delete announcement "${log.title}"? This cannot be undone.`)) return
+  try {
+    await useDeleteAnnouncement(log.id)
+    await loadAnnouncements()
+  } catch (e) {
+    alert('Failed to delete announcement: ' + ((e as any)?.response?.data?.message || (e as Error).message))
+  }
 }
 
 // ---------- System Settings (real API) ----------
@@ -886,47 +1124,96 @@ const systemSettings = ref({
   },
 })
 const systemSettingsMessage = ref<{ ok: boolean; text: string } | null>(null)
+const integrationsMessage = ref<{ ok: boolean; text: string } | null>(null)
+
+// The three JSONB columns are stored in the DB as serialized JSON strings and
+// returned verbatim by GET /admin/settings. Parse defensively on load,
+// serialize back on save.
+const parseJson = <T>(raw: unknown, fallback: T): T => {
+  if (typeof raw === 'string' && raw.trim()) {
+    try { return JSON.parse(raw) as T } catch { return fallback }
+  }
+  return fallback
+}
 
 const loadSystemSettings = async () => {
   try {
-    const data = await useGetSystemSettings()
-    if (data) {
-      systemSettings.value.portalName = data.portalName ?? systemSettings.value.portalName
-      systemSettings.value.maintenanceMode = !!data.maintenanceMode
-      systemSettings.value.inviteBaseUrl = data.inviteBaseUrl ?? ''
-    }
+    const data: any = await useGetSystemSettings()
+    if (!data) return
+    systemSettings.value.portalName = data.portalName ?? systemSettings.value.portalName
+    systemSettings.value.maintenanceMode = !!data.maintenanceMode
+    systemSettings.value.inviteBaseUrl = data.inviteBaseUrl ?? ''
+    systemSettings.value.securityPolicies = parseJson<any>(data.securityPolicies, systemSettings.value.securityPolicies)
+    emailTemplates.value = parseJson<any[]>(data.emailTemplates, DEFAULT_EMAIL_TEMPLATES.map(t => ({ ...t })))
+    integrations.value = parseJson<any[]>(data.integrations, DEFAULT_INTEGRATIONS.map(t => ({ ...t })))
   } catch {
     // keep defaults if the settings endpoint is unavailable
   }
 }
 
-const saveSystemSettings = async () => {
+const saveGeneralSettings = async () => {
   systemSettingsMessage.value = null
   try {
     await useUpdateSystemSettings({
       portalName: systemSettings.value.portalName,
       maintenanceMode: systemSettings.value.maintenanceMode,
       inviteBaseUrl: systemSettings.value.inviteBaseUrl.trim(),
+      securityPolicies: JSON.stringify(systemSettings.value.securityPolicies),
     })
     systemSettingsMessage.value = { ok: true, text: 'System settings saved.' }
   } catch (err: any) {
     systemSettingsMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save settings' }
   }
 }
-const emailTemplates = ref([
+
+const saveEmailTemplates = async () => {
+  systemSettingsMessage.value = null
+  try {
+    await useUpdateSystemSettings({ emailTemplates: JSON.stringify(emailTemplates.value) })
+    systemSettingsMessage.value = { ok: true, text: 'Email templates saved.' }
+  } catch (err: any) {
+    systemSettingsMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save email templates' }
+  }
+}
+
+const saveIntegrations = async () => {
+  integrationsMessage.value = null
+  try {
+    await useUpdateSystemSettings({ integrations: JSON.stringify(integrations.value) })
+    integrationsMessage.value = { ok: true, text: 'Integrations saved.' }
+  } catch (err: any) {
+    integrationsMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save integrations' }
+  }
+}
+
+const DEFAULT_EMAIL_TEMPLATES = [
   { id: 1, name: 'Welcome Email', subject: 'Welcome to the SECPhils Portal', body: 'Hi {{name}},\n\nYour account is ready. Sign in to view your assigned projects.\n\n— SECPhils Team' },
   { id: 2, name: 'Team Invitation', subject: 'You have been invited to {{company}}', body: 'Hi {{name}},\n\n{{inviter}} has invited you to join {{company}} on the SECPhils Portal.\n\nSetup link: {{setupLink}}\n\n— SECPhils Team' },
   { id: 3, name: 'Project Update', subject: 'Update on {{project}}', body: 'Hi {{name}},\n\nNew update on {{project}}: {{updateText}}\n\n— SECPhils Team' },
-])
-const integrations = ref([
+]
+const DEFAULT_INTEGRATIONS = [
   { id: 1, name: 'Gmail / Google Workspace', type: 'Email', status: 'Connected', detail: 'notifications@secphils.com' },
   { id: 2, name: 'Slack', type: 'Notifications', status: 'Disconnected', detail: '—' },
   { id: 3, name: 'Microsoft Teams', type: 'Notifications', status: 'Disconnected', detail: '—' },
   { id: 4, name: 'DocuSign', type: 'Documents', status: 'Connected', detail: 'secphils@docusign.net' },
-])
-const toggleIntegration = (i: (typeof integrations.value)[0]) => {
+]
+const emailTemplates = ref<any[]>(DEFAULT_EMAIL_TEMPLATES.map(t => ({ ...t })))
+const integrations = ref<any[]>(DEFAULT_INTEGRATIONS.map(t => ({ ...t })))
+
+// Optimistic toggle + immediate persist; rolls back on failure.
+const toggleIntegration = async (i: (typeof integrations.value)[0]) => {
+  const prev = { status: i.status, detail: i.detail }
   i.status = i.status === 'Connected' ? 'Disconnected' : 'Connected'
-  i.detail = i.status === 'Connected' ? i.detail === '—' ? 'Connected' : i.detail : '—'
+  i.detail = i.status === 'Connected' ? (i.detail === '—' ? 'Connected' : i.detail) : '—'
+  integrationsMessage.value = null
+  try {
+    await useUpdateSystemSettings({ integrations: JSON.stringify(integrations.value) })
+    integrationsMessage.value = { ok: true, text: 'Integrations saved.' }
+  } catch (err: any) {
+    i.status = prev.status
+    i.detail = prev.detail
+    integrationsMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save integrations' }
+  }
 }
 
 // ---------- Tabs ----------
@@ -945,6 +1232,21 @@ const isActiveTab = (tab: string) => activeTab.value === tab
 
 const starRating = (n: number) => '★'.repeat(n) + '☆'.repeat(5 - n)
 const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLink', 'updateText'].map(v => '{{' + v + '}}')
+
+// Health badge color by status value.
+const healthBadge = (status: string) => {
+  const s = (status || '').toUpperCase()
+  if (s === 'HEALTHY' || s === 'OK' || s === 'UP') return 'bg-green-100 text-green-800'
+  if (s === 'DEGRADED' || s === 'WARNING') return 'bg-amber-100 text-amber-800'
+  if (s === 'UNKNOWN') return 'bg-gray-100 text-gray-600'
+  return 'bg-red-100 text-red-800'
+}
+// Safe time-of-day extract (handles "2026-08-15 10:30" or ISO "2026-08-15T10:30").
+const timeOfDay = (ts: string) => {
+  if (!ts) return ''
+  const idx = ts.indexOf(' ') >= 0 ? ts.indexOf(' ') : ts.indexOf('T')
+  return idx >= 0 ? ts.slice(idx + 1) : ts
+}
 </script>
 
 <template>
@@ -989,8 +1291,8 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           <p class="text-3xl font-bold text-gray-900 mt-2">${{ (dashboardStats.totalRevenue / 1000000).toFixed(1) }}M</p>
         </div>
         <div class="bg-white rounded-lg shadow p-6">
-          <p class="text-sm text-gray-600">Projected Revenue</p>
-          <p class="text-3xl font-bold text-gray-900 mt-2">${{ (dashboardStats.projectedRevenue / 1000000).toFixed(1) }}M</p>
+          <p class="text-sm text-gray-600">Pending Reviews</p>
+          <p class="text-3xl font-bold text-gray-900 mt-2">{{ dashboardStats.pendingReviews }}</p>
         </div>
       </div>
 
@@ -1000,18 +1302,18 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <span class="text-gray-700">Backend</span>
-              <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+              <span :class="['px-2 py-1 text-xs font-medium rounded-full', healthBadge(dashboardStats.backendStatus)]">
                 {{ dashboardStats.backendStatus }}
               </span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-gray-700">Database</span>
-              <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+              <span :class="['px-2 py-1 text-xs font-medium rounded-full', healthBadge(dashboardStats.databaseStatus)]">
                 {{ dashboardStats.databaseStatus }}
               </span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-gray-700">Last Backup</span>
+              <span class="text-gray-700">Last Settings Update</span>
               <span class="text-sm text-gray-600">{{ dashboardStats.lastBackup }}</span>
             </div>
           </div>
@@ -1020,6 +1322,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
         <div class="bg-white rounded-lg shadow p-6">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
           <div class="space-y-3">
+            <p v-if="auditLogs.length === 0" class="text-sm text-gray-500">No recent activity recorded.</p>
             <div
               v-for="log in auditLogs.slice(0, 3)"
               :key="log.id"
@@ -1029,7 +1332,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 <p class="text-sm font-medium text-gray-900">{{ log.action }} {{ log.entity }}</p>
                 <p class="text-xs text-gray-600">{{ log.details }}</p>
               </div>
-              <span class="text-xs text-gray-500">{{ log.timestamp.split(' ')[1] }}</span>
+              <span class="text-xs text-gray-500">{{ timeOfDay(log.timestamp) }}</span>
             </div>
           </div>
         </div>
@@ -1813,29 +2116,73 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
       <!-- Dropdown Value Management -->
       <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-2">Dropdown Value Management</h2>
-        <p class="text-sm text-gray-600 mb-6">All static dropdown values used throughout the portal.</p>
+        <p class="text-sm text-gray-600 mb-4">All static dropdown values used throughout the portal.</p>
+
+        <!-- Create category -->
+        <div class="flex flex-wrap items-center gap-2 mb-6">
+          <input
+            v-model="newDropdownCategory.name"
+            type="text"
+            placeholder="New category name"
+            class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm w-48"
+          />
+          <input
+            v-model="newDropdownCategory.description"
+            type="text"
+            placeholder="Description (optional)"
+            class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm w-56"
+          />
+          <button
+            :disabled="creatingDropdownCategory"
+            @click="addNewDropdownCategory"
+            class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
+          >
+            + Add Category
+          </button>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div v-for="category in dropdownCategories" :key="category.name" class="border border-gray-200 rounded-lg p-4">
-            <h3 class="font-semibold text-gray-900 text-sm mb-3">{{ category.name }}</h3>
-            <div class="space-y-2">
-              <div v-for="value in category.values" :key="value" class="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded">
-                <span class="text-sm text-gray-700">{{ value }}</span>
-                <button @click="removeDropdownValue(category, value)" class="text-red-500 hover:text-red-700 text-xs">
-                  <i class="fas fa-times" />
+          <div v-if="dropdownCategories.length === 0" class="col-span-full text-sm text-gray-500">
+            {{ dropdownLoading ? 'Loading dropdowns…' : 'No dropdown categories. Add one above.' }}
+          </div>
+          <div v-for="category in dropdownCategories" :key="category.id" class="border border-gray-200 rounded-lg p-4">
+            <div class="flex items-start justify-between mb-1">
+              <h3 class="font-semibold text-gray-900 text-sm">{{ category.name }}</h3>
+              <div class="flex items-center gap-2">
+                <button @click="renameDropdownCategory(category)" class="text-emerald-600 hover:text-emerald-800 text-xs" title="Rename category">
+                  <i class="fas fa-pen" />
                 </button>
+                <button @click="removeDropdownCategory(category)" class="text-red-500 hover:text-red-700 text-xs" title="Delete category">
+                  <i class="fas fa-trash" />
+                </button>
+              </div>
+            </div>
+            <p v-if="category.description" class="text-xs text-gray-500 mb-2">{{ category.description }}</p>
+            <div class="space-y-2 mt-2">
+              <div v-if="!category.values || category.values.length === 0" class="text-xs text-gray-400 py-1">No values yet.</div>
+              <div v-for="value in category.values" :key="value.id" class="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded">
+                <span class="text-sm text-gray-700">{{ value.displayLabel || value.value }}</span>
+                <div class="flex items-center gap-1.5">
+                  <button @click="renameDropdownValue(value)" class="text-emerald-600 hover:text-emerald-800 text-xs" title="Rename value">
+                    <i class="fas fa-pen" />
+                  </button>
+                  <button @click="removeDropdownValue(category, value)" class="text-red-500 hover:text-red-700 text-xs" title="Delete value">
+                    <i class="fas fa-times" />
+                  </button>
+                </div>
               </div>
             </div>
             <div class="mt-3 flex gap-2">
               <input
-                :value="newDropdownValues[category.name] || ''"
-                @input="newDropdownValues[category.name] = ($event.target as HTMLInputElement).value"
-                @keyup.enter="addDropdownValue(category, newDropdownValues[category.name] || ''); newDropdownValues[category.name] = ''"
+                :value="newDropdownValues[category.id] || ''"
+                @input="newDropdownValues[category.id] = ($event.target as HTMLInputElement).value"
+                @keyup.enter="addDropdownValue(category, newDropdownValues[category.id] || ''); newDropdownValues[category.id] = ''"
                 type="text"
                 placeholder="Add value"
                 class="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
               />
               <button
-                @click="addDropdownValue(category, newDropdownValues[category.name] || ''); newDropdownValues[category.name] = ''"
+                @click="addDropdownValue(category, newDropdownValues[category.id] || ''); newDropdownValues[category.id] = ''"
                 class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors text-xs font-medium"
               >
                 + Add
@@ -1913,18 +2260,33 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             <label class="block text-sm font-medium text-gray-700 mb-1">Body</label>
             <textarea v-model="announcementForm.body" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Audience</label>
-            <select v-model="announcementForm.audience" class="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-              <option>Company</option>
-              <option>Project: Energy Audit</option>
-              <option>Project: ISO 9001 Certification</option>
-              <option>Project: Market Research Study</option>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Audience</label>
+              <select v-model="announcementForm.audience" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="COMPANY">Company-wide</option>
+                <option value="PROJECT">Project</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <select v-model="announcementForm.category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="PROJECT_UPDATE">Project Update</option>
+                <option value="COMPANY_NEWS">Company News</option>
+                <option value="MAINTENANCE">Maintenance</option>
+              </select>
+            </div>
+          </div>
+          <div v-if="announcementForm.audience === 'PROJECT'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Project</label>
+            <select v-model="announcementForm.projectId" class="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option :value="null" disabled>Select a project…</option>
+              <option v-for="p in projectOptions" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
           </div>
           <div class="flex justify-end">
-            <button @click="publishAnnouncement" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium">
-              <i class="fas fa-bullhorn mr-1" /> Publish
+            <button :disabled="publishing" @click="publishAnnouncement" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50">
+              <i class="fas fa-bullhorn mr-1" /> {{ publishing ? 'Publishing…' : 'Publish' }}
             </button>
           </div>
         </div>
@@ -1935,7 +2297,10 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           <h2 class="text-lg font-semibold text-gray-900">Communication Logs</h2>
         </div>
         <div class="overflow-x-auto">
-          <table class="w-full">
+          <p v-if="communicationLogs.length === 0" class="px-6 py-6 text-sm text-gray-500">
+            {{ communicationLoading ? 'Loading announcements…' : 'No announcements yet. Publish one above.' }}
+          </p>
+          <table v-else class="w-full">
             <thead class="bg-gray-50">
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
@@ -1943,15 +2308,28 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Audience</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Author</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Channel</th>
+                <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
               <tr v-for="log in communicationLogs" :key="log.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ log.date }}</td>
                 <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ log.title }}</td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ log.audience }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">
+                  <span :class="['px-2 py-1 text-xs font-medium rounded-full', log.audience === 'COMPANY' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800']">
+                    {{ audienceDisplay(log.audience) }}
+                  </span>
+                  <span v-if="log.audience === 'PROJECT' && log.projectId" class="ml-1 text-xs text-gray-500">
+                    ({{ projectOptions.find(p => p.id === log.projectId)?.name || `Project #${log.projectId}` }})
+                  </span>
+                </td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ log.author }}</td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ log.channel }}</td>
+                <td class="px-3 py-4 text-right whitespace-nowrap">
+                  <button @click="deleteAnnouncement(log)" class="text-red-500 hover:text-red-700 text-xs" title="Delete announcement">
+                    <i class="fas fa-trash" />
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -2043,7 +2421,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           </div>
 
           <div class="flex justify-end">
-            <button @click="saveSystemSettings" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium">
+            <button @click="saveGeneralSettings" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium">
               Save Settings
             </button>
           </div>
@@ -2075,7 +2453,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           </div>
         </div>
         <div class="mt-4 flex justify-end">
-          <button @click="saveSystemSettings" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
+          <button @click="saveEmailTemplates" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
             Save Templates
           </button>
         </div>
@@ -2103,16 +2481,41 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
             </button>
           </div>
         </div>
+        <div class="mt-4 flex items-center justify-end gap-3">
+          <p v-if="integrationsMessage" :class="['text-sm', integrationsMessage.ok ? 'text-green-700' : 'text-red-600']">
+            {{ integrationsMessage.text }}
+          </p>
+          <button @click="saveIntegrations" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
+            Save Integrations
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- ================= AUDIT LOGS ================= -->
     <div v-if="isActiveTab('audit')" class="bg-white rounded-lg shadow overflow-hidden">
-      <div class="p-6 border-b border-gray-200">
+      <div class="p-6 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h2 class="text-lg font-semibold text-gray-900">Audit Logs</h2>
+        <div class="flex items-center gap-2">
+          <input
+            v-model="auditSearch"
+            type="search"
+            placeholder="Filter by action, user, entity, details…"
+            class="w-full sm:w-72 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+          />
+          <button @click="loadAuditLogs" :disabled="auditLoading" class="px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm font-medium whitespace-nowrap disabled:opacity-50">
+            <i class="fas fa-rotate mr-1" /> {{ auditLoading ? 'Refreshing…' : 'Refresh' }}
+          </button>
+        </div>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full">
+        <p v-if="auditLogs.length === 0" class="px-6 py-6 text-sm text-gray-500">
+          {{ auditLoading ? 'Loading audit logs…' : 'No audit logs recorded yet.' }}
+        </p>
+        <p v-else-if="filteredAuditLogs.length === 0" class="px-6 py-6 text-sm text-gray-500">
+          No logs match "{{ auditSearch }}".
+        </p>
+        <table v-else class="w-full">
           <thead class="bg-gray-50">
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
@@ -2125,7 +2528,7 @@ const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLin
           </thead>
           <tbody class="divide-y divide-gray-200">
             <tr
-              v-for="log in auditLogs"
+              v-for="log in filteredAuditLogs"
               :key="log.id"
               class="hover:bg-gray-50"
             >
