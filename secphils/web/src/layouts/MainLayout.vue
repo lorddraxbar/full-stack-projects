@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useRole } from '../composables/useRole'
+import { useGetNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '../services/api'
 
 const { role } = useRole()
 const router = useRouter()
@@ -26,6 +27,71 @@ const isUserMenuOpen = ref(false)
 const userMenuRef = ref<HTMLElement | null>(null)
 const route = useRoute()
 
+// --- Notifications (live from the backend; refreshed on a light interval) ---
+interface Notif {
+  id: number
+  title: string
+  body: string
+  type: string
+  entityType: string | null
+  entityId: number | null
+  isRead: boolean
+  createdAt: string
+}
+const notifications = ref<Notif[]>([])
+const isNotifOpen = ref(false)
+const notifRef = ref<HTMLElement | null>(null)
+const unreadCount = computed(() => notifications.value.filter(n => !n.isRead).length)
+
+const notifRoute = (n: Notif) => {
+  switch (n.entityType) {
+    case 'Announcement': return '/announcements'
+    case 'Task': return '/tasks'
+    case 'Message': return '/messages'
+    case 'Project': return '/projects'
+    default: return '/dashboard'
+  }
+}
+
+const timeAgo = (iso: string) => {
+  const diff = Date.now() - new Date(iso).getTime()
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return 'just now'
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const day = Math.floor(hr / 24)
+  if (day < 7) return `${day}d ago`
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+async function loadNotifications() {
+  try {
+    const res = await useGetNotifications()
+    notifications.value = Array.isArray(res) ? (res as Notif[]) : []
+  } catch {
+    notifications.value = []
+  }
+}
+
+async function openNotif(n: Notif) {
+  if (!n.isRead) {
+    n.isRead = true // optimistic; the PATCH below makes it stick
+    try { await useMarkNotificationRead(n.id) } catch { /* keep the local state */ }
+  }
+  isNotifOpen.value = false
+  router.push(notifRoute(n))
+}
+
+async function markAllNotifsRead() {
+  try {
+    await useMarkAllNotificationsRead()
+    notifications.value.forEach(n => n.isRead = true)
+  } catch { /* best effort */ }
+}
+
+let notifTimer: number | null = null
+
 const userName = computed(() => localStorage.getItem('userName') || 'User')
 const userInitial = computed(() => userName.value.charAt(0))
 
@@ -47,17 +113,23 @@ const onDocumentClick = (e: MouseEvent) => {
   if (userMenuRef.value && !userMenuRef.value.contains(e.target as Node)) {
     isUserMenuOpen.value = false
   }
+  if (notifRef.value && !notifRef.value.contains(e.target as Node)) {
+    isNotifOpen.value = false
+  }
 }
 
 onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
   document.addEventListener('click', onDocumentClick)
+  loadNotifications()
+  notifTimer = window.setInterval(loadNotifications, 60000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
   document.removeEventListener('click', onDocumentClick)
+  if (notifTimer !== null) window.clearInterval(notifTimer)
 })
 
 const isActive = (path: string) => {
@@ -138,11 +210,59 @@ const logout = () => {
 
         <!-- Right side -->
         <div class="flex items-center gap-4">
-          <!-- Notification bell -->
-          <button class="p-2 rounded-lg hover:bg-gray-100 transition-colors relative">
-            <i class="fas fa-bell text-lg" />
-            <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-          </button>
+          <!-- Notification bell (live: unread count from /notifications, 60s poll) -->
+          <div class="relative" ref="notifRef">
+            <button
+              class="p-2 rounded-lg hover:bg-gray-100 transition-colors relative text-gray-500"
+              @click="isNotifOpen = !isNotifOpen"
+            >
+              <i class="fas fa-bell text-lg" />
+              <span
+                v-if="unreadCount > 0"
+                class="absolute top-0.5 right-0.5 min-w-4 h-4 px-1 flex items-center justify-center text-[10px] font-bold text-white bg-red-500 rounded-full"
+              >
+                {{ unreadCount }}
+              </span>
+            </button>
+
+            <div
+              v-if="isNotifOpen"
+              class="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl z-50"
+            >
+              <div class="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                <span class="text-sm font-semibold text-gray-900">Notifications</span>
+                <button
+                  v-if="unreadCount > 0"
+                  @click="markAllNotifsRead"
+                  class="text-xs text-emerald-600 hover:text-emerald-700"
+                >
+                  Mark all read
+                </button>
+              </div>
+              <div v-if="notifications.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
+                You're all caught up.
+              </div>
+              <button
+                v-for="n in notifications"
+                :key="n.id"
+                @click="openNotif(n)"
+                :class="['block w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors',
+                  !n.isRead ? 'bg-emerald-50/50' : '']"
+              >
+                <div class="flex items-start gap-2">
+                  <span
+                    :class="['mt-1.5 w-1.5 h-1.5 rounded-full shrink-0',
+                      !n.isRead ? 'bg-emerald-600' : 'bg-transparent']"
+                  />
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">{{ n.title }}</p>
+                    <p class="text-xs text-gray-600 line-clamp-2">{{ n.body }}</p>
+                    <p class="text-[11px] text-gray-400 mt-1">{{ timeAgo(n.createdAt) }}</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
 
           <!-- User menu -->
           <div ref="userMenuRef" class="relative flex items-center gap-2">

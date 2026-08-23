@@ -60,9 +60,9 @@ export const ANNOUNCEMENT_CATEGORY_LABELS: Record<string, string> = {
 }
 
 export const ANNOUNCEMENT_CATEGORY_COLORS: Record<string, string> = {
-  'Project Update': 'bg-teal-100 text-teal-800',
-  'Company News': 'bg-purple-100 text-purple-800',
-  'Maintenance': 'bg-orange-100 text-orange-800',
+  PROJECT_UPDATE: 'bg-teal-100 text-teal-800',
+  COMPANY_NEWS: 'bg-purple-100 text-purple-800',
+  MAINTENANCE: 'bg-orange-100 text-orange-800',
 }
 
 export const ANNOUNCEMENT_AUDIENCE_LABELS: Record<string, string> = {

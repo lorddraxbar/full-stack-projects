@@ -16,6 +16,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByRoleAndIsActive(String role, Boolean isActive);
 
+    /** Active members of a company — recipients for company-wide notifications. */
+    List<User> findByCompanyIdAndIsActiveTrue(Long companyId);
+
     /** Number of portal accounts currently holding this role name. */
     long countByRole(String role);
 

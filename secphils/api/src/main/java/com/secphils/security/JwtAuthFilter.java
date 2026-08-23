@@ -39,7 +39,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 Claims claims = jwtService.parse(token, JwtService.TokenType.ACCESS);
                 User user = userRepository.findById(jwtService.userId(claims)).orElse(null);
                 if (user != null && Boolean.TRUE.equals(user.getIsActive())) {
-                    AuthUser authUser = new AuthUser(user.getId(), user.getEmail(), user.getRole());
+                    AuthUser authUser = new AuthUser(user.getId(), user.getEmail(), user.getRole(), user.getCompanyId());
                     var authentication = new UsernamePasswordAuthenticationToken(
                             authUser, null,
                             List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole())));
