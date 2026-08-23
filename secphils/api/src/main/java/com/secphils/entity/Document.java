@@ -35,7 +35,7 @@ public class Document {
     @Column(length = 50)
     private String category = "OTHER";
 
-    @Column(name = "file_url", nullable = false, length = 500)
+    @Column(name = "file_url", nullable = false, length = 1000)
     private String fileUrl;
 
     @Column(name = "file_size")

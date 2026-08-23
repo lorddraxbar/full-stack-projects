@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAdminStats, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAdminStats, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 
@@ -1086,6 +1086,80 @@ const parseJson = <T>(raw: unknown, fallback: T): T => {
   return fallback
 }
 
+// ---------- Object Storage (S3 / S3-compatible) ----------
+interface StorageForm {
+  provider: string
+  region: string
+  bucket: string
+  accessKey: string
+  secretKey: string   // '********' when a secret is already stored (masked by the API)
+  endpoint: string
+  publicBaseUrl: string
+  folder: string
+  maxUploadMb: number
+}
+const DEFAULT_STORAGE: StorageForm = {
+  provider: 'AWS S3', region: 'us-east-1', bucket: '', accessKey: '', secretKey: '',
+  endpoint: '', publicBaseUrl: '', folder: 'documents', maxUploadMb: 25,
+}
+const storageForm = ref<StorageForm>({ ...DEFAULT_STORAGE })
+const storageMessage = ref<{ ok: boolean; text: string } | null>(null)
+const testingStorage = ref(false)
+const storageConnected = ref(false)
+
+const loadStorageSettings = (data: any) => {
+  const stored = parseJson<any>(data?.storage, null)
+  storageForm.value = {
+    provider: stored?.provider || DEFAULT_STORAGE.provider,
+    region: stored?.region || DEFAULT_STORAGE.region,
+    bucket: stored?.bucket || '',
+    accessKey: stored?.accessKey || '',
+    secretKey: stored?.secretKey || '',
+    endpoint: stored?.endpoint || '',
+    publicBaseUrl: stored?.publicBaseUrl || '',
+    folder: stored?.folder || DEFAULT_STORAGE.folder,
+    maxUploadMb: Number(stored?.maxUploadMb) || DEFAULT_STORAGE.maxUploadMb,
+  }
+  storageConnected.value = !!(stored?.bucket && stored?.accessKey)
+}
+
+const storagePayload = () => ({
+  provider: storageForm.value.provider,
+  region: storageForm.value.region.trim(),
+  bucket: storageForm.value.bucket.trim(),
+  accessKey: storageForm.value.accessKey.trim(),
+  secretKey: storageForm.value.secretKey.trim(),
+  endpoint: storageForm.value.endpoint.trim(),
+  publicBaseUrl: storageForm.value.publicBaseUrl.trim(),
+  folder: storageForm.value.folder.trim(),
+  maxUploadMb: Number(storageForm.value.maxUploadMb) || 25,
+})
+
+const testStorageConnection = async () => {
+  storageMessage.value = null
+  testingStorage.value = true
+  try {
+    const res = await useTestStorage(storagePayload())
+    storageMessage.value = { ok: !!res.ok, text: res.message }
+    storageConnected.value = !!res.ok
+  } catch (err: any) {
+    storageMessage.value = { ok: false, text: err.response?.data?.message || 'Connection test failed' }
+  } finally {
+    testingStorage.value = false
+  }
+}
+
+const saveStorageSettings = async () => {
+  storageMessage.value = null
+  try {
+    await useUpdateSystemSettings({ storage: JSON.stringify(storagePayload()) })
+    storageMessage.value = { ok: true, text: 'Object storage settings saved.' }
+    storageConnected.value = !!(storageForm.value.bucket && storageForm.value.accessKey)
+  } catch (err: any) {
+    storageMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save storage settings' }
+  }
+}
+
 const loadSystemSettings = async () => {
   try {
     const data: any = await useGetSystemSettings()
@@ -1096,6 +1170,7 @@ const loadSystemSettings = async () => {
     systemSettings.value.securityPolicies = parseJson<any>(data.securityPolicies, systemSettings.value.securityPolicies)
     emailTemplates.value = parseJson<any[]>(data.emailTemplates, DEFAULT_EMAIL_TEMPLATES.map(t => ({ ...t })))
     integrations.value = parseJson<any[]>(data.integrations, DEFAULT_INTEGRATIONS.map(t => ({ ...t })))
+    loadStorageSettings(data)
   } catch {
     // keep defaults if the settings endpoint is unavailable
   }
@@ -2320,6 +2395,135 @@ const timeOfDay = (ts: string) => {
               Save Settings
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Object Storage (S3 / S3-compatible) -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="text-lg font-semibold text-gray-900">Object Storage</h2>
+          <span
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+            :class="storageConnected
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-amber-100 text-amber-700'"
+          >
+            <span class="w-1.5 h-1.5 rounded-full" :class="storageConnected ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+            {{ storageConnected ? 'Configured' : 'Not configured' }}
+          </span>
+        </div>
+        <p class="text-sm text-gray-600 mb-4">
+          Document files are stored in an S3 bucket. Leave <em>endpoint</em> empty for AWS S3;
+          set it for any S3-compatible service (MinIO, Cloudflare R2, DigitalOcean Spaces).
+          The secret key is stored securely and never returned in plaintext — leave it
+          unchanged to keep the existing one.
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+            <select
+              v-model="storageForm.provider"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="AWS S3">AWS S3</option>
+              <option value="MinIO">MinIO</option>
+              <option value="Cloudflare R2">Cloudflare R2</option>
+              <option value="DigitalOcean Spaces">DigitalOcean Spaces</option>
+              <option value="Other">Other (S3-compatible)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Region</label>
+            <input
+              v-model="storageForm.region"
+              type="text"
+              placeholder="us-east-1"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Bucket *</label>
+            <input
+              v-model="storageForm.bucket"
+              type="text"
+              placeholder="secphils-documents"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Endpoint</label>
+            <input
+              v-model="storageForm.endpoint"
+              type="text"
+              placeholder="https://minio.internal:9000 (blank = AWS S3)"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Access Key *</label>
+            <input
+              v-model="storageForm.accessKey"
+              type="text"
+              placeholder="AKIA..."
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Secret Key *</label>
+            <input
+              v-model="storageForm.secretKey"
+              type="password"
+              placeholder="•••••••••••••••• (unchanged = keep existing)"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Public Base URL</label>
+            <input
+              v-model="storageForm.publicBaseUrl"
+              type="text"
+              placeholder="https://cdn.example.com (optional, for public links)"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Object Folder Prefix</label>
+            <input
+              v-model="storageForm.folder"
+              type="text"
+              placeholder="documents (optional subfolder inside the bucket)"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Max Upload (MB)</label>
+            <input
+              v-model.number="storageForm.maxUploadMb"
+              type="number"
+              min="1"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+        </div>
+
+        <div v-if="storageMessage" class="mt-4 text-sm" :class="storageMessage.ok ? 'text-emerald-700' : 'text-red-700'">
+          {{ storageMessage.text }}
+        </div>
+
+        <div class="mt-6 flex items-center justify-end gap-3">
+          <button
+            @click="testStorageConnection"
+            :disabled="testingStorage"
+            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50"
+          >
+            {{ testingStorage ? 'Testing…' : 'Test Connection' }}
+          </button>
+          <button
+            @click="saveStorageSettings"
+            class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+          >
+            Save Object Storage
+          </button>
         </div>
       </div>
 

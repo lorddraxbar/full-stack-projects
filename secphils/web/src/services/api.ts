@@ -273,10 +273,47 @@ export async function useDeleteTask(id: number) {
   return response.data
 }
 
-// ---------- Documents (backend: /api/v1/documents, JSON body, no file upload) ----------
+// ---------- Documents (backend: /api/v1/documents) ----------
 export async function useGetDocuments(params?: { projectId?: number; category?: string }) {
   const response = await api.get('/documents', { params })
   return response.data
+}
+
+/**
+ * S3-backed upload: multipart form to /documents/upload.
+ * `file` is a native File; the backend stores it in object storage and
+ * records the s3:// URI.
+ */
+export async function useUploadDocument(payload: {
+  projectId: number
+  title: string
+  category?: string
+  description?: string
+  file: File
+}) {
+  const form = new FormData()
+  form.append('project', String(payload.projectId))
+  form.append('title', payload.title)
+  if (payload.category) form.append('category', payload.category)
+  if (payload.description) form.append('description', payload.description)
+  form.append('file', payload.file)
+  const response = await api.post('/documents/upload', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120_000,
+  })
+  return response.data
+}
+
+/**
+ * Authenticated file download. Returns the raw blob so the UI can
+ * trigger a browser download (works for S3-backed and http(s) files alike).
+ */
+export async function useDownloadDocument(id: number) {
+  const response = await api.get(`/documents/${id}/download`, {
+    responseType: 'blob',
+    timeout: 120_000,
+  })
+  return response.data as Blob
 }
 
 export async function useCreateDocument(data: Record<string, unknown>) {
@@ -422,6 +459,17 @@ export async function useGetSystemSettings() {
 export async function useUpdateSystemSettings(data: Record<string, unknown>) {
   const response = await api.put('/admin/settings', data)
   return response.data
+}
+
+/**
+ * Tests an object-storage configuration without saving it.
+ * `body` uses the same field names as the storage JSONB:
+ * { provider, region, bucket, accessKey, secretKey, endpoint, publicBaseUrl, folder, maxUploadMb }
+ * Returns { ok, bucket?, message }.
+ */
+export async function useTestStorage(body: Record<string, unknown>) {
+  const response = await api.post('/admin/settings/storage/test', body, { timeout: 30_000 })
+  return response.data as { ok: boolean; bucket?: string; message: string }
 }
 
 // ---------- Public landing page ----------

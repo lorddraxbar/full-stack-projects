@@ -30,6 +30,10 @@ public class SystemSettings {
     private String integrations;
 
     @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "JSONB")
+    private String storage;
+
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "security_policies", columnDefinition = "JSONB")
     private String securityPolicies;
 

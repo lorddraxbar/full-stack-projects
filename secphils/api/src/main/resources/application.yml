@@ -17,6 +17,11 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+  servlet:
+    multipart:
+      # Document uploads (S3-backed); nginx caps the /api/ proxy at 25m
+      max-file-size: 25MB
+      max-request-size: 25MB
   mail:
     host: ${SMTP_HOST:smtp.zoho.com}
     port: ${SMTP_PORT:465}
