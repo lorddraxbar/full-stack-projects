@@ -253,7 +253,7 @@ export async function useUpdateMe(data: Record<string, unknown>) {
 }
 
 // ---------- Tasks ----------
-export async function useGetTasks(params?: { projectId?: number; status?: string; priority?: string; assigneeId?: number }) {
+export async function useGetTasks(params?: { projectId?: number; status?: string; priority?: string; assigneeId?: number; scope?: string }) {
   const response = await api.get('/tasks', { params })
   return response.data
 }

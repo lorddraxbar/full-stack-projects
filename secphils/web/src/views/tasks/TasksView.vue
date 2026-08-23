@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button'
 import TaskDetailModal from '@/components/TaskDetailModal.vue'
 import { useProjectsStore } from '@/stores/projects'
 import { useGetTasks, useCreateTask, useUpdateTask, useDeleteTask, useGetUsers } from '@/services/api'
-import type { Task } from '@/types/task'
+import { useRole } from '@/composables/useRole'
+import type { Task, Subtask } from '@/types/task'
 import { STATUS_LABELS, PRIORITY_LABELS } from '@/types/task'
 import { formatDate } from '@/lib/labels'
 
+const { isAdmin } = useRole()
 const projectsStore = useProjectsStore()
 
 // ---- DB code <-> frontend key mapping ----
@@ -27,6 +29,17 @@ const KEY_TO_PRIORITY: Record<string, string> = {
 const projectName = (id: number) =>
   projectsStore.projects.find(p => p.id === id)?.name ?? `Project #${id}`
 
+const normalizeSubtasks = (raw: unknown): Subtask[] => {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter(s => s && typeof s === 'object' && !!(s as Subtask).title?.trim())
+    .map(s => ({
+      id: Number((s as Subtask).id) || Date.now() + Math.floor(Math.random() * 1e6),
+      title: String((s as Subtask).title),
+      completed: Boolean((s as Subtask).completed),
+    }))
+}
+
 const mapTask = (t: any): Task => ({
   id: t.id,
   title: t.title,
@@ -38,7 +51,7 @@ const mapTask = (t: any): Task => ({
   dueDate: t.dueDate ?? '',
   projectId: t.projectId,
   projectTitle: projectName(t.projectId),
-  subtasks: [],
+  subtasks: normalizeSubtasks(t.subtasks),
 })
 
 // ---- State ----
@@ -48,6 +61,8 @@ const users = ref<{ id: number; name: string }[]>([])
 const filterStatus = ref('ALL')
 const filterPriority = ref('ALL')
 const filterProject = ref('ALL')
+// Scope: non-admins are always "my tasks"; admins can switch to "all".
+const scope = ref<'mine' | 'all'>('mine')
 const modalOpen = ref(false)
 const editingTask = ref<Task | null>(null)
 
@@ -77,7 +92,7 @@ const filteredTasks = computed(() =>
 const loadTasks = async () => {
   loading.value = true
   try {
-    const data = await useGetTasks()
+    const data = await useGetTasks({ scope: scope.value === 'all' ? 'ALL' : undefined })
     tasks.value = (data as any[]).map(mapTask)
   } catch (e) {
     console.error('Failed to load tasks', e)
@@ -93,11 +108,20 @@ const loadUsers = async () => {
       .filter(u => u.isActive !== false)
       .map(u => ({ id: u.id, name: u.fullName }))
   } catch (e) {
+    // Non-admins can't list users (admin-only endpoint) — expected; the
+    // assignee field is locked for them anyway.
     console.error('Failed to load users', e)
   }
 }
 
+const onScopeChange = (value: string) => {
+  if (value !== 'mine' && value !== 'all') return
+  scope.value = value
+  loadTasks()
+}
+
 onMounted(async () => {
+  if (!isAdmin.value) scope.value = 'mine'
   await Promise.all([projectsStore.loadProjects(), loadUsers()])
   await loadTasks()
 })
@@ -121,6 +145,7 @@ const buildPayload = (task: Task) => ({
   status: KEY_TO_STATUS[task.status],
   priority: KEY_TO_PRIORITY[task.priority],
   dueDate: task.dueDate,
+  subtasks: task.subtasks.map(s => ({ id: s.id, title: s.title, completed: s.completed })),
 })
 
 const handleSave = async (task: Task) => {
@@ -140,6 +165,7 @@ const handleSave = async (task: Task) => {
 }
 
 const handleDelete = async (id: number) => {
+  if (!isAdmin.value) return
   if (!confirm('Delete this task? This cannot be undone.')) return
   try {
     await useDeleteTask(id)
@@ -176,9 +202,28 @@ const subtaskProgress = (task: Task) => {
     <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
       <div>
         <h1 class="text-2xl font-bold text-gray-900">My Tasks</h1>
-        <p class="text-gray-600 mt-1">View and manage your assigned tasks across all projects</p>
+        <p class="text-gray-600 mt-1">
+          {{ isAdmin
+            ? 'View and manage tasks — your own, or everyone’s'
+            : 'View and manage the tasks assigned to you' }}
+        </p>
       </div>
       <Button @click="openCreate">+ New Task</Button>
+    </div>
+
+    <!-- Admin scope toggle: My tasks / All tasks -->
+    <div v-if="isAdmin" class="mb-4 flex gap-2">
+      <button
+        v-for="opt in ['mine', 'all'] as const"
+        :key="opt"
+        @click="onScopeChange(opt)"
+        :class="[
+          'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+          scope === opt ? 'bg-emerald-600 text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100',
+        ]"
+      >
+        {{ opt === 'mine' ? 'My Tasks' : 'All Tasks' }}
+      </button>
     </div>
 
     <!-- Filters -->
@@ -247,7 +292,7 @@ const subtaskProgress = (task: Task) => {
                 </h3>
                 <p class="text-sm text-gray-600 truncate">{{ task.projectTitle }}</p>
                 <p class="text-xs text-gray-500 mt-1">
-                  Assigned to {{ task.assignee }}
+                  {{ scope === 'all' ? 'Assigned to ' : '' }}{{ task.assignee }}
                   <span v-if="subtaskProgress(task)"> · Subtasks {{ subtaskProgress(task) }}</span>
                 </p>
               </div>
@@ -268,7 +313,9 @@ const subtaskProgress = (task: Task) => {
       </div>
 
       <div v-if="filteredTasks.length === 0" class="p-12 text-center">
-        <p class="text-gray-600">{{ loading ? 'Loading tasks…' : 'No tasks found.' }}</p>
+        <p class="text-gray-600">
+          {{ loading ? 'Loading tasks…' : scope === 'mine' ? 'No tasks assigned to you yet.' : 'No tasks found.' }}
+        </p>
       </div>
     </div>
 
@@ -278,6 +325,8 @@ const subtaskProgress = (task: Task) => {
       :task="editingTask"
       :projects="projectsStore.projects"
       :users="users"
+      :allow-delete="isAdmin"
+      :lock-assignee="!isAdmin"
       @save="handleSave"
       @delete="handleDelete"
     />

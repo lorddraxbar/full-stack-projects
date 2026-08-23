@@ -127,7 +127,10 @@ async function load() {
   loadError.value = ''
   try {
     const [meRes, projRes, taskRes, notifRes] = await Promise.all([
-      useGetMe(), useGetProjects(), useGetTasks(), useGetNotifications(),
+      useGetMe(), useGetProjects(),
+      // Admins keep the pre-scoping behaviour (all tasks); everyone else now
+      // only sees their own tasks on the dashboard.
+      useGetTasks(isAdmin.value ? { scope: 'ALL' } : undefined), useGetNotifications(),
     ])
     me.value = meRes.user ?? null
     const projContent = Array.isArray(projRes) ? projRes : projRes?.content ?? []

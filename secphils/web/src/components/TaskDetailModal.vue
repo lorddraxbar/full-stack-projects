@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,12 +21,19 @@ interface UserOption {
   name: string
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean
   task?: Task | null
   projects?: ProjectOption[]
   users?: UserOption[]
-}>()
+  /** Show the Delete button (admins only). */
+  allowDelete?: boolean
+  /** Lock the assignee select to the current assignee (non-admins). */
+  lockAssignee?: boolean
+}>(), {
+  allowDelete: true,
+  lockAssignee: false,
+})
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
@@ -59,7 +66,9 @@ watch(() => props.open, (val) => {
     saveError.value = ''
     if (props.task) {
       isCreateMode.value = false
-      editingTask.value = JSON.parse(JSON.stringify(props.task)) // Deep copy
+      const copy = JSON.parse(JSON.stringify(props.task)) as Task // Deep copy
+      if (!Array.isArray(copy.subtasks)) copy.subtasks = []
+      editingTask.value = copy
     } else {
       isCreateMode.value = true
       editingTask.value = newTask()
@@ -95,12 +104,28 @@ const onAssigneeChange = (value: AcceptableValue) => {
 const addSubtask = () => {
   if (!editingTask.value) return
   const newSubtask: Subtask = {
-    id: Date.now(),
+    // Unique even within the same millisecond.
+    id: Date.now() + Math.floor(Math.random() * 1e6),
     title: '',
     completed: false,
   }
   editingTask.value.subtasks.push(newSubtask)
 }
+
+// Assignee options: everyone when editable; only the current assignee when
+// locked (non-admins can't reassign). Non-admins can't list users (403), so
+// fall back to the task's own assignee name.
+const assigneeOptions = computed<UserOption[]>(() => {
+  if (!props.lockAssignee) return props.users ?? []
+  const t = editingTask.value
+  if (!t?.assigneeId) return []
+  const current = (props.users ?? []).find(u => u.id === t.assigneeId)
+  return [current ?? { id: t.assigneeId, name: t.assignee || `User #${t.assigneeId}` }]
+})
+
+const assigneeModelValue = computed(() =>
+  editingTask.value?.assigneeId ? String(editingTask.value.assigneeId) : ''
+)
 
 const removeSubtask = (subtaskId: number) => {
   if (!editingTask.value) return
@@ -121,7 +146,9 @@ const handleSave = () => {
     saveError.value = 'Task title is required.'
     return
   }
-  if (!editingTask.value.assigneeId) {
+  // Non-admins creating a task leave the assignee blank — the backend
+  // defaults it to themselves.
+  if (!props.lockAssignee && !editingTask.value.assigneeId) {
     saveError.value = 'Assignee is required.'
     return
   }
@@ -244,14 +271,18 @@ const totalSubtasks = (task: Task) => {
         <!-- Assignee & Due Date -->
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
-            <Label for="assignee">Assignee *</Label>
-            <Select :model-value="editingTask.assigneeId ? String(editingTask.assigneeId) : ''" @update:model-value="onAssigneeChange">
-              <SelectTrigger>
+            <Label for="assignee">Assignee {{ props.lockAssignee ? '' : '*' }}</Label>
+            <Select
+              :model-value="assigneeModelValue"
+              :disabled="props.lockAssignee"
+              @update:model-value="onAssigneeChange"
+            >
+              <SelectTrigger :class="props.lockAssignee ? 'opacity-70' : ''">
                 <SelectValue placeholder="Select an assignee" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem v-for="user in users" :key="user.id" :value="String(user.id)">
+                  <SelectItem v-for="user in assigneeOptions" :key="user.id" :value="String(user.id)">
                     {{ user.name }}
                   </SelectItem>
                 </SelectGroup>
@@ -311,7 +342,7 @@ const totalSubtasks = (task: Task) => {
 
       <!-- Footer -->
       <DialogFooter class="flex flex-col sm:flex-row gap-2 sm:justify-between">
-        <Button v-if="!isCreateMode" variant="destructive" @click="handleDelete">
+        <Button v-if="!isCreateMode && allowDelete" variant="destructive" @click="handleDelete">
           Delete
         </Button>
         <span v-else />

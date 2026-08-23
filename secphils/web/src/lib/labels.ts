@@ -131,8 +131,16 @@ export function priorityLabel(code: string | null | undefined): string {
 
 export function formatDate(d: string | null | undefined): string {
   if (!d) return '—'
-  // Accepts ISO date (2026-09-30) or datetime (2026-09-30T10:00:00)
-  const date = new Date(d)
+  // Date-only values (e.g. "2026-09-30") are parsed as UTC by `new Date()`,
+  // which shifts them a day earlier in negative-UTC timezones. Parse the
+  // parts as local time instead.
+  let date: Date
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d)
+  if (m) {
+    date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  } else {
+    date = new Date(d)
+  }
   if (isNaN(date.getTime())) return d
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
