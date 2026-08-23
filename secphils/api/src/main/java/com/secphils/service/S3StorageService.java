@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -192,9 +193,22 @@ public class S3StorageService {
         // Custom endpoints (MinIO / LocalStack / Cloudflare R2 / DigitalOcean Spaces):
         // address objects by path (path-style) rather than a virtual-hosted Host header,
         // which S3-compatible gateways may reject for SigV4.
+        //
+        // We also DISABLE the AWS "chunked" (streaming) SigV4 payload
+        // (STREAMING-AWS4-HMAC-SHA256-PAYLOAD). It is the SDK's default for uploads,
+        // but many S3-compatible gateways — notably MinIO — reject its signature,
+        // producing a 403 SignatureDoesNotMatch on PutObject while HEAD/LIST (no body)
+        // still succeed. With the payload already in memory (RequestBody.fromBytes)
+        // there is no streaming benefit, so we send the universally-compatible
+        // plain sha256 + Content-Length form instead.
         if (!cfg.endpoint().isBlank()) {
             builder.endpointOverride(URI.create(cfg.endpoint().trim()))
-                    .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
+                    .serviceConfiguration(S3Configuration.builder()
+                            .pathStyleAccessEnabled(true)
+                            .chunkedEncodingEnabled(false)
+                            .build());
+        } else {
+            builder.serviceConfiguration(S3Configuration.builder().chunkedEncodingEnabled(false).build());
         }
         return builder.build();
     }
@@ -212,9 +226,15 @@ public class S3StorageService {
         }
         String key = buildKey(cfg, originalName);
         String ct = (contentType == null || contentType.isBlank()) ? "application/octet-stream" : contentType;
-        c.putObject(
-                PutObjectRequest.builder().bucket(cfg.bucket()).key(key).contentType(ct).build(),
-                RequestBody.fromBytes(bytes));
+        try {
+            c.putObject(
+                    PutObjectRequest.builder().bucket(cfg.bucket()).key(key).contentType(ct).build(),
+                    RequestBody.fromBytes(bytes));
+        } catch (S3Exception e) {
+            throw storageFailure(e, "save the file");
+        } catch (SdkClientException e) {
+            throw transportFailure(e, "save the file");
+        }
         return "s3://" + cfg.bucket() + "/" + key;
     }
 
@@ -254,6 +274,8 @@ public class S3StorageService {
         } catch (S3Exception e) {
             int code = e.statusCode();
             throw ApiException.badRequest("Storage object is missing or unreadable (HTTP " + code + ")");
+        } catch (SdkClientException e) {
+            throw transportFailure(e, "read the file");
         } catch (java.io.IOException e) {
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to read the storage object");
         }
@@ -325,6 +347,24 @@ public class S3StorageService {
                 }
             }
         }
+    }
+
+    /** Maps an S3-level rejection (403/404/...) to a friendly 503 the UI can surface. */
+    private static ApiException storageFailure(S3Exception e, String verb) {
+        String detail = e.awsErrorDetails() == null ? null : e.awsErrorDetails().errorMessage();
+        log.warn("Object storage rejected while trying to {} — HTTP {} {}", verb, e.statusCode(),
+                detail == null ? "" : "(" + detail + ")");
+        return ApiException.serviceUnavailable(
+                "Object storage rejected the request (HTTP " + e.statusCode() + "). "
+                        + "Check the bucket name and credentials in Admin → Settings → Object Storage.");
+    }
+
+    /** Maps a transport-level failure (endpoint down / unreachable / timeout) to a friendly 503. */
+    private static ApiException transportFailure(SdkClientException e, String verb) {
+        log.error("Object storage transport failure while trying to {} — {}", verb, e.getMessage());
+        return ApiException.serviceUnavailable(
+                "Could not reach the configured object storage. The endpoint may be down or unreachable — "
+                        + "verify it in Admin → Settings → Object Storage and re-test the connection.");
     }
 
     private String prefix(StorageConfig cfg) {
