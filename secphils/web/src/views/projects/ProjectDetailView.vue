@@ -52,8 +52,11 @@ async function load() {
   loadError.value = ''
   try {
     const [meRes, projRes] = await Promise.all([useGetMe(), useGetProject(projectId.value)])
-    me.value = meRes.user ?? null
+    // GET /users/me returns the UserResponse body directly (no envelope)
+    me.value = meRes || null
     project.value = projRes
+    // Initialize the admin form only once the project has loaded
+    initAdminForm()
 
     const [teamRes, docsRes, msgsRes] = await Promise.all([
       useGetProjectTeam(projectId.value).catch(() => []),
@@ -95,27 +98,27 @@ async function sendMessage() {
   }
 }
 
-// ---------- Documents (upload / delete) ----------
+// ---------- Documents (add / delete) ----------
 const docDialogOpen = ref(false)
 const docSaving = ref(false)
-const docForm = ref({ name: '', category: 'Deliverable', version: 'v1.0', description: '' })
-const docCategories = ['Deliverable', 'Client-Submitted', 'Requested']
+const docForm = ref({ title: '', category: 'DELIVERABLE', description: '', fileUrl: '' })
+const docCategories = ['CLIENT_SUBMITTED', 'REQUESTED', 'DELIVERABLE']
 
 function openDocDialog() {
-  docForm.value = { name: '', category: 'Deliverable', version: 'v1.0', description: '' }
+  docForm.value = { title: '', category: 'DELIVERABLE', description: '', fileUrl: '' }
   docDialogOpen.value = true
 }
 
 async function submitDocument() {
-  if (!docForm.value.name.trim() || docSaving.value) return
+  if (!docForm.value.title.trim() || docSaving.value) return
   docSaving.value = true
   try {
     await useCreateDocument({
       projectId: projectId.value,
-      name: docForm.value.name.trim(),
+      title: docForm.value.title.trim(),
       category: docForm.value.category,
-      version: docForm.value.version.trim() || 'v1.0',
       description: docForm.value.description.trim() || null,
+      fileUrl: docForm.value.fileUrl.trim() || null,
     })
     docDialogOpen.value = false
     documents.value = await useGetDocuments({ projectId: projectId.value })
@@ -158,7 +161,7 @@ function initAdminForm() {
   }
   adminReady.value = true
 }
-onMounted(initAdminForm)
+// (adminForm is initialized inside load() once the project is available)
 
 async function saveAdminChanges() {
   if (!project.value) return
@@ -170,8 +173,15 @@ async function saveAdminChanges() {
       name: project.value.name,
       scope: adminForm.value.scope,
       objectives: adminForm.value.objectives,
+      deliverables: project.value.deliverables ?? null,
       status: adminForm.value.status,
       totalCost: project.value.totalCost ?? null,
+      rawMaterials: project.value.rawMaterials ?? null,
+      productionOutput: project.value.productionOutput ?? null,
+      wasteManagement: project.value.wasteManagement ?? null,
+      wasteMaterials: project.value.wasteMaterials ?? null,
+      manufacturingProcedure: project.value.manufacturingProcedure ?? null,
+      productionFlowchartUrl: project.value.productionFlowchartUrl ?? null,
       dueDate: adminForm.value.dueDate || null,
       progress: adminForm.value.progress,
     })
@@ -369,6 +379,7 @@ async function saveAdminChanges() {
         <div class="p-6 border-b border-gray-200 flex items-center justify-between">
           <h2 class="text-lg font-semibold text-gray-900">Project Documents</h2>
           <button
+            v-if="!isClient"
             @click="openDocDialog"
             class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
           >
@@ -396,7 +407,7 @@ async function saveAdminChanges() {
                   <div class="flex items-center gap-3">
                     <i class="fas fa-file-lines text-emerald-500 text-lg" />
                     <div>
-                      <span class="font-medium text-gray-900 text-sm">{{ doc.name }}</span>
+                      <span class="font-medium text-gray-900 text-sm">{{ doc.title }}</span>
                       <p v-if="doc.description" class="text-xs text-gray-500">{{ doc.description }}</p>
                     </div>
                   </div>
@@ -406,9 +417,9 @@ async function saveAdminChanges() {
                     {{ documentCategoryLabel(doc.category) }}
                   </span>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ doc.version }}</td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ doc.uploadedByName || '—' }}</td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ formatDate(doc.createdAt) }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">v{{ doc.version ?? 1 }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ doc.uploaderName || '—' }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ formatDate(doc.uploadedAt) }}</td>
                 <td class="px-3 py-4 text-right whitespace-nowrap">
                   <RowActionsMenu v-if="!isClient" :actions="[
                     { label: 'Delete', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => deleteDocument(doc.id) }
@@ -448,6 +459,13 @@ async function saveAdminChanges() {
                 </p>
               </div>
               <p class="text-sm">{{ msg.body }}</p>
+              <div
+                v-if="msg.attachmentFileName"
+                class="mt-2 pt-2 border-t text-xs"
+                :class="isMine(msg) ? 'border-white/20 text-emerald-100' : 'border-gray-300 text-gray-600'"
+              >
+                <i class="fas fa-paperclip mr-1"></i>{{ msg.attachmentFileName }}
+              </div>
             </div>
           </div>
         </div>
@@ -549,33 +567,31 @@ async function saveAdminChanges() {
         </div>
         <div class="p-6 space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Document Name</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Document Title</label>
             <input
-              v-model="docForm.name"
+              v-model="docForm.title"
               type="text"
               placeholder="e.g. Bottleneck Analysis — Line 3"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
           </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <select
-                v-model="docForm.category"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-              >
-                <option v-for="c in docCategories" :key="c" :value="c">{{ c }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Version</label>
-              <input
-                v-model="docForm.version"
-                type="text"
-                placeholder="v1.0"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-              />
-            </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <select
+              v-model="docForm.category"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            >
+              <option v-for="c in docCategories" :key="c" :value="c">{{ documentCategoryLabel(c) }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">File URL (optional)</label>
+            <input
+              v-model="docForm.fileUrl"
+              type="url"
+              placeholder="https://… (link to the hosted file)"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>

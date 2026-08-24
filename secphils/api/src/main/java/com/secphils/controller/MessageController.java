@@ -94,7 +94,10 @@ public class MessageController {
     @GetMapping
     @Transactional(readOnly = true)
     public ResponseEntity<List<MessageResponse>> list(@RequestParam Long projectId) {
-        if (!projectRepository.existsById(projectId)) throw ApiException.notFound("Project");
+        AuthUser actor = CurrentUser.require();
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> ApiException.notFound("Project"));
+        requireVisibleTo(actor, project.getCompany().getId());
         return ResponseEntity.ok(
                 messageRepository.findByProjectIdOrderByCreatedAtAsc(projectId).stream()
                         .map(MessageResponse::from).toList());
@@ -107,6 +110,7 @@ public class MessageController {
         AuthUser actor = CurrentUser.require();
         Project project = projectRepository.findById(req.projectId())
                 .orElseThrow(() -> ApiException.notFound("Project"));
+        requireVisibleTo(actor, project.getCompany().getId());
         Message message = new Message();
         message.setProject(project);
         User sender = userRepository.findById(actor.id())
@@ -139,9 +143,7 @@ public class MessageController {
 
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> ApiException.notFound("Project"));
-        if (!actor.isAdmin() && !project.getCompany().getId().equals(actor.getCompanyId())) {
-            throw ApiException.forbidden("You can only post to projects of your own company");
-        }
+        requireVisibleTo(actor, project.getCompany().getId());
 
         S3StorageService.StorageConfig cfg = storageService.currentConfig();
         if (!cfg.isConfigured()) {
@@ -197,9 +199,7 @@ public class MessageController {
         AuthUser actor = CurrentUser.require();
         Message m = messageRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Message"));
-        if (!actor.isAdmin() && !m.getProject().getCompany().getId().equals(actor.getCompanyId())) {
-            throw ApiException.forbidden("You can only download files from projects of your own company");
-        }
+        requireVisibleTo(actor, m.getProject().getCompany().getId());
         String url = m.getAttachmentUrl();
         if (url == null || url.isBlank()) {
             throw ApiException.badRequest("This message has no file attached");
@@ -283,5 +283,12 @@ public class MessageController {
 
     private static String esc(String s) {
         return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    /** Clients/staff may only touch messages of their own company; admin is unrestricted. */
+    private void requireVisibleTo(AuthUser actor, Long companyId) {
+        if (!actor.isAdmin() && !companyId.equals(actor.getCompanyId())) {
+            throw ApiException.notFound("Project"); // 404, not 403 — don't reveal other companies' data
+        }
     }
 }

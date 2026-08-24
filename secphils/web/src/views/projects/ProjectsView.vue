@@ -8,10 +8,10 @@ import { Badge } from '@/components/ui/badge'
 import NewProjectWizard from '@/components/NewProjectWizard.vue'
 import type { WizardData } from '@/components/NewProjectWizard.vue'
 import { useRole } from '@/composables/useRole'
-import { useGetProjects, useCreateProject } from '@/services/api'
+import { useGetMe, useGetProjects, useCreateProject, useCreateCompany } from '@/services/api'
 import { projectStatusLabel, PROJECT_STATUS_COLORS, formatDate } from '@/lib/labels'
 
-const { isClient, isUser, isAdmin } = useRole()
+const { isClient } = useRole()
 const router = useRouter()
 const searchQuery = ref('')
 const selectedStatus = ref('ALL')
@@ -19,7 +19,7 @@ const showWizard = ref(false)
 const loading = ref(false)
 const loadError = ref('')
 
-// Backend ProjectResponse -> display shape
+// Backend ProjectResponse -> display shape (only fields the API actually returns)
 interface ProjectRow {
   id: number
   name: string
@@ -28,12 +28,11 @@ interface ProjectRow {
   status: string
   progress: number
   dueDate: string
-  rep: string
-  assignee: string
-  team: number
 }
 
 const projects = ref<ProjectRow[]>([])
+const meCompanyId = ref<number | null>(null)
+const noCompany = ref(false)
 
 function mapProject(p: any): ProjectRow {
   return {
@@ -44,9 +43,6 @@ function mapProject(p: any): ProjectRow {
     status: projectStatusLabel(p.status),
     progress: p.progress ?? 0,
     dueDate: formatDate(p.dueDate),
-    rep: p.authorizedRepName || '—',
-    assignee: p.assigneeName || 'Unassigned',
-    team: p.teamSize ?? 0,
   }
 }
 
@@ -54,7 +50,16 @@ async function loadProjects() {
   loading.value = true
   loadError.value = ''
   try {
-    const data = await useGetProjects()
+    const params: Record<string, unknown> = {}
+    if (isClient.value) {
+      if (noCompany.value) {
+        projects.value = []
+        return
+      }
+      // Server-side scope: clients only see their own company's projects.
+      params.companyId = meCompanyId.value
+    }
+    const data = await useGetProjects(params)
     const content = Array.isArray(data) ? data : data?.content ?? []
     projects.value = content.map(mapProject)
   } catch (e: any) {
@@ -64,11 +69,32 @@ async function loadProjects() {
   }
 }
 
+async function init() {
+  if (isClient.value) {
+    try {
+      // GET /users/me returns the UserResponse body directly (no envelope).
+      const me = (await useGetMe()) as any
+      if (me?.companyId != null) meCompanyId.value = me.companyId
+      else noCompany.value = true
+    } catch {
+      noCompany.value = true
+    }
+  }
+  await loadProjects()
+}
+
+const statusOptions = [
+  { value: 'ALL', label: 'All Status' },
+  { value: 'NOT_STARTED', label: 'Not Started' },
+  { value: 'IN_PROGRESS', label: 'In Progress' },
+  { value: 'ON_HOLD', label: 'On Hold' },
+  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'ARCHIVED', label: 'Archived' },
+]
+
 const statusColors: Record<string, string> = PROJECT_STATUS_COLORS
 
-const heading = computed(() =>
-  isClient.value ? 'My Projects' : 'All Projects'
-)
+const heading = computed(() => (isClient.value ? 'My Projects' : 'All Projects'))
 const subheading = computed(() =>
   isClient.value
     ? 'Projects assigned to your company.'
@@ -80,14 +106,15 @@ const filteredProjects = computed(() => {
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
-    result = result.filter(p =>
-      p.name.toLowerCase().includes(query) ||
-      p.client.toLowerCase().includes(query)
+    result = result.filter(
+      p =>
+        p.name.toLowerCase().includes(query) ||
+        p.client.toLowerCase().includes(query)
     )
   }
 
   if (selectedStatus.value !== 'ALL') {
-    result = result.filter(p => p.status === selectedStatus.value)
+    result = result.filter(p => p.status === projectStatusLabel(selectedStatus.value))
   }
 
   return result
@@ -97,19 +124,43 @@ const goToProject = (id: number) => {
   router.push(`/projects/${id}`)
 }
 
+// Wizard orchestration:
+// - existing customer -> POST /projects against the selected companyId
+// - new customer      -> POST /companies (rep email becomes the company contact)
+//                        then POST /projects against the returned companyId
 const handleWizardSubmit = async (data: WizardData) => {
   try {
-    await useCreateProject(data as unknown as Record<string, unknown>)
+    let companyId = data.companyId
+    if (data.scenario === 'new') {
+      const company = await useCreateCompany({
+        name: data.company.name,
+        location: data.company.location || null,
+        owner: data.company.owner || null,
+        description: data.company.description || null,
+        email: data.rep.email || null,
+      })
+      companyId = (company as any).id
+    }
+    await useCreateProject({
+      companyId,
+      serviceId: data.project.serviceId,
+      name: data.project.name,
+      scope: data.project.scope,
+      dueDate: data.project.dueDate,
+    })
     showWizard.value = false
     await loadProjects()
   } catch (e: any) {
-    loadError.value = e?.response?.data?.message || 'Failed to create project'
+    const status = e?.response?.status
+    loadError.value =
+      e?.response?.data?.message ||
+      (status === 409
+        ? 'A company with that name already exists.'
+        : 'Failed to create the project')
   }
 }
 
-onMounted(() => {
-  loadProjects()
-})
+onMounted(init)
 </script>
 
 <template>
@@ -122,6 +173,10 @@ onMounted(() => {
       <Button v-if="!isClient" @click="showWizard = true">
         + New Project
       </Button>
+    </div>
+
+    <div v-if="loadError" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+      {{ loadError }}
     </div>
 
     <!-- Filters -->
@@ -139,11 +194,9 @@ onMounted(() => {
             v-model="selectedStatus"
             class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
-            <option value="ALL">All Status</option>
-            <option value="Not Started">Not Started</option>
-            <option value="In Progress">In Progress</option>
-            <option value="On Hold">On Hold</option>
-            <option value="Completed">Completed</option>
+            <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </option>
           </select>
         </div>
       </CardContent>
@@ -152,7 +205,21 @@ onMounted(() => {
     <!-- Projects List -->
     <Card>
       <CardContent class="p-0">
-        <div class="divide-y divide-gray-200">
+        <div v-if="loading && projects.length === 0" class="p-12 text-center text-gray-500">
+          Loading projects…
+        </div>
+        <div v-else-if="noCompany && isClient" class="p-12 text-center">
+          <p class="text-gray-600">
+            No company is linked to your account yet.
+          </p>
+          <p class="text-gray-500 text-sm mt-1">
+            Contact a SECPhils administrator to get your workspace set up.
+          </p>
+        </div>
+        <div v-else-if="filteredProjects.length === 0" class="p-12 text-center">
+          <p class="text-gray-600">No projects found matching your criteria.</p>
+        </div>
+        <div v-else class="divide-y divide-gray-200">
           <div
             v-for="project in filteredProjects"
             :key="project.id"
@@ -165,38 +232,25 @@ onMounted(() => {
                 {{ project.status }}
               </Badge>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-gray-600 mb-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-gray-600 mb-3">
               <span>
                 <i class="fas fa-building text-xs mr-1 text-gray-400" />{{ project.client }}
               </span>
               <span>
                 <i class="fas fa-tag text-xs mr-1 text-gray-400" />{{ project.serviceType }}
               </span>
-              <span v-if="isClient">
-                <i class="fas fa-user text-xs mr-1 text-gray-400" />Rep: {{ project.rep }}
-              </span>
-              <span v-if="isUser">
-                <i class="fas fa-user text-xs mr-1 text-gray-400" />Assignee: {{ project.assignee }}
-              </span>
-              <span v-if="isAdmin">
-                <i class="fas fa-users text-xs mr-1 text-gray-400" />Team: {{ project.team }} members
-              </span>
-            </div>
-            <div class="flex items-center justify-between text-sm">
               <span class="text-gray-600">Due: {{ project.dueDate }}</span>
-              <span class="text-gray-600">{{ project.progress }}% complete</span>
             </div>
-            <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
-              <div
-                class="bg-emerald-600 h-2 rounded-full transition-all"
-                :style="{ width: project.progress + '%' }"
-              />
+            <div class="flex items-center gap-3 text-sm">
+              <span class="text-gray-600 w-24 shrink-0">{{ project.progress }}% complete</span>
+              <div class="flex-1 bg-gray-200 rounded-full h-2">
+                <div
+                  class="bg-emerald-600 h-2 rounded-full transition-all"
+                  :style="{ width: project.progress + '%' }"
+                />
+              </div>
             </div>
           </div>
-        </div>
-
-        <div v-if="filteredProjects.length === 0" class="p-12 text-center">
-          <p class="text-gray-600">No projects found matching your criteria.</p>
         </div>
       </CardContent>
     </Card>

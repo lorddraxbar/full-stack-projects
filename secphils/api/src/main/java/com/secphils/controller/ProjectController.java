@@ -47,16 +47,30 @@ public class ProjectController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
             Pageable pageable) {
+        AuthUser actor = CurrentUser.require();
+        // Staff and clients are locked to their own company; admin sees all
+        // (may narrow with ?companyId=) — mirrors DocumentController's role model.
+        Long effectiveCompanyId = companyId;
+        if (!actor.isAdmin()) {
+            if (companyId != null && !companyId.equals(actor.getCompanyId())) {
+                throw ApiException.forbidden("You can only view projects of your own company");
+            }
+            if (actor.getCompanyId() == null) {
+                return ResponseEntity.ok(Page.empty(pageable));
+            }
+            effectiveCompanyId = actor.getCompanyId();
+        }
+        final Long scopeCompanyId = effectiveCompanyId;
         Pageable page = pageable.getSort().isUnsorted()
                 ? org.springframework.data.domain.PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
                         Sort.by(Sort.Direction.DESC, "createdAt"))
                 : pageable;
         Specification<Project> spec = (root, query, cb) -> {
-            if (companyId == null && status == null && (search == null || search.isBlank())) {
+            if (scopeCompanyId == null && status == null && (search == null || search.isBlank())) {
                 return cb.conjunction();
             }
             var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
-            if (companyId != null) predicates.add(cb.equal(root.get("company").get("id"), companyId));
+            if (scopeCompanyId != null) predicates.add(cb.equal(root.get("company").get("id"), scopeCompanyId));
             if (status != null && !status.isBlank()) predicates.add(cb.equal(root.get("status"), status));
             if (search != null && !search.isBlank()) {
                 predicates.add(cb.like(cb.lower(root.get("name")), "%" + search.toLowerCase() + "%"));
@@ -71,6 +85,9 @@ public class ProjectController {
     public ResponseEntity<ProjectResponse> create(@Valid @RequestBody ProjectRequest req,
                                                   HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
+        if (!actor.isAdmin() && (req.companyId() == null || !req.companyId().equals(actor.getCompanyId()))) {
+            throw ApiException.forbidden("You can only create projects for your own company");
+        }
         Project project = new Project();
         apply(project, req);
         project = projectRepository.save(project);
@@ -81,7 +98,9 @@ public class ProjectController {
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
     public ResponseEntity<ProjectResponse> get(@PathVariable Long id) {
+        AuthUser actor = CurrentUser.require();
         Project project = projectRepository.findById(id).orElseThrow(() -> ApiException.notFound("Project"));
+        requireVisibleTo(actor, project.getCompany().getId());
         return ResponseEntity.ok(ProjectResponse.from(project));
     }
 
@@ -92,6 +111,10 @@ public class ProjectController {
                                                   HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
         Project project = projectRepository.findById(id).orElseThrow(() -> ApiException.notFound("Project"));
+        requireVisibleTo(actor, project.getCompany().getId());
+        if (!actor.isAdmin() && (req.companyId() == null || !req.companyId().equals(actor.getCompanyId()))) {
+            throw ApiException.forbidden("You can only update projects of your own company");
+        }
         apply(project, req);
         project = projectRepository.save(project);
         auditService.audit(actor, "PROJECT_UPDATE", "Project", project.getId(), "Name: " + project.getName(), http);
@@ -102,7 +125,11 @@ public class ProjectController {
     @Transactional
     public ResponseEntity<Void> archive(@PathVariable Long id, HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
+        if (actor.isClient()) {
+            throw ApiException.forbidden("Clients cannot archive projects");
+        }
         Project project = projectRepository.findById(id).orElseThrow(() -> ApiException.notFound("Project"));
+        requireVisibleTo(actor, project.getCompany().getId());
         project.setStatus("ARCHIVED");
         projectRepository.save(project);
         auditService.audit(actor, "PROJECT_ARCHIVE", "Project", project.getId(), "Name: " + project.getName(), http);
@@ -132,5 +159,12 @@ public class ProjectController {
         project.setProductionFlowchartUrl(req.productionFlowchartUrl());
         project.setDueDate(req.dueDate());
         project.setProgress(req.progress() != null ? req.progress() : 0);
+    }
+
+    /** Clients/staff may only touch projects of their own company; admin is unrestricted. */
+    private void requireVisibleTo(AuthUser actor, Long companyId) {
+        if (!actor.isAdmin() && !companyId.equals(actor.getCompanyId())) {
+            throw ApiException.notFound("Project"); // 404, not 403 — don't reveal other companies' data
+        }
     }
 }

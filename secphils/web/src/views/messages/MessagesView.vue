@@ -16,7 +16,7 @@ interface Conversation {
   lastHasFile: boolean
 }
 
-const me = ref<{ id: number; fullName: string } | null>(null)
+const me = ref<{ id: number; fullName: string; companyId: number | null } | null>(null)
 const conversations = ref<Conversation[]>([])
 const selectedId = ref<number | null>(null)
 const messages = ref<any[]>([])
@@ -80,9 +80,12 @@ async function loadConversations() {
   loadError.value = ''
   try {
     const meRes = await useGetMe()
-    me.value = meRes.user ?? null
-
-    const page = await useGetProjects()
+    // GET /users/me returns the UserResponse body directly (no envelope)
+    me.value = meRes || null
+    // Clients see only their own company's projects (their conversations)
+    const page = await useGetProjects({
+      companyId: me.value?.companyId ?? undefined,
+    })
     const projects = Array.isArray(page) ? page : (page?.content ?? [])
 
     const convs: Conversation[] = []
