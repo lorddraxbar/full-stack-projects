@@ -210,7 +210,7 @@ public class DocumentController {
         }
 
         byte[] bytes = file.getBytes();
-        String s3Uri = storageService.upload(cfg, bytes, file.getOriginalFilename(), file.getContentType());
+        String s3Uri = storageService.upload(cfg, project.getId(), bytes, file.getOriginalFilename(), file.getContentType());
         try {
             Document doc = new Document();
             doc.setProject(project);

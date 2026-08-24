@@ -40,6 +40,10 @@ import java.util.UUID;
  * env vars. The client is built lazily and rebuilt only when the effective
  * configuration changes, so editing settings in the UI takes effect immediately
  * without a restart.
+ *
+ * <p>Objects are stored one folder per project: {@code projects/{projectId}/documents/YYYY/MM/DD/<uuid>__<name>}
+ * (an optional configured {@code folder} prefixes the whole tree). The project scope in the
+ * key is informational — access control is enforced in the API layer, not by S3 paths.
  */
 @Service
 public class S3StorageService {
@@ -215,8 +219,8 @@ public class S3StorageService {
 
     // ---------- operations ----------
 
-    /** Stores the file and returns its s3:// reference. */
-    public String upload(StorageConfig cfg, byte[] bytes, String originalName, String contentType) {
+    /** Stores the file under the project folder and returns its s3:// reference. */
+    public String upload(StorageConfig cfg, Long projectId, byte[] bytes, String originalName, String contentType) {
         S3Client c = client(cfg);
         if (bytes == null || bytes.length == 0) {
             throw ApiException.badRequest("The uploaded file is empty");
@@ -224,7 +228,7 @@ public class S3StorageService {
         if (bytes.length > (long) cfg.maxUploadMb() * 1024 * 1024) {
             throw ApiException.badRequest("File exceeds the " + cfg.maxUploadMb() + " MB upload limit");
         }
-        String key = buildKey(cfg, originalName);
+        String key = buildKey(cfg, projectId, originalName);
         String ct = (contentType == null || contentType.isBlank()) ? "application/octet-stream" : contentType;
         try {
             c.putObject(
@@ -238,12 +242,12 @@ public class S3StorageService {
         return "s3://" + cfg.bucket() + "/" + key;
     }
 
-    public String buildKey(StorageConfig cfg, String originalName) {
+    public String buildKey(StorageConfig cfg, Long projectId, String originalName) {
         String folder = cfg.folder() == null ? "" : cfg.folder().trim()
                 .replaceAll("^/+", "").replaceAll("/+$", "");
         String base = folder.isEmpty() ? "" : folder + "/";
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
-        return base + "documents/" + date + "/" + UUID.randomUUID() + "__" + safeName(originalName);
+        return base + "projects/" + projectId + "/documents/" + date + "/" + UUID.randomUUID() + "__" + safeName(originalName);
     }
 
     /** Makes a filename safe for use as an object key. */
@@ -330,7 +334,7 @@ public class S3StorageService {
             out.put("ok", true);
             out.put("bucket", cfg.bucket());
             out.put("message", "Connected to " + where + " — bucket " + cfg.bucket()
-                    + " is reachable (" + n + " objects under the document prefix)");
+                    + " is reachable (" + n + " objects under the project folders)");
             return out;
         } catch (S3Exception e) {
             int code = e.statusCode();
@@ -370,7 +374,7 @@ public class S3StorageService {
     private String prefix(StorageConfig cfg) {
         String folder = cfg.folder() == null ? "" : cfg.folder().trim()
                 .replaceAll("^/+", "").replaceAll("/+$", "");
-        return folder.isEmpty() ? "documents/" : folder + "/documents/";
+        return folder.isEmpty() ? "projects/" : folder + "/projects/";
     }
 
     private static String clean(String s) {
