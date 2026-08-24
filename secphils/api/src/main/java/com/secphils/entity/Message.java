@@ -30,6 +30,19 @@ public class Message {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    /** Optional file attachment: an s3://bucket/key ref (or http(s) URL) in object storage. */
+    @Column(name = "attachment_url")
+    private String attachmentUrl;
+
+    @Column(name = "attachment_file_name")
+    private String attachmentFileName;
+
+    @Column(name = "attachment_file_size")
+    private Long attachmentFileSize;
+
+    @Column(name = "attachment_content_type")
+    private String attachmentContentType;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) createdAt = LocalDateTime.now();

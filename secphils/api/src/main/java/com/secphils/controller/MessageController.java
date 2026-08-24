@@ -19,13 +19,19 @@ import com.secphils.repository.UserRepository;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
 import com.secphils.service.MailService;
+import com.secphils.service.S3StorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +62,7 @@ public class MessageController {
     private final NotificationRepository notificationRepository;
     private final NotificationPreferenceRepository preferenceRepository;
     private final MailService mailService;
+    private final S3StorageService storageService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String portalBaseUrl;
 
@@ -65,6 +72,7 @@ public class MessageController {
                              NotificationRepository notificationRepository,
                              NotificationPreferenceRepository preferenceRepository,
                              MailService mailService,
+                             S3StorageService storageService,
                              AuditService auditService,
                              @Value("${app.invite.base-url:http://localhost:3000}") String portalBaseUrl) {
         this.messageRepository = messageRepository;
@@ -74,6 +82,7 @@ public class MessageController {
         this.notificationRepository = notificationRepository;
         this.preferenceRepository = preferenceRepository;
         this.mailService = mailService;
+        this.storageService = storageService;
         this.portalBaseUrl = portalBaseUrl;
     }
 
@@ -104,6 +113,94 @@ public class MessageController {
         dispatch(message, project, sender, actor, http);
         auditService.audit(actor, "MESSAGE_SEND", "Message", message.getId(), "Project: " + project.getId(), http);
         return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(message));
+    }
+
+    /**
+     * Multipart upload: the file bytes go to object storage and the message row
+     * stores the resulting s3:// reference plus display metadata. If the DB
+     * insert fails after a successful S3 put, the orphaned object is removed.
+     * A blank body is filled with the file name so the row stays non-empty for
+     * file-only messages.
+     */
+    @PostMapping("/upload")
+    @Transactional
+    public ResponseEntity<MessageResponse> upload(
+            @RequestParam("projectId") Long projectId,
+            @RequestParam(required = false) String body,
+            @RequestParam("file") MultipartFile file,
+            HttpServletRequest http) throws IOException {
+        AuthUser actor = CurrentUser.require();
+        if (file == null || file.isEmpty()) throw ApiException.badRequest("No file was uploaded");
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> ApiException.notFound("Project"));
+        if (!actor.isAdmin() && !project.getCompany().getId().equals(actor.getCompanyId())) {
+            throw ApiException.forbidden("You can only post to projects of your own company");
+        }
+
+        S3StorageService.StorageConfig cfg = storageService.currentConfig();
+        if (!cfg.isConfigured()) {
+            throw ApiException.badRequest("Object storage is not configured yet — an administrator must configure it in Admin Settings first");
+        }
+
+        byte[] bytes = file.getBytes();
+        String s3Uri = storageService.upload(cfg, bytes, file.getOriginalFilename(), file.getContentType());
+        try {
+            User sender = userRepository.findById(actor.id())
+                    .orElseThrow(() -> ApiException.notFound("User"));
+            Message message = new Message();
+            message.setProject(project);
+            message.setSender(sender);
+            message.setBody(body == null || body.isBlank()
+                    ? (file.getOriginalFilename() == null ? "File attached" : file.getOriginalFilename())
+                    : body.trim());
+            message.setAttachmentUrl(s3Uri);
+            message.setAttachmentFileName(file.getOriginalFilename() == null ? "file" : file.getOriginalFilename());
+            message.setAttachmentFileSize((long) bytes.length);
+            message.setAttachmentContentType(file.getContentType());
+            message.setCreatedAt(LocalDateTime.now());
+            message = messageRepository.save(message);
+            dispatch(message, project, sender, actor, http);
+            auditService.audit(actor, "MESSAGE_UPLOAD", "Message", message.getId(),
+                    "Project: " + project.getId() + " (file: " + message.getAttachmentFileName() + ", " + bytes.length + " bytes)", http);
+            return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(message));
+        } catch (RuntimeException e) {
+            storageService.deleteQuietly(s3Uri); // don't leak an orphaned object
+            throw e;
+        }
+    }
+
+    /**
+     * Authenticated proxy download of a message attachment. S3 refs are
+     * proxied (so access control is always enforced); plain http(s) refs
+     * redirect to the source.
+     */
+    @GetMapping("/{id}/download")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> download(@PathVariable Long id) {
+        AuthUser actor = CurrentUser.require();
+        Message m = messageRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Message"));
+        if (!actor.isAdmin() && !m.getProject().getCompany().getId().equals(actor.getCompanyId())) {
+            throw ApiException.forbidden("You can only download files from projects of your own company");
+        }
+        String url = m.getAttachmentUrl();
+        if (url == null || url.isBlank()) {
+            throw ApiException.badRequest("This message has no file attached");
+        }
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(url)).build();
+        }
+        byte[] bytes = storageService.download(url);
+        String q = String.valueOf((char) 34); // double-quote, built without a backslash
+        String name = (m.getAttachmentFileName() == null || m.getAttachmentFileName().isBlank())
+                ? "attachment" : m.getAttachmentFileName().replace(q, "");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + q + name + q)
+                .contentType(m.getAttachmentContentType() == null
+                        ? MediaType.APPLICATION_OCTET_STREAM : MediaType.parseMediaType(m.getAttachmentContentType()))
+                .contentLength(bytes.length)
+                .body(bytes);
     }
 
     // ---------- fan-out (mirrors AnnouncementController.dispatch) ----------

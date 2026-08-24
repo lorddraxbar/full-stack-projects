@@ -332,6 +332,40 @@ export async function useDeleteDocument(id: number) {
 }
 
 // ---------- Messages (backend: /api/v1/messages?projectId=) ----------
+
+/**
+ * Send a message with a file attachment. The file bytes are uploaded to
+ * object storage (multipart) and the message row stores the s3:// reference.
+ * Fails with 400 if the admin has not configured Object Storage yet.
+ */
+export async function useUploadMessage(payload: {
+  projectId: number
+  body?: string
+  file: File
+}) {
+  const form = new FormData()
+  form.append('projectId', String(payload.projectId))
+  if (payload.body) form.append('body', payload.body)
+  form.append('file', payload.file)
+  const response = await api.post('/messages/upload', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120_000,
+  })
+  return response.data
+}
+
+/**
+ * Authenticated download of a message attachment. Returns the raw blob so
+ * the UI can trigger a browser download (works for S3-backed and http(s) files).
+ */
+export async function useDownloadMessage(id: number) {
+  const response = await api.get(`/messages/${id}/download`, {
+    responseType: 'blob',
+    timeout: 120_000,
+  })
+  return response.data as Blob
+}
+
 export async function useGetMessages(projectId: number) {
   const response = await api.get('/messages', { params: { projectId } })
   return response.data

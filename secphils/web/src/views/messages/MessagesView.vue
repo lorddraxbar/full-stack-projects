@@ -2,8 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import {
   useGetMe, useGetProjects, useGetMessages, useSendMessage,
+  useUploadMessage, useDownloadMessage,
 } from '@/services/api'
-import { formatDateTime, timeAgo } from '@/lib/labels'
+import { formatDateTime, timeAgo, formatFileSize } from '@/lib/labels'
 
 interface Conversation {
   id: number
@@ -12,6 +13,7 @@ interface Conversation {
   lastMessageBy: string
   lastMessageTime: string
   messageCount: number
+  lastHasFile: boolean
 }
 
 const me = ref<{ id: number; fullName: string } | null>(null)
@@ -24,6 +26,11 @@ const newMessage = ref('')
 const sending = ref(false)
 const sendError = ref('')
 
+const pendingFile = ref<File | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024 // matches backend maxUploadMb / nginx cap
+
 const selectedConversation = computed(() =>
   conversations.value.find(c => c.id === selectedId.value) || null
 )
@@ -34,6 +41,38 @@ function initials(name: string): string {
 
 function isOwn(msg: any): boolean {
   return me.value != null && msg.senderId === me.value.id
+}
+
+function onFilePicked(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0]
+  if (!f) return
+  if (f.size > MAX_UPLOAD_BYTES) {
+    sendError.value = 'File is too large (max 25 MB)'
+    return
+  }
+  sendError.value = ''
+  pendingFile.value = f
+}
+
+function removePendingFile() {
+  pendingFile.value = null
+  if (fileInput.value) fileInput.value.value = ''
+}
+
+async function downloadAttachment(msg: any) {
+  try {
+    const blob = await useDownloadMessage(msg.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = msg.attachmentFileName || 'attachment'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (err: any) {
+    sendError.value = err?.response?.data?.message || 'Failed to download file'
+  }
 }
 
 async function loadConversations() {
@@ -59,6 +98,7 @@ async function loadConversations() {
           lastMessageBy: last ? (last.senderName || '—') : '',
           lastMessageTime: last ? timeAgo(last.createdAt) : '',
           messageCount: list.length,
+          lastHasFile: !!(last && last.attachmentFileName),
         })
       } catch {
         convs.push({
@@ -68,6 +108,7 @@ async function loadConversations() {
           lastMessageBy: '',
           lastMessageTime: '',
           messageCount: 0,
+          lastHasFile: false,
         })
       }
     }
@@ -85,6 +126,8 @@ async function loadConversations() {
 async function selectConversation(id: number) {
   selectedId.value = id
   sendError.value = ''
+  pendingFile.value = null
+  if (fileInput.value) fileInput.value.value = ''
   try {
     const msgs = await useGetMessages(id)
     messages.value = Array.isArray(msgs) ? msgs : []
@@ -95,12 +138,20 @@ async function selectConversation(id: number) {
 }
 
 async function sendMessage() {
-  if (!newMessage.value.trim() || selectedId.value == null || sending.value) return
+  const text = newMessage.value.trim()
+  const file = pendingFile.value
+  if ((!text && !file) || selectedId.value == null || sending.value) return
   sending.value = true
   sendError.value = ''
   try {
-    await useSendMessage(selectedId.value, newMessage.value.trim())
+    if (file) {
+      await useUploadMessage({ projectId: selectedId.value, body: text || undefined, file })
+    } else {
+      await useSendMessage(selectedId.value, text)
+    }
     newMessage.value = ''
+    pendingFile.value = null
+    if (fileInput.value) fileInput.value.value = ''
     await selectConversation(selectedId.value)
     await loadConversations()
   } catch (err: any) {
@@ -155,7 +206,10 @@ onMounted(loadConversations)
               <h3 class="font-medium text-gray-900 text-sm">{{ conv.project }}</h3>
               <span class="text-xs text-gray-500 whitespace-nowrap ml-2">{{ conv.lastMessageTime }}</span>
             </div>
-            <p class="text-sm text-gray-600 truncate">{{ conv.lastMessage }}</p>
+            <p class="text-sm text-gray-600 truncate">
+              <i v-if="conv.lastHasFile" class="fas fa-paperclip mr-1 text-emerald-600"></i>
+              {{ conv.lastMessage }}
+            </p>
             <div class="flex items-center justify-between mt-2">
               <span class="text-xs text-gray-500">{{ conv.lastMessageBy }}</span>
               <span v-if="conv.messageCount > 0" class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
@@ -194,7 +248,31 @@ onMounted(loadConversations)
               isOwn(msg) ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-900'
             ]">
               <p class="text-sm font-medium mb-0.5">{{ msg.senderName }}</p>
-              <p class="text-sm">{{ msg.body }}</p>
+              <p class="text-sm">
+                {{ msg.body }}
+                <span v-if="msg.attachmentFileName" class="text-emerald-300">
+                  <i class="fas fa-paperclip"></i>
+                </span>
+              </p>
+              <div
+                v-if="msg.attachmentFileName"
+                class="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+                :class="isOwn(msg) ? 'bg-emerald-700/60 text-emerald-50' : 'bg-white border border-gray-200 text-gray-800'"
+              >
+                <i class="fas fa-file text-base"></i>
+                <span class="flex-1 truncate">
+                  {{ msg.attachmentFileName }}
+                  <span class="opacity-70 text-xs">({{ formatFileSize(msg.attachmentFileSize) }})</span>
+                </span>
+                <button
+                  type="button"
+                  @click="downloadAttachment(msg)"
+                  class="text-xs font-medium underline"
+                  :class="isOwn(msg) ? 'text-emerald-200 hover:text-white' : 'text-emerald-700 hover:text-emerald-900'"
+                >
+                  Download
+                </button>
+              </div>
               <p :class="[
                 'text-xs mt-1',
                 isOwn(msg) ? 'text-emerald-100' : 'text-gray-500'
@@ -208,7 +286,36 @@ onMounted(loadConversations)
         <!-- Message Input -->
         <div class="p-4 border-t border-gray-200">
           <p v-if="sendError" class="text-xs text-red-600 mb-2">{{ sendError }}</p>
+          <div v-if="pendingFile" class="mb-2 flex items-center gap-2">
+            <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-lg">
+              <i class="fas fa-paperclip text-emerald-600"></i>
+              <span class="max-w-[220px] truncate">{{ pendingFile.name }}</span>
+              <span class="text-xs text-emerald-600">{{ formatFileSize(pendingFile.size) }}</span>
+              <button
+                type="button"
+                @click="removePendingFile"
+                class="ml-1 text-emerald-500 hover:text-emerald-700"
+                title="Remove file"
+              >
+                <i class="fas fa-times"></i>
+              </button>
+            </span>
+          </div>
           <div class="flex gap-2">
+            <button
+              type="button"
+              @click="fileInput?.click()"
+              class="px-3 py-2 border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-emerald-600 transition-colors"
+              title="Attach a file"
+            >
+              <i class="fas fa-paperclip"></i>
+            </button>
+            <input
+              ref="fileInput"
+              type="file"
+              class="hidden"
+              @change="onFilePicked"
+            />
             <input
               v-model="newMessage"
               @keyup.enter="sendMessage"

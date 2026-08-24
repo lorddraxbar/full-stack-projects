@@ -10,6 +10,9 @@ public record MessageResponse(
         Long senderId,
         String senderName,
         String body,
+        String attachmentFileName,
+        Long attachmentFileSize,
+        String attachmentContentType,
         LocalDateTime createdAt
 ) {
     public static MessageResponse from(Message m) {
@@ -17,6 +20,10 @@ public record MessageResponse(
                 m.getProject() != null ? m.getProject().getId() : null,
                 m.getSender() != null ? m.getSender().getId() : null,
                 m.getSender() != null ? m.getSender().getFullName() : null,
-                m.getBody(), m.getCreatedAt());
+                m.getBody(),
+                m.getAttachmentFileName(),
+                m.getAttachmentFileSize(),
+                m.getAttachmentContentType(),
+                m.getCreatedAt());
     }
 }
