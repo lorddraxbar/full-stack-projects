@@ -6,17 +6,19 @@ import com.secphils.common.ApiException;
 import com.secphils.dto.MessageRequest;
 import com.secphils.dto.MessageResponse;
 import com.secphils.entity.Company;
+import com.secphils.entity.Document;
 import com.secphils.entity.Message;
 import com.secphils.entity.Notification;
 import com.secphils.entity.NotificationPreference;
 import com.secphils.entity.Project;
-import com.secphils.entity.User;
+import com.secphils.repository.DocumentRepository;
 import com.secphils.repository.MessageRepository;
+import com.secphils.repository.UserRepository;
 import com.secphils.repository.NotificationPreferenceRepository;
 import com.secphils.repository.NotificationRepository;
 import com.secphils.repository.ProjectRepository;
-import com.secphils.repository.UserRepository;
 import com.secphils.security.AuthUser;
+import com.secphils.entity.User;
 import com.secphils.security.CurrentUser;
 import com.secphils.service.MailService;
 import com.secphils.service.S3StorageService;
@@ -63,6 +65,7 @@ public class MessageController {
     private final NotificationPreferenceRepository preferenceRepository;
     private final MailService mailService;
     private final S3StorageService storageService;
+    private final DocumentRepository documentRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String portalBaseUrl;
 
@@ -73,6 +76,7 @@ public class MessageController {
                              NotificationPreferenceRepository preferenceRepository,
                              MailService mailService,
                              S3StorageService storageService,
+                             DocumentRepository documentRepository,
                              AuditService auditService,
                              @Value("${app.invite.base-url:http://localhost:3000}") String portalBaseUrl) {
         this.messageRepository = messageRepository;
@@ -83,6 +87,7 @@ public class MessageController {
         this.preferenceRepository = preferenceRepository;
         this.mailService = mailService;
         this.storageService = storageService;
+        this.documentRepository = documentRepository;
         this.portalBaseUrl = portalBaseUrl;
     }
 
@@ -161,11 +166,22 @@ public class MessageController {
             message.setCreatedAt(LocalDateTime.now());
             message = messageRepository.save(message);
             dispatch(message, project, sender, actor, http);
+            // Every message attachment is also saved to Documents so it shows up on
+            // the all-files view and is findable by project without scrolling the thread.
+            Document doc = new Document();
+            doc.setProject(project);
+            doc.setTitle(message.getAttachmentFileName());
+            doc.setDescription("Attached in a message in project " + project.getId() + ".");
+            doc.setFileUrl(s3Uri);
+            doc.setFileSize((long) bytes.length);
+            doc.setUploader(sender);
+            doc.setUploadedAt(LocalDateTime.now());
+            doc = documentRepository.save(doc);
             auditService.audit(actor, "MESSAGE_UPLOAD", "Message", message.getId(),
-                    "Project: " + project.getId() + " (file: " + message.getAttachmentFileName() + ", " + bytes.length + " bytes)", http);
+                    "Project: " + project.getId() + " (file: " + message.getAttachmentFileName() + ", " + bytes.length + " bytes); saved as Document " + doc.getId(), http);
             return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(message));
         } catch (RuntimeException e) {
-            storageService.deleteQuietly(s3Uri); // don't leak an orphaned object
+            storageService.deleteQuietly(s3Uri); // don't leak an orphaned object (message + document roll back)
             throw e;
         }
     }
