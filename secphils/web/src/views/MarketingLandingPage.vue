@@ -634,7 +634,7 @@ onBeforeUnmount(() => {
     <!-- ================= REVIEWS (conditional — hidden with 0 approved reviews) ================= -->
     <section v-if="hasReviews" id="reviews" class="py-20 scroll-mt-16" :style="{ background: sectionShades.reviews }">
       <div class="mx-auto max-w-[1140px] px-4">
-        <div class="pb-10 text-center">
+        <div class="pb-10">
           <p class="section-eyebrow">Client feedback</p>
           <h1 class="font-light text-3xl sm:text-4xl md:text-[3em]" style="color: #202020">What People Say</h1>
         </div>
@@ -747,7 +747,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- ================= CONTACT ================= -->
-    <section id="contact" class="py-20 scroll-mt-16 text-center" :style="{ background: sectionShades.contact }">
+    <section id="contact" class="py-20 scroll-mt-16" :style="{ background: sectionShades.contact }">
       <div class="mx-auto max-w-[1140px] px-4">
         <div class="pb-10">
           <p class="section-eyebrow">Get in touch</p>
@@ -774,7 +774,7 @@ onBeforeUnmount(() => {
           <div class="contact-card">
             <i :class="socialLinks[0]?.icon || 'fa-brands fa-facebook-f'" class="mb-3 text-2xl" style="color: var(--bsp)" />
             <p class="mb-1 text-sm font-semibold" style="color: #202020">Follow us</p>
-            <div class="mt-1 flex flex-wrap items-center justify-center gap-2.5">
+            <div class="mt-1 flex flex-wrap items-center justify-start gap-2.5">
               <a
                 v-for="sl in socialLinks"
                 :key="sl.url"
@@ -1112,8 +1112,8 @@ onBeforeUnmount(() => {
   border-radius: 14px;
   text-decoration: none;
   border: 0;
+  text-align: left;
   width: 100%;
-  text-align: center;
   transition: box-shadow 0.25s, transform 0.25s;
   cursor: pointer;
   font-family: inherit;
