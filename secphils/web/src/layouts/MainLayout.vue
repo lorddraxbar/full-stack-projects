@@ -169,6 +169,7 @@ const logout = () => {
     >
       <!-- Logo -->
       <div class="h-16 flex items-center justify-center border-b border-gray-200">
+        <img src="/images/landing/seclogo.png" alt="SECPhils" class="h-8 w-auto" :class="{ 'mr-2': isSidebarOpen }" />
         <h1 class="text-lg font-bold text-emerald-600" :class="{ 'hidden': !isSidebarOpen }">
           SECPhils
         </h1>

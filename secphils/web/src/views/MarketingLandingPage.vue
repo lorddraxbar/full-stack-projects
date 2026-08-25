@@ -536,10 +536,75 @@ onBeforeUnmount(() => {
                 <span class="mt-1 text-[11px] font-bold uppercase tracking-wider" style="color: #d98d0b">Success rate</span>
               </div>
               <p class="mt-5 text-sm leading-6" style="color: #757575">
-                Every company we have helped so far has <span class="font-semibold" style="color: #202020">hit their compliance target</span> — no exceptions.
+                Every company we have helped has <span class="font-semibold" style="color: #202020">hit their compliance target</span> — no exceptions.
               </p>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PORTAL (live client workspace) ================= -->
+    <section id="portal" class="scroll-mt-16 py-20" style="background: #ffffff">
+      <div class="mx-auto max-w-[1140px] px-4">
+        <div class="pb-10">
+          <p class="section-eyebrow">The SECPhils portal</p>
+          <h1 class="font-light text-3xl sm:text-4xl md:text-[3em]" style="color: #202020">
+            Your Compliance. <span style="color: var(--bsp)">Live. In Your Hands.</span>
+          </h1>
+          <p class="mt-3 max-w-2xl text-sm leading-6" style="color: #757575">
+            Every engagement runs on our private client portal — a secure workspace where you watch
+            progress unfold, talk straight to the engineers working your project, and stay in the
+            loop in real time. No black box. No "what's the status?" emails.
+          </p>
+        </div>
+
+        <div class="grid gap-8 md:grid-cols-3">
+          <div class="rounded-2xl border p-7" style="border-color: #e8e8e8; background: #f9f9f9">
+            <div
+              class="flex h-11 w-11 items-center justify-center rounded-xl text-lg"
+              style="background: var(--bsp-soft); color: var(--bsp)"
+            >
+              <i class="fa-solid fa-gauge-high"></i>
+            </div>
+            <h2 class="mt-4 text-xl font-semibold" style="color: #353535">Progress you can watch</h2>
+            <p class="mt-2 text-sm leading-6" style="color: #757575">
+              Tasks, milestones and document updates the second they happen. Open the portal and your
+              project is exactly where it is — you'll always know.
+            </p>
+          </div>
+
+          <div class="rounded-2xl border p-7" style="border-color: #e8e8e8; background: #f9f9f9">
+            <div
+              class="flex h-11 w-11 items-center justify-center rounded-xl text-lg"
+              style="background: var(--bsp-soft); color: var(--bsp)"
+            >
+              <i class="fa-solid fa-comments"></i>
+            </div>
+            <h2 class="mt-4 text-xl font-semibold" style="color: #353535">Talk to your team, instantly</h2>
+            <p class="mt-2 text-sm leading-6" style="color: #757575">
+              Message the engineers on your project in real time. No phone tag, no gatekeepers —
+              just you, us, and the work moving forward.
+            </p>
+          </div>
+
+          <div class="rounded-2xl border p-7" style="border-color: #e8e8e8; background: #f9f9f9">
+            <div
+              class="flex h-11 w-11 items-center justify-center rounded-xl text-lg"
+              style="background: var(--bsp-soft); color: var(--bsp)"
+            >
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <h2 class="mt-4 text-xl font-semibold" style="color: #353535">Locked down, by design</h2>
+            <p class="mt-2 text-sm leading-6" style="color: #757575">
+              Encrypted in transit and at rest, with role-based access. Your data never leaves your
+              company's walls — and our side of the lock is just as tight.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-12 text-center">
+          <button class="hero-btn" @click="openContact">Step Inside the Portal</button>
         </div>
       </div>
     </section>
