@@ -456,8 +456,8 @@ onBeforeUnmount(() => {
           <p class="section-eyebrow">What we do</p>
           <h1 class="font-light text-3xl sm:text-4xl md:text-[3em]" style="color: #202020">Our Services</h1>
           <p class="mt-3 max-w-2xl text-sm leading-6" style="color: #757575">
-            Environmental compliance and business engineering services, handled end to end by our
-            team of licensed Filipino engineers.
+            Environmental compliance and engineering services, handled end to end by our team of
+            highly competitive Filipino engineers.
           </p>
         </div>
 
