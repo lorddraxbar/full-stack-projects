@@ -81,6 +81,22 @@ public class Project {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Set when the project is archived (soft delete). */
+    @Column(name = "archived_at")
+    private LocalDateTime archivedAt;
+
+    /** 7 days after archived_at — when the project becomes eligible for hard delete. */
+    @Column(name = "delete_at")
+    private LocalDateTime deleteAt;
+
+    /** Status before archiving; restored on un-archive. */
+    @Column(name = "previous_status", length = 30)
+    private String previousStatus;
+
+    /** S3 prefix where the project's objects were relocated while archived. */
+    @Column(name = "archive_dir", length = 500)
+    private String archiveDir;
+
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Task> tasks = new ArrayList<>();
 

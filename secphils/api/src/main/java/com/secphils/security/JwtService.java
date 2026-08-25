@@ -75,6 +75,44 @@ public class JwtService {
         return claims.get("role", String.class);
     }
 
+    /**
+     * SSO "state" token: a random nonce signed with the JWT key, so the
+     * callback can prove the authorize redirect was minted by us (CSRF /
+     * login-forgery protection) without storing server-side state.
+     */
+    public String signSsoState(String nonce) {
+        return nonce + "." + hmac(nonce);
+    }
+
+    public boolean verifySsoState(String state) {
+        if (state == null || !state.contains(".")) return false;
+        int i = state.indexOf('.');
+        String nonce = state.substring(0, i);
+        String sig = state.substring(i + 1);
+        if (nonce.isBlank() || sig.isBlank()) return false;
+        return constantTimeEquals(hmac(nonce), sig);
+    }
+
+    private String hmac(String data) {
+        try {
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            mac.init(key);
+            byte[] raw = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
+        } catch (Exception e) {
+            throw new JwtException("HMAC failure");
+        }
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        byte[] x = a.getBytes(StandardCharsets.UTF_8);
+        byte[] y = b.getBytes(StandardCharsets.UTF_8);
+        if (x.length != y.length) return false;
+        int r = 0;
+        for (int i = 0; i < x.length; i++) r |= x[i] ^ y[i];
+        return r == 0;
+    }
+
     public static class JwtException extends RuntimeException {
         public JwtException(String message) {
             super(message);

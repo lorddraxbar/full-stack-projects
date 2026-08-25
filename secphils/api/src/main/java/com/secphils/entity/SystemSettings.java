@@ -34,6 +34,10 @@ public class SystemSettings {
     private String storage;
 
     @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "google_sso", columnDefinition = "JSONB")
+    private String googleSso;
+
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "security_policies", columnDefinition = "JSONB")
     private String securityPolicies;
 

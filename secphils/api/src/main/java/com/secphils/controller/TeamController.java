@@ -64,6 +64,9 @@ public class TeamController {
         ProjectTeamMember member = new ProjectTeamMember();
         member.setProject(project);
         member.setUser(user);
+        // The column is NOT NULL — the user's portal role is the working role
+        // on the project (there is no per-project role vocabulary yet).
+        member.setRoleOnProject(user.getRole());
         member.setAssignedAt(LocalDateTime.now());
         member = teamMemberRepository.save(member);
         auditService.audit(actor, "TEAM_ADD", "ProjectTeamMember", user.getId(),

@@ -2,6 +2,7 @@ package com.secphils.controller;
 
 import com.secphils.common.AuditService;
 import com.secphils.common.ApiException;
+import com.secphils.dto.GoogleSsoConfig;
 import com.secphils.entity.AuditLog;
 import com.secphils.entity.SystemSettings;
 import com.secphils.repository.CompanyRepository;
@@ -13,6 +14,7 @@ import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
 import com.secphils.service.S3StorageService;
 import com.secphils.service.S3StorageService.StorageConfig;
+import com.secphils.service.SsoService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -108,7 +110,7 @@ public class AdminController {
     public ResponseEntity<SystemSettings> getSettings() {
         SystemSettings settings = settingsRepository.findAll().stream().findFirst()
                 .orElseThrow(() -> ApiException.notFound("System settings"));
-        return ResponseEntity.ok(maskStorage(settings));
+        return ResponseEntity.ok(maskStorage(maskSso(settings)));
     }
 
     @PutMapping("/settings")
@@ -123,6 +125,7 @@ public class AdminController {
         if (body.containsKey("integrations")) settings.setIntegrations((String) body.get("integrations"));
         if (body.containsKey("securityPolicies")) settings.setSecurityPolicies((String) body.get("securityPolicies"));
         if (body.containsKey("storage")) settings.setStorage(normalizeStorage(body.get("storage"), settings.getStorage()));
+        if (body.containsKey("googleSso")) settings.setGoogleSso(normalizeSso(body.get("googleSso"), settings.getGoogleSso()));
         if (body.containsKey("maintenanceMode")) {
             settings.setMaintenanceMode(Boolean.valueOf(String.valueOf(body.get("maintenanceMode"))));
         }
@@ -133,7 +136,7 @@ public class AdminController {
         settings.setUpdatedAt(LocalDateTime.now());
         settings = settingsRepository.save(settings);
         auditService.audit(actor, "SETTINGS_UPDATE", "SystemSettings", settings.getId(), null, http);
-        return ResponseEntity.ok(maskStorage(settings));
+        return ResponseEntity.ok(maskStorage(maskSso(settings)));
     }
 
     /**
@@ -196,6 +199,39 @@ public class AdminController {
                 cfg = new StorageConfig(cfg.provider(), cfg.region(), cfg.bucket(), cfg.accessKey(),
                         S3StorageService.SECRET_MASK, cfg.endpoint(), cfg.publicBaseUrl(), cfg.folder(), cfg.maxUploadMb());
                 s.setStorage(storageService.serialize(cfg));
+            }
+        }
+        return s;
+    }
+
+    /**
+     * Google SSO arrives as a JSON string (like the other JSONB columns).
+     *
+     * Client-secret semantics (mirrors the storage config rule — the UI
+     * loads the stored config with the secret redacted to "********"):
+     *   • mask ("********")  → keep the currently stored secret
+     *   • blank             → keep the currently stored secret (toggle-off)
+     *   • any other value    → adopt it as the new secret
+     */
+    private String normalizeSso(Object incoming, String currentJson) {
+        if (incoming == null) return currentJson;
+        String json = String.valueOf(incoming);
+        if (json.isBlank()) return currentJson;
+        GoogleSsoConfig in = SsoService.fromJson(json);
+        GoogleSsoConfig cur = SsoService.fromJson(currentJson);
+        if (in.clientSecret == null || in.clientSecret.isBlank()
+                || GoogleSsoConfig.SECRET_MASK.equals(in.clientSecret)) {
+            in.clientSecret = cur.clientSecret == null ? "" : cur.clientSecret;
+        }
+        return SsoService.toJson(in);
+    }
+
+    /** Redacts the stored SSO client secret on read. */
+    private SystemSettings maskSso(SystemSettings s) {
+        if (s.getGoogleSso() != null) {
+            GoogleSsoConfig cfg = SsoService.fromJson(s.getGoogleSso());
+            if (cfg.clientSecret != null && !cfg.clientSecret.isBlank()) {
+                s.setGoogleSso(SsoService.toJson(GoogleSsoConfig.masked(cfg)));
             }
         }
         return s;

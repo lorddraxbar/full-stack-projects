@@ -2,6 +2,7 @@ package com.secphils.controller;
 
 import com.secphils.common.AuditService;
 import com.secphils.common.ApiException;
+import com.secphils.dto.ProjectHardDeleteRequest;
 import com.secphils.dto.ProjectRequest;
 import com.secphils.dto.ProjectResponse;
 import com.secphils.entity.Company;
@@ -12,6 +13,7 @@ import com.secphils.repository.ProjectRepository;
 import com.secphils.repository.ServiceRepository;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
+import com.secphils.service.ProjectArchiveService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -31,13 +33,16 @@ public class ProjectController {
     private final CompanyRepository companyRepository;
     private final ServiceRepository serviceRepository;
     private final AuditService auditService;
+    private final ProjectArchiveService archiveService;
 
     public ProjectController(ProjectRepository projectRepository, CompanyRepository companyRepository,
-                             ServiceRepository serviceRepository, AuditService auditService) {
+                             ServiceRepository serviceRepository, AuditService auditService,
+                             ProjectArchiveService archiveService) {
         this.projectRepository = projectRepository;
         this.companyRepository = companyRepository;
         this.serviceRepository = serviceRepository;
         this.auditService = auditService;
+        this.archiveService = archiveService;
     }
 
     @GetMapping
@@ -121,18 +126,46 @@ public class ProjectController {
         return ResponseEntity.ok(ProjectResponse.from(project));
     }
 
+    /**
+     * Archive (soft delete). Staff only — clients can never archive.
+     * Stamps archived_at/delete_at, relocates S3 objects under a timestamped
+     * archive prefix, and notifies the project's company members.
+     */
     @DeleteMapping("/{id}")
     @Transactional
     public ResponseEntity<Void> archive(@PathVariable Long id, HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
-        if (actor.isClient()) {
-            throw ApiException.forbidden("Clients cannot archive projects");
-        }
-        Project project = projectRepository.findById(id).orElseThrow(() -> ApiException.notFound("Project"));
-        requireVisibleTo(actor, project.getCompany().getId());
-        project.setStatus("ARCHIVED");
-        projectRepository.save(project);
-        auditService.audit(actor, "PROJECT_ARCHIVE", "Project", project.getId(), "Name: " + project.getName(), http);
+        archiveService.archive(actor, id);
+        auditService.audit(actor, "PROJECT_ARCHIVE", "Project", id,
+                "Name: " + projectRepository.findById(id).map(Project::getName).orElse("?"), http);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Restore an archived project (undo a soft delete). Staff only. */
+    @PostMapping("/{id}/restore")
+    @Transactional
+    public ResponseEntity<ProjectResponse> restore(@PathVariable Long id, HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        Project project = archiveService.restore(actor, id);
+        auditService.audit(actor, "PROJECT_RESTORE", "Project", id,
+                "Name: " + project.getName(), http);
+        return ResponseEntity.ok(ProjectResponse.from(project));
+    }
+
+    /**
+     * Permanently delete an archived project (DB rows + S3 objects).
+     * Admins only; requires the account password when the 7-day window
+     * hasn't elapsed yet.
+     */
+    @DeleteMapping("/{id}/hard")
+    @Transactional
+    public ResponseEntity<Void> hardDelete(@PathVariable Long id,
+                                           @RequestBody(required = false) ProjectHardDeleteRequest req,
+                                           HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        archiveService.hardDelete(actor, id, req == null ? null : req.password);
+        auditService.audit(actor, "PROJECT_HARD_DELETE", "Project", id,
+                "Force: " + (req != null && req.password != null && !req.password.isBlank()), http);
         return ResponseEntity.noContent().build();
     }
 

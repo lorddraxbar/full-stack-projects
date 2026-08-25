@@ -14,9 +14,11 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -294,6 +296,50 @@ public class S3StorageService {
                     .deleteObject(DeleteObjectRequest.builder().bucket(ref.bucket()).key(ref.key()).build());
         } catch (Exception e) {
             log.warn("Failed to delete S3 object {}: {}", s3Uri, e.toString());
+        }
+    }
+
+    /** All object keys under a bucket prefix (paginated). Empty prefix = whole bucket. */
+    public List<String> listKeys(StorageConfig cfg, String prefix) {
+        S3Client c = client(cfg);
+        List<String> keys = new java.util.ArrayList<>();
+        String continuation = null;
+        do {
+            ListObjectsV2Request.Builder rb = ListObjectsV2Request.builder()
+                    .bucket(cfg.bucket()).maxKeys(1000);
+            if (prefix != null && !prefix.isEmpty()) rb.prefix(prefix);
+            if (continuation != null) rb.continuationToken(continuation);
+            ListObjectsV2Response resp = c.listObjectsV2(rb.build());
+            for (S3Object o : resp.contents()) keys.add(o.key());
+            continuation = resp.isTruncated() ? resp.nextContinuationToken() : null;
+        } while (continuation != null);
+        return keys;
+    }
+
+    /** Server-side copy of a single object within the bucket. Returns the new key. */
+    public String copyObject(StorageConfig cfg, String sourceKey, String destKey) {
+        try {
+            client(cfg).copyObject(
+                    CopyObjectRequest.builder()
+                            .sourceBucket(cfg.bucket()).sourceKey(sourceKey)
+                            .destinationBucket(cfg.bucket()).destinationKey(destKey)
+                            .build());
+        } catch (S3Exception e) {
+            throw storageFailure(e, "copy a storage object");
+        } catch (SdkClientException e) {
+            throw transportFailure(e, "copy a storage object");
+        }
+        return destKey;
+    }
+
+    /** Hard delete of one object key. Throws on failure (unlike {@link #deleteQuietly}). */
+    public void deleteObject(StorageConfig cfg, String key) {
+        try {
+            client(cfg).deleteObject(DeleteObjectRequest.builder().bucket(cfg.bucket()).key(key).build());
+        } catch (S3Exception e) {
+            throw storageFailure(e, "delete a storage object");
+        } catch (SdkClientException e) {
+            throw transportFailure(e, "delete a storage object");
         }
     }
 

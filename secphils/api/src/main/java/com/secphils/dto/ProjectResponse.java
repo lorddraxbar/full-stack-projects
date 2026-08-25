@@ -27,7 +27,9 @@ public record ProjectResponse(
         LocalDate dueDate,
         Integer progress,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        LocalDateTime archivedAt,
+        LocalDateTime deleteAt
 ) {
     public static ProjectResponse from(Project p) {
         return new ProjectResponse(
@@ -40,6 +42,7 @@ public record ProjectResponse(
                 p.getStatus(), p.getTotalCost(), p.getRawMaterials(), p.getProductionOutput(),
                 p.getWasteManagement(), p.getWasteMaterials(), p.getManufacturingProcedure(),
                 p.getProductionFlowchartUrl(), p.getDueDate(), p.getProgress(),
-                p.getCreatedAt(), p.getUpdatedAt());
+                p.getCreatedAt(), p.getUpdatedAt(),
+                p.getArchivedAt(), p.getDeleteAt());
     }
 }

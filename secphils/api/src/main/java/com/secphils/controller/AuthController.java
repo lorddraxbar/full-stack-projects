@@ -3,10 +3,13 @@ package com.secphils.controller;
 import com.secphils.common.AuditService;
 import com.secphils.common.ApiException;
 import com.secphils.dto.*;
+import com.secphils.entity.SystemSettings;
 import com.secphils.entity.User;
+import com.secphils.repository.SystemSettingsRepository;
 import com.secphils.repository.UserRepository;
 import com.secphils.security.CurrentUser;
 import com.secphils.security.JwtService;
+import com.secphils.service.SsoService;
 import com.secphils.service.TwoFactorService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
 @RestController
@@ -29,15 +33,20 @@ public class AuthController {
     private final JwtService jwtService;
     private final AuditService auditService;
     private final TwoFactorService twoFactorService;
+    private final SsoService ssoService;
+    private final SystemSettingsRepository settingsRepository;
 
     public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder,
                           JwtService jwtService, AuditService auditService,
-                          TwoFactorService twoFactorService) {
+                          TwoFactorService twoFactorService, SsoService ssoService,
+                          SystemSettingsRepository settingsRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.auditService = auditService;
         this.twoFactorService = twoFactorService;
+        this.ssoService = ssoService;
+        this.settingsRepository = settingsRepository;
     }
 
     @PostMapping("/login")
@@ -184,41 +193,101 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Logged out"));
     }
 
-    @PostMapping("/sso/google")
-    @Transactional
-    public ResponseEntity<LoginResponse> ssoGoogle(@Valid @RequestBody SsoCallbackRequest req,
-                                                   HttpServletRequest http) {
-        return ssoLogin(req, "GOOGLE", http);
+    // ------------------------------------------------------------------
+    // Google SSO — OAuth 2.0 authorization-code flow (id_token + JWKS).
+    // Identities are established exclusively from Google-verified claims;
+    // the previous "trust a client-submitted email" stub is gone.
+    // ------------------------------------------------------------------
+
+    /** Lets the login page decide whether to render the Google button. */
+    @GetMapping("/sso/status")
+    @Transactional(readOnly = true)
+    public ResponseEntity<Map<String, Object>> ssoStatus() {
+        GoogleSsoConfig cfg = currentSsoConfig();
+        boolean ready = cfg.enabled
+                && cfg.clientId != null && !cfg.clientId.isBlank()
+                && cfg.clientSecret != null && !cfg.clientSecret.isBlank()
+                && cfg.redirectUri != null && !cfg.redirectUri.isBlank();
+        return ResponseEntity.ok(Map.of("googleEnabled", cfg.enabled, "googleConfigured", ready));
     }
 
-    @PostMapping("/sso/microsoft")
-    @Transactional
-    public ResponseEntity<LoginResponse> ssoMicrosoft(@Valid @RequestBody SsoCallbackRequest req,
-                                                      HttpServletRequest http) {
-        return ssoLogin(req, "MICROSOFT", http);
+    /**
+     * Step 1: browser asks us where to send the user. We mint a signed
+     * state nonce (CSRF / login-forgery protection) and return Google's
+     * authorization URL for the frontend to redirect to.
+     */
+    @PostMapping("/sso/google/authorize")
+    @Transactional(readOnly = true)
+    public ResponseEntity<GoogleSsoAuthorizeResponse> ssoGoogleAuthorize() {
+        GoogleSsoConfig cfg = currentSsoConfig();
+        if (!cfg.enabled || cfg.clientId == null || cfg.clientId.isBlank()) {
+            throw ApiException.notFound("Google sign-in is not enabled");
+        }
+        if (cfg.clientSecret == null || cfg.clientSecret.isBlank()) {
+            throw ApiException.badRequest("Google SSO is misconfigured (client secret missing)");
+        }
+        if (cfg.redirectUri == null || cfg.redirectUri.isBlank()) {
+            throw ApiException.badRequest("Google SSO is misconfigured (redirect URI missing)");
+        }
+        String state = jwtService.signSsoState(UUID.randomUUID().toString());
+        return ResponseEntity.ok(new GoogleSsoAuthorizeResponse(ssoService.buildAuthorizeUrl(cfg, state)));
     }
 
-    @PostMapping("/sso/linkedin")
+    /**
+     * Step 2: Google redirected the browser back with code + state. The
+     * callback page posts both here; we verify the signed state, exchange
+     * the code with Google, verify the id_token via JWKS, then sign the
+     * user in (auto-provisioning new users as CLIENT, like invites).
+     */
+    @PostMapping("/sso/google/callback")
     @Transactional
-    public ResponseEntity<LoginResponse> ssoLinkedIn(@Valid @RequestBody SsoCallbackRequest req,
-                                                     HttpServletRequest http) {
-        return ssoLogin(req, "LINKEDIN", http);
-    }
+    public ResponseEntity<LoginResponse> ssoGoogleCallback(@Valid @RequestBody GoogleSsoCallbackRequest req,
+                                                           HttpServletRequest http) {
+        GoogleSsoConfig cfg = currentSsoConfig();
+        if (!cfg.enabled) {
+            throw ApiException.badRequest("Google sign-in is disabled");
+        }
+        if (!jwtService.verifySsoState(req.state())) {
+            auditService.audit(null, "SSO_STATE_MISMATCH", "User", null,
+                    "state: " + String.valueOf(req.state()).substring(0, Math.min(24, String.valueOf(req.state()).length())), http);
+            throw ApiException.badRequest("Invalid or expired SSO session. Please try again.");
+        }
 
-    private ResponseEntity<LoginResponse> ssoLogin(SsoCallbackRequest req, String provider, HttpServletRequest http) {
-        // Stub: in production, verify the provider token/ID here before trusting the identity.
-        User user = userRepository.findByEmail(req.email()).orElseGet(() -> {
+        Map<String, String> claims;
+        try {
+            claims = ssoService.exchangeCode(cfg, req.code());
+        } catch (Exception e) {
+            String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            auditService.audit(null, "SSO_LOGIN_FAILED", "User", null,
+                    "provider: GOOGLE, reason: " + reason, http);
+            throw ApiException.badRequest(reason);
+        }
+
+        String email = claims.get("email");
+        User user = userRepository.findByEmail(email).orElseGet(() -> {
             User u = new User();
-            u.setEmail(req.email());
-            u.setFirstName(req.firstName());
-            u.setLastName(req.lastName());
+            u.setEmail(email);
+            u.setFirstName(claims.getOrDefault("given_name", ""));
+            u.setLastName(claims.getOrDefault("family_name", ""));
             u.setRole("CLIENT");
             u.setIsActive(true);
             return u;
         });
-        user = userRepository.save(user);
-        auditService.audit(null, "USER_SSO_LOGIN", "User", user.getId(), "Provider: " + provider, http);
+        // Keep the profile fresh if Google has it and the row is stale.
+        if (user.getFirstName() == null || user.getFirstName().isBlank()) {
+            user.setFirstName(claims.getOrDefault("given_name", ""));
+            user.setLastName(claims.getOrDefault("family_name", ""));
+        }
+        user.setLastLogin(LocalDateTime.now());
+        userRepository.save(user);
+        auditService.audit(null, "USER_SSO_LOGIN", "User", user.getId(), "Provider: GOOGLE", http);
         return ResponseEntity.ok(buildTokenResponse(user));
+    }
+
+    private GoogleSsoConfig currentSsoConfig() {
+        return settingsRepository.findAll().stream().findFirst()
+                .map(s -> SsoService.fromJson(s.getGoogleSso()))
+                .orElseGet(GoogleSsoConfig::new);
     }
 
     private LoginResponse buildTokenResponse(User user) {
