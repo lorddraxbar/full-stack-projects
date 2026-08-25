@@ -80,9 +80,22 @@ export async function useChangePassword(currentPassword: string, newPassword: st
   return response.data as { message: string }
 }
 
-export async function useSSOCallback(provider: string, identity: { email: string; firstName: string; lastName: string }) {
-  const response = await api.post(`/auth/sso/${provider}`, identity)
-  return response.data
+// ---------- Google SSO ----------
+export async function useGetSsoStatus() {
+  const response = await api.get('/auth/sso/status')
+  return response.data as { googleEnabled: boolean; googleConfigured: boolean }
+}
+
+/** Kicks off the Google OAuth flow; returns the authorization URL to redirect the browser to. */
+export async function useGoogleSsoAuthorize() {
+  const response = await api.post('/auth/sso/google/authorize')
+  return response.data as { url: string }
+}
+
+/** Completes the Google OAuth callback with the authorization code + signed state. */
+export async function useGoogleSsoCallback(code: string, state: string) {
+  const response = await api.post('/auth/sso/google/callback', { code, state })
+  return response.data as LoginResult
 }
 
 // ---------- Users ----------
@@ -153,6 +166,27 @@ export async function useUpdateProject(id: number, data: Record<string, unknown>
 
 export async function useDeleteProject(id: number) {
   const response = await api.delete(`/projects/${id}`)
+  return response.data
+}
+
+/** Soft-delete / archive a project (staff only). */
+export async function useArchiveProject(id: number) {
+  const response = await api.delete(`/projects/${id}`)
+  return response.data
+}
+
+/** Restore an archived project (undo soft delete). */
+export async function useRestoreProject(id: number) {
+  const response = await api.post(`/projects/${id}/restore`)
+  return response.data
+}
+
+/**
+ * Permanently delete an archived project (admin only).
+ * Pass the admin's password when the 7-day grace window hasn't elapsed.
+ */
+export async function useHardDeleteProject(id: number, password?: string) {
+  const response = await api.delete(`/projects/${id}/hard`, password ? { data: { password } } : {})
   return response.data
 }
 

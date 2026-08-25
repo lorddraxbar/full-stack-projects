@@ -1160,6 +1160,65 @@ const saveStorageSettings = async () => {
   }
 }
 
+// ---------- Google Sign-In (SSO) ----------
+interface SsoForm {
+  enabled: boolean
+  clientId: string
+  clientSecret: string
+  redirectUri: string
+  domainRestriction: string
+}
+const DEFAULT_SSO: SsoForm = {
+  enabled: false,
+  clientId: '',
+  clientSecret: '',
+  redirectUri: '',
+  domainRestriction: '',
+}
+const ssoForm = ref<SsoForm>({ ...DEFAULT_SSO })
+const ssoMessage = ref<{ ok: boolean; text: string } | null>(null)
+const ssoSaving = ref(false)
+
+const loadSsoSettings = (data: any) => {
+  const stored = parseJson<any>(data?.googleSso, null)
+  ssoForm.value = {
+    enabled: !!stored?.enabled,
+    clientId: stored?.clientId || '',
+    clientSecret: stored?.clientSecret || '',
+    redirectUri: stored?.redirectUri || '',
+    domainRestriction: stored?.domainRestriction || '',
+  }
+}
+
+const ssoPayload = (): Record<string, unknown> => ({
+  enabled: ssoForm.value.enabled,
+  clientId: ssoForm.value.clientId.trim(),
+  clientSecret: ssoForm.value.clientSecret.trim(),
+  redirectUri: ssoForm.value.redirectUri.trim(),
+  domainRestriction: ssoForm.value.domainRestriction.trim(),
+})
+
+const saveSsoSettings = async () => {
+  ssoMessage.value = null
+  if (ssoForm.value.enabled && !ssoForm.value.clientId.trim()) {
+    ssoMessage.value = { ok: false, text: 'Client ID is required when Google sign-in is enabled.' }
+    return
+  }
+  if (ssoForm.value.enabled && !ssoForm.value.redirectUri.trim()) {
+    ssoMessage.value = { ok: false, text: 'Redirect URI is required when Google sign-in is enabled.' }
+    return
+  }
+  ssoSaving.value = true
+  try {
+    await useUpdateSystemSettings({ googleSso: JSON.stringify(ssoPayload()) })
+    ssoMessage.value = { ok: true, text: 'Google sign-in settings saved.' }
+  } catch (err: any) {
+    ssoMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save Google sign-in settings' }
+  } finally {
+    ssoSaving.value = false
+  }
+}
+
 const loadSystemSettings = async () => {
   try {
     const data: any = await useGetSystemSettings()
@@ -1171,6 +1230,7 @@ const loadSystemSettings = async () => {
     emailTemplates.value = parseJson<any[]>(data.emailTemplates, DEFAULT_EMAIL_TEMPLATES.map(t => ({ ...t })))
     integrations.value = parseJson<any[]>(data.integrations, DEFAULT_INTEGRATIONS.map(t => ({ ...t })))
     loadStorageSettings(data)
+    loadSsoSettings(data)
   } catch {
     // keep defaults if the settings endpoint is unavailable
   }
@@ -2523,6 +2583,86 @@ const timeOfDay = (ts: string) => {
             class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
           >
             Save Object Storage
+          </button>
+        </div>
+      </div>
+
+      <!-- Google Sign-In (SSO) -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="text-lg font-semibold text-gray-900">Google Sign-In (SSO)</h2>
+          <span
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+            :class="ssoForm.enabled
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-gray-100 text-gray-600'"
+          >
+            <span class="w-1.5 h-1.5 rounded-full" :class="ssoForm.enabled ? 'bg-emerald-500' : 'bg-gray-400'"></span>
+            {{ ssoForm.enabled ? 'Enabled' : 'Disabled' }}
+          </span>
+        </div>
+        <p class="text-sm text-gray-600 mb-4">
+          Let users sign in with their Google account. Create an OAuth 2.0 Client ID in
+          Google Cloud Console and add its redirect URI as an authorized redirect.
+          The client secret is stored securely and never returned in plaintext — leave it
+          unchanged to keep the existing one.
+        </p>
+        <div class="mb-5">
+          <label class="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+            <input v-model="ssoForm.enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+            Allow users to sign in with Google
+          </label>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">OAuth Client ID *</label>
+            <input
+              v-model="ssoForm.clientId"
+              type="text"
+              placeholder="xxxxxxxx.apps.googleusercontent.com"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">OAuth Client Secret</label>
+            <input
+              v-model="ssoForm.clientSecret"
+              type="password"
+              placeholder="•••••••••••••••• (unchanged = keep existing)"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Redirect URI *</label>
+            <input
+              v-model="ssoForm.redirectUri"
+              type="text"
+              placeholder="https://secphils.example.com/auth/sso/callback"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Domain Restriction</label>
+            <input
+              v-model="ssoForm.domainRestriction"
+              type="text"
+              placeholder="secphils.com (optional — only allow @domain emails)"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+        </div>
+
+        <div v-if="ssoMessage" class="mt-4 text-sm" :class="ssoMessage.ok ? 'text-emerald-700' : 'text-red-700'">
+          {{ ssoMessage.text }}
+        </div>
+
+        <div class="mt-6 flex items-center justify-end">
+          <button
+            @click="saveSsoSettings"
+            :disabled="ssoSaving"
+            class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
+          >
+            {{ ssoSaving ? 'Saving…' : 'Save Google Sign-In' }}
           </button>
         </div>
       </div>

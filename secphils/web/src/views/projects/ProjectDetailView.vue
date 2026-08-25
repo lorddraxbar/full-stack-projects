@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useRole } from '@/composables/useRole'
 import RowActionsMenu from '@/components/RowActionsMenu.vue'
 import {
   useGetMe, useGetProject, useGetCompany, useGetProjectTeam,
   useGetDocuments, useCreateDocument, useDeleteDocument,
   useGetMessages, useSendMessage, useUpdateProject,
+  useArchiveProject, useRestoreProject, useHardDeleteProject,
 } from '@/services/api'
 import {
   projectStatusLabel, documentCategoryLabel,
@@ -80,6 +81,55 @@ async function load() {
 }
 
 onMounted(load)
+
+// ---------- Archive lifecycle (soft delete / restore / hard delete) ----------
+const router = useRouter()
+const lifecycleBusy = ref(false)
+const archived = computed(() => project.value?.status === 'ARCHIVED')
+
+async function archiveProject() {
+  if (!confirm('Archive this project? It will be hidden and its files moved into the archive. You can restore it within the grace period.')) return
+  lifecycleBusy.value = true
+  saveError.value = ''
+  try {
+    await useArchiveProject(projectId.value)
+    await load()
+  } catch (err: any) {
+    saveError.value = err?.response?.data?.message || 'Failed to archive project'
+  } finally {
+    lifecycleBusy.value = false
+  }
+}
+
+async function restoreProject() {
+  if (!confirm('Restore this archived project? It will return to its previous status.')) return
+  lifecycleBusy.value = true
+  saveError.value = ''
+  try {
+    await useRestoreProject(projectId.value)
+    await load()
+  } catch (err: any) {
+    saveError.value = err?.response?.data?.message || 'Failed to restore project'
+  } finally {
+    lifecycleBusy.value = false
+  }
+}
+
+async function hardDeleteProject() {
+  if (!confirm('Permanently delete this project? All data and files will be permanently removed. This cannot be undone.')) return
+  // Admins must supply their password when the 7-day grace window hasn't elapsed.
+  const password = window.prompt('Enter your password to permanently delete this project:')
+  if (password === null) return
+  lifecycleBusy.value = true
+  saveError.value = ''
+  try {
+    await useHardDeleteProject(projectId.value, password)
+    router.push('/projects')
+  } catch (err: any) {
+    saveError.value = err?.response?.data?.message || 'Failed to delete project'
+    lifecycleBusy.value = false
+  }
+}
 
 // ---------- Messages ----------
 const messageDraft = ref('')
@@ -551,6 +601,55 @@ async function saveAdminChanges() {
           >
             Save Changes
           </button>
+        </div>
+
+        <!-- Lifecycle: archive / restore / hard delete -->
+        <div class="mt-8 border-t border-gray-200 pt-6">
+          <h3 class="text-base font-semibold text-gray-900">Lifecycle</h3>
+          <p class="mt-1 text-sm text-gray-600">
+            Archiving hides the project from the list and moves its files into the archive.
+            While archived it can be restored within the retention window; after that it can only
+            be permanently deleted.
+          </p>
+
+          <div v-if="archived" class="mt-4 rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm">
+            <p class="font-medium text-amber-800">This project is archived.</p>
+            <p class="mt-1 text-amber-700">
+              Archived {{ project.archivedAt ? formatDate(project.archivedAt) : '—' }}
+              <span v-if="project.deleteAt">
+                · retention ends {{ formatDate(project.deleteAt) }}
+              </span>
+            </p>
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              v-if="!archived"
+              @click="archiveProject"
+              :disabled="lifecycleBusy"
+              class="px-4 py-2 border border-amber-300 text-amber-800 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors text-sm font-medium disabled:opacity-50"
+            >
+              {{ lifecycleBusy ? 'Working…' : 'Archive Project' }}
+            </button>
+            <button
+              v-else
+              @click="restoreProject"
+              :disabled="lifecycleBusy"
+              class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
+            >
+              {{ lifecycleBusy ? 'Working…' : 'Restore Project' }}
+            </button>
+            <button
+              @click="hardDeleteProject"
+              :disabled="lifecycleBusy"
+              class="px-4 py-2 border border-red-300 text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium disabled:opacity-50"
+            >
+              {{ lifecycleBusy ? 'Working…' : 'Permanently Delete' }}
+            </button>
+            <p class="text-xs text-gray-500">
+              Permanent deletion requires your password inside the retention window.
+            </p>
+          </div>
         </div>
       </div>
     </div>

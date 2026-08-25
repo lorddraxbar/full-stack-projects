@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useGetSsoStatus, useGoogleSsoAuthorize } from '@/services/api'
 
 const router = useRouter()
 const email = ref('')
@@ -8,6 +9,29 @@ const password = ref('')
 const showPassword = ref(false)
 const error = ref('')
 const loading = ref(false)
+
+// Google SSO
+const ssoEnabled = ref(false)
+const ssoLoading = ref(false)
+const handleGoogleLogin = async () => {
+  ssoLoading.value = true
+  error.value = ''
+  try {
+    const { url } = await useGoogleSsoAuthorize()
+    window.location.href = url
+  } catch (err: any) {
+    error.value = err?.response?.data?.message || err.message || 'Unable to start Google sign-in'
+    ssoLoading.value = false
+  }
+}
+onMounted(async () => {
+  try {
+    const s = await useGetSsoStatus()
+    ssoEnabled.value = !!(s.googleEnabled && s.googleConfigured)
+  } catch {
+    ssoEnabled.value = false
+  }
+})
 
 const awaiting2fa = ref(false)
 const pendingToken = ref('')
@@ -207,7 +231,7 @@ const handle2faVerify = async () => {
       </button>
     </form>
 
-    <div v-if="!awaiting2fa" class="mt-6">
+    <div v-if="!awaiting2fa && ssoEnabled" class="mt-6">
       <div class="relative">
         <div class="absolute inset-0 flex items-center">
           <div class="w-full border-t border-gray-300"></div>
@@ -217,18 +241,15 @@ const handle2faVerify = async () => {
         </div>
       </div>
 
-      <div class="mt-4 grid grid-cols-3 gap-3">
-        <button class="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+      <div class="mt-4">
+        <button
+          type="button"
+          @click="handleGoogleLogin"
+          :disabled="ssoLoading"
+          class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+        >
           <i class="fab fa-google text-lg"></i>
-          <span class="ml-2 text-sm">Google</span>
-        </button>
-        <button class="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          <i class="fab fa-microsoft text-lg"></i>
-          <span class="ml-2 text-sm">Microsoft</span>
-        </button>
-        <button class="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          <i class="fab fa-linkedin text-lg"></i>
-          <span class="ml-2 text-sm">LinkedIn</span>
+          <span class="ml-2 text-sm">{{ ssoLoading ? 'Redirecting to Google…' : 'Google' }}</span>
         </button>
       </div>
     </div>
