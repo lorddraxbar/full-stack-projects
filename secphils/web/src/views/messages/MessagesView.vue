@@ -35,10 +35,6 @@ const selectedConversation = computed(() =>
   conversations.value.find(c => c.id === selectedId.value) || null
 )
 
-function initials(name: string): string {
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-}
-
 function isOwn(msg: any): boolean {
   return me.value != null && msg.senderId === me.value.id
 }
@@ -214,7 +210,7 @@ onMounted(loadConversations)
               {{ conv.lastMessage }}
             </p>
             <div class="flex items-center justify-between mt-2">
-              <span class="text-xs text-gray-500">{{ conv.lastMessageBy }}</span>
+              <span class="text-xs text-gray-500">{{ conv.lastMessageBy ? 'SECPhils' : '' }}</span>
               <span v-if="conv.messageCount > 0" class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
                 {{ conv.messageCount }}
               </span>
@@ -244,13 +240,13 @@ onMounted(loadConversations)
             ]"
           >
             <div class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
-              {{ initials(msg.senderName || '?') }}
+              S
             </div>
             <div :class="[
               'max-w-[70%] rounded-lg p-3',
               isOwn(msg) ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-900'
             ]">
-              <p class="text-sm font-medium mb-0.5">{{ msg.senderName }}</p>
+              <p class="text-sm font-medium mb-0.5">SECPhils</p>
               <p class="text-sm">
                 {{ msg.body }}
                 <span v-if="msg.attachmentFileName" class="text-emerald-300">

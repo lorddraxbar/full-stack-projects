@@ -502,7 +502,7 @@ async function saveAdminChanges() {
             >
               <div class="flex items-center justify-between gap-4 mb-1">
                 <p :class="['text-xs font-medium', isMine(msg) ? 'text-emerald-100' : 'text-gray-600']">
-                  {{ msg.senderName || '—' }}
+                  SECPhils
                 </p>
                 <p :class="['text-xs', isMine(msg) ? 'text-emerald-200' : 'text-gray-400']">
                   {{ formatDateTime(msg.createdAt) }}
