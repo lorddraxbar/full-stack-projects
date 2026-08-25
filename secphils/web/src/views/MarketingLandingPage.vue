@@ -288,6 +288,21 @@ const sectionShades = computed<Record<string, string>>(() => {
   return shades
 })
 
+// Card backgrounds: always the OPPOSITE shade of the parent section, so a card
+// can never blend into its section regardless of whether Client Feedback shows.
+// Exposed as --card-bg on each <section> so both inline-style and CSS-class
+// cards (which inherit the variable) can use it.
+const cardShades = computed<Record<string, string>>(() => {
+  const order = ['services', 'portal']
+  if (hasReviews.value) order.push('reviews')
+  order.push('about', 'contact')
+  const shades: Record<string, string> = {}
+  order.forEach((id, i) => {
+    shades[id] = i % 2 === 0 ? '#ffffff' : '#f9f9f9'
+  })
+  return shades
+})
+
 // ---------- Contact form (Get Started / email card) ----------
 const contactOpen = ref(false)
 const sending = ref(false)
@@ -473,7 +488,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- ================= SERVICES (modernized) ================= -->
-    <section id="services" class="scroll-mt-0 py-20" :style="{ background: sectionShades.services }">
+    <section id="services" class="scroll-mt-0 py-20" :style="{ background: sectionShades.services, '--card-bg': cardShades.services }">
       <div class="mx-auto max-w-[1140px] px-4">
         <div class="pb-10">
           <p class="section-eyebrow">What we do</p>
@@ -487,7 +502,7 @@ onBeforeUnmount(() => {
         <div class="flex flex-col gap-10 lg:grid lg:grid-cols-[58%_42%] lg:gap-10">
           <!-- Tabs + content -->
           <div class="lg:col-start-1 lg:row-start-1">
-            <div class="h-full rounded-2xl border p-6 sm:p-8" style="border-color: #e8e8e8; background: #ffffff">
+            <div class="h-full rounded-2xl border p-6 sm:p-8" style="border-color: #e8e8e8; background: var(--card-bg)">
               <div class="grid grid-cols-3 gap-3">
                 <button
                   v-for="cat in serviceCategories"
@@ -533,7 +548,7 @@ onBeforeUnmount(() => {
 
           <!-- Track record: 100% success rate -->
           <div class="lg:col-start-2 lg:row-start-1 lg:flex lg:flex-col">
-            <div class="track-card flex flex-1 flex-col items-center justify-center rounded-2xl bg-white p-8 text-center shadow-sm sm:p-10" style="border: 1px solid #e8e8e8">
+            <div class="track-card flex flex-1 flex-col items-center justify-center rounded-2xl p-8 text-center shadow-sm sm:p-10" style="border: 1px solid #e8e8e8; background: var(--card-bg)">
               <p class="text-xs font-bold uppercase tracking-[2px]" style="color: #999999">Our track record</p>
               <div class="mt-5 flex flex-col items-center">
                 <svg viewBox="0 0 160 160" class="h-36 w-36 sm:h-40 sm:w-40">
@@ -568,7 +583,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- ================= PORTAL (live client workspace) ================= -->
-    <section id="portal" class="scroll-mt-16 py-20" :style="{ background: sectionShades.portal }">
+    <section id="portal" class="scroll-mt-16 py-20" :style="{ background: sectionShades.portal, '--card-bg': cardShades.portal }">
       <div class="mx-auto max-w-[1140px] px-4">
         <div class="pb-10">
           <p class="section-eyebrow">The SECPhils portal</p>
@@ -582,7 +597,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="grid gap-8 md:grid-cols-3">
-          <div class="rounded-2xl border p-7" style="border-color: #e8e8e8; background: #f9f9f9">
+          <div class="rounded-2xl border p-7" style="border-color: #e8e8e8; background: var(--card-bg)">
             <div
               class="flex h-11 w-11 items-center justify-center rounded-xl text-lg"
               style="background: var(--bsp-soft); color: var(--bsp)"
@@ -596,7 +611,7 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
-          <div class="rounded-2xl border p-7" style="border-color: #e8e8e8; background: #f9f9f9">
+          <div class="rounded-2xl border p-7" style="border-color: #e8e8e8; background: var(--card-bg)">
             <div
               class="flex h-11 w-11 items-center justify-center rounded-xl text-lg"
               style="background: var(--bsp-soft); color: var(--bsp)"
@@ -610,7 +625,7 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
-          <div class="rounded-2xl border p-7" style="border-color: #e8e8e8; background: #f9f9f9">
+          <div class="rounded-2xl border p-7" style="border-color: #e8e8e8; background: var(--card-bg)">
             <div
               class="flex h-11 w-11 items-center justify-center rounded-xl text-lg"
               style="background: var(--bsp-soft); color: var(--bsp)"
@@ -632,7 +647,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- ================= REVIEWS (conditional — hidden with 0 approved reviews) ================= -->
-    <section v-if="hasReviews" id="reviews" class="py-20 scroll-mt-16" :style="{ background: sectionShades.reviews }">
+    <section v-if="hasReviews" id="reviews" class="py-20 scroll-mt-16" :style="{ background: sectionShades.reviews, '--card-bg': cardShades.reviews }">
       <div class="mx-auto max-w-[1140px] px-4">
         <div class="pb-10">
           <p class="section-eyebrow">Client feedback</p>
@@ -645,7 +660,7 @@ onBeforeUnmount(() => {
             v-for="r in reviews"
             :key="'g-' + r.id"
             class="rounded-2xl border p-8 transition-shadow hover:shadow-md"
-            style="border-color: #e8e8e8; background: #f9f9f9"
+            style="border-color: #e8e8e8; background: var(--card-bg)"
           >
             <div class="mb-3 text-lg" style="color: #f5a623">{{ stars(r.rating) }}</div>
             <h3 class="mb-4 font-light text-xl leading-snug" style="color: #353535">{{ r.title }}</h3>
@@ -678,7 +693,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- ================= ABOUT (modernized) ================= -->
-    <section id="about" class="py-20 scroll-mt-16" :style="{ background: sectionShades.about }">
+    <section id="about" class="py-20 scroll-mt-16" :style="{ background: sectionShades.about, '--card-bg': cardShades.about }">
       <div class="mx-auto max-w-[1140px] px-4">
         <div class="pb-10">
           <p class="section-eyebrow">Who we are</p>
@@ -687,7 +702,7 @@ onBeforeUnmount(() => {
 
         <div class="grid items-stretch gap-10 lg:grid-cols-2">
           <!-- Left: description -->
-          <div class="flex flex-col rounded-2xl border bg-white p-8 sm:p-10" style="border-color: #e8e8e8">
+          <div class="flex flex-col rounded-2xl border p-8 sm:p-10" style="border-color: #e8e8e8; background: var(--card-bg)">
             <i class="fa-solid fa-building-columns mb-4 block text-2xl" style="color: var(--bsp)"></i>
             <h2 class="mb-3 font-light text-2xl sm:text-3xl" style="color: #353535">{{ c.name }}</h2>
             <p class="text-base leading-7" style="color: #757575">{{ c.description }}</p>
@@ -715,7 +730,7 @@ onBeforeUnmount(() => {
 
         <!-- Team strip -->
         <div class="mt-10 grid gap-4 sm:grid-cols-3">
-          <div class="flex items-center gap-4 rounded-2xl bg-white p-5" style="border: 1px solid #e8e8e8">
+          <div class="flex items-center gap-4 rounded-2xl p-5" style="border: 1px solid #e8e8e8; background: var(--card-bg)">
             <span class="about-badge">
               <i class="fa-solid fa-users-gear"></i>
             </span>
@@ -724,7 +739,7 @@ onBeforeUnmount(() => {
               <p class="text-xs leading-5" style="color: #757575">Owned and operated by highly competitive Filipino engineers.</p>
             </div>
           </div>
-          <div class="flex items-center gap-4 rounded-2xl bg-white p-5" style="border: 1px solid #e8e8e8">
+          <div class="flex items-center gap-4 rounded-2xl p-5" style="border: 1px solid #e8e8e8; background: var(--card-bg)">
             <span class="about-badge">
               <i class="fa-solid fa-award"></i>
             </span>
@@ -733,7 +748,7 @@ onBeforeUnmount(() => {
               <p class="text-xs leading-5" style="color: #757575">Every professional brings multiple years of industry practice.</p>
             </div>
           </div>
-          <div class="flex items-center gap-4 rounded-2xl bg-white p-5" style="border: 1px solid #e8e8e8">
+          <div class="flex items-center gap-4 rounded-2xl p-5" style="border: 1px solid #e8e8e8; background: var(--card-bg)">
             <span class="about-badge">
               <i class="fa-solid fa-magnifying-glass-chart"></i>
             </span>
@@ -747,14 +762,14 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- ================= CONTACT ================= -->
-    <section id="contact" class="py-20 scroll-mt-16" :style="{ background: sectionShades.contact }">
+    <section id="contact" class="py-20 scroll-mt-16" :style="{ background: sectionShades.contact, '--card-bg': cardShades.contact }">
       <div class="mx-auto max-w-[1140px] px-4">
         <div class="pb-10">
           <p class="section-eyebrow">Get in touch</p>
           <h1 class="font-light text-3xl sm:text-4xl md:text-[3em]" style="color: #202020">Say hello to us</h1>
         </div>
 
-        <div class="mx-auto grid max-w-3xl gap-6 sm:grid-cols-3">
+        <div class="grid gap-6 sm:grid-cols-3">
           <button
             type="button"
             class="contact-card"
@@ -974,9 +989,10 @@ onBeforeUnmount(() => {
   width: 340px;
   flex-shrink: 0;
   padding: 32px; /* p-8 — matches the static grid card */
-  background: #f9f9f9;
+  background: var(--card-bg); /* opposite of the reviews section shade → always visible */
   border: 1px solid #e8e8e8;
   border-radius: 16px; /* rounded-2xl */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
 }
 .marquee-highlight {
   animation: review-glow 2.8s ease-in-out infinite;
@@ -1107,11 +1123,12 @@ onBeforeUnmount(() => {
 /* Say hello cards (button variant for the email card) */
 .contact-card {
   display: block;
-  background: #f9f9f9;
+  background: var(--card-bg); /* opposite of the contact section shade → always visible */
   padding: 24px 16px;
   border-radius: 14px;
   text-decoration: none;
-  border: 0;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
   text-align: left;
   width: 100%;
   transition: box-shadow 0.25s, transform 0.25s;
