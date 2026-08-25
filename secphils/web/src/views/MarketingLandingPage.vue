@@ -748,9 +748,6 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="mt-10">
-          <button class="section-btn" @click="router.push('/auth/login')">Portal Login</button>
-        </div>
       </div>
     </section>
 
