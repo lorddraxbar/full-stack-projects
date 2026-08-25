@@ -776,32 +776,38 @@ onBeforeUnmount(() => {
             @click="openContact"
             title="Open the contact form"
           >
-            <i class="fas fa-envelope mb-3 text-2xl" style="color: var(--bsp)" />
-            <p class="mb-1 text-sm font-semibold" style="color: #202020">Email</p>
-            <p class="break-all text-sm" style="color: #757575">{{ primaryEmail }}</p>
-            <p class="mt-2 text-xs font-semibold" style="color: var(--bsp)">Send us a message →</p>
+            <span class="contact-card-icon"><i class="fas fa-envelope" style="color: var(--bsp)" /></span>
+            <span class="contact-card-body">
+              <p class="text-sm font-semibold" style="color: #202020">Email</p>
+              <p class="break-all text-sm" style="color: #757575">{{ primaryEmail }}</p>
+              <p class="mt-1 text-xs font-semibold" style="color: var(--bsp)">Send us a message →</p>
+            </span>
           </button>
           <a :href="`tel:${primaryPhone.replace(/\s/g, '')}`" class="contact-card">
-            <i class="fas fa-phone mb-3 text-2xl" style="color: var(--bsp)" />
-            <p class="mb-1 text-sm font-semibold" style="color: #202020">Phone</p>
-            <p v-for="p in phones" :key="p" class="text-sm" style="color: #757575">{{ p }}</p>
+            <span class="contact-card-icon"><i class="fas fa-phone" style="color: var(--bsp)" /></span>
+            <span class="contact-card-body">
+              <p class="text-sm font-semibold" style="color: #202020">Phone</p>
+              <p v-for="p in phones" :key="p" class="text-sm" style="color: #757575">{{ p }}</p>
+            </span>
           </a>
           <div class="contact-card">
-            <i :class="socialLinks[0]?.icon || 'fa-brands fa-facebook-f'" class="mb-3 text-2xl" style="color: var(--bsp)" />
-            <p class="mb-1 text-sm font-semibold" style="color: #202020">Follow us</p>
-            <div class="mt-1 flex flex-wrap items-center justify-start gap-2.5">
-              <a
-                v-for="sl in socialLinks"
-                :key="sl.url"
-                :href="sl.url"
-                target="_blank"
-                rel="noopener"
-                class="social-dot"
-                :title="sl.label"
-              >
-                <i :class="sl.icon"></i>
-              </a>
-            </div>
+            <span class="contact-card-icon"><i :class="socialLinks[0]?.icon || 'fa-brands fa-facebook-f'" style="color: var(--bsp)" /></span>
+            <span class="contact-card-body">
+              <p class="text-sm font-semibold" style="color: #202020">Follow us</p>
+              <span class="mt-1 flex flex-wrap items-center justify-center gap-2.5">
+                <a
+                  v-for="sl in socialLinks"
+                  :key="sl.url"
+                  :href="sl.url"
+                  target="_blank"
+                  rel="noopener"
+                  class="social-dot"
+                  :title="sl.label"
+                >
+                  <i :class="sl.icon"></i>
+                </a>
+              </span>
+            </span>
           </div>
         </div>
 
@@ -1120,16 +1126,17 @@ onBeforeUnmount(() => {
   font-size: 19px;
 }
 
-/* Say hello cards (button variant for the email card) */
+/* Say hello cards (button variant for the email card) — icon left, content centered */
 .contact-card {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   background: var(--card-bg); /* opposite of the contact section shade → always visible */
-  padding: 24px 16px;
+  padding: 24px 20px;
   border-radius: 14px;
   text-decoration: none;
   border: 1px solid #e8e8e8;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-  text-align: left;
   width: 100%;
   transition: box-shadow 0.25s, transform 0.25s;
   cursor: pointer;
@@ -1142,6 +1149,24 @@ onBeforeUnmount(() => {
 .contact-card:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   transform: translateY(-2px);
+}
+/* Avatar/icon pinned to the left edge */
+.contact-card-icon {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bsp-soft);
+  font-size: 18px;
+}
+/* Text content fills the remaining width and centers */
+.contact-card-body {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
 }
 
 /* Green pill button (template .section-btn) */
