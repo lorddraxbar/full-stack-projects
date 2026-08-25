@@ -265,6 +265,13 @@ const reviews = ref<LandingReview[]>([])
 const loading = ref(true)
 const stars = (rating: number) => '★'.repeat(Math.max(0, Math.min(5, rating))) + '☆'.repeat(5 - Math.max(0, Math.min(5, rating)))
 
+// A lot of reviews (more than one grid row) → auto-scrolling marquee instead of a stacked grid
+const useMarquee = computed(() => reviews.value.length > 3)
+// Duplicate the list so the marquee loop (translateX -50%) is seamless
+const marqueeReviews = computed(() => [...reviews.value, ...reviews.value])
+// Scale loop time with the count so the scroll speed stays steady
+const marqueeDuration = computed(() => Math.max(20, reviews.value.length * 4) + 's')
+
 // ---------- Contact form (Get Started / email card) ----------
 const contactOpen = ref(false)
 const sending = ref(false)
@@ -616,10 +623,11 @@ onBeforeUnmount(() => {
           <h1 class="font-light text-3xl sm:text-4xl md:text-[3em]" style="color: #202020">What People Say</h1>
         </div>
 
-        <div v-if="!loading" class="grid gap-6 md:grid-cols-3">
+        <!-- Small set: static 3-column grid (fits one row) -->
+        <div v-if="!loading && !useMarquee" class="grid gap-6 md:grid-cols-3">
           <div
             v-for="r in reviews"
-            :key="r.id"
+            :key="'g-' + r.id"
             class="rounded-2xl border p-8 transition-shadow hover:shadow-md"
             style="border-color: #e8e8e8; background: #f9f9f9"
           >
@@ -628,8 +636,26 @@ onBeforeUnmount(() => {
             <p class="text-sm leading-6" style="color: #757575">{{ r.body }}</p>
             <p class="mt-4 text-sm font-semibold" style="color: #202020">
               {{ r.customerName || 'Client' }}
-              <span v-if="r.projectName" class="font-normal" style="color: #757575"> — {{ r.projectName }}</span>
             </p>
+          </div>
+        </div>
+
+        <!-- Many reviews: auto-scrolling marquee (right → left), each card highlight-animated -->
+        <div v-if="!loading && useMarquee" class="reviews-marquee" aria-label="Client reviews">
+          <div class="marquee-track" :style="{ animationDuration: marqueeDuration }">
+            <div
+              v-for="(r, i) in marqueeReviews"
+              :key="'m-' + r.id + '-' + i"
+              class="review-card marquee-highlight"
+              :style="{ animationDelay: (i % reviews.length) * 0.4 + 's' }"
+            >
+              <div class="mb-3 text-lg" style="color: #f5a623">{{ stars(r.rating) }}</div>
+              <h3 class="mb-4 font-light text-xl leading-snug" style="color: #353535">{{ r.title }}</h3>
+              <p class="text-sm leading-6" style="color: #757575">{{ r.body }}</p>
+              <p class="mt-4 text-sm font-semibold" style="color: #202020">
+                {{ r.customerName || 'Client' }}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -904,6 +930,49 @@ onBeforeUnmount(() => {
   font-weight: 700;
   color: var(--bsp);
   margin: 0 0 6px;
+}
+
+/* ---- Reviews marquee: many approved reviews auto-scroll right → left ----
+   The track holds two copies of the list and translates -50% for a seamless
+   loop. Each card runs a staggered "glow" so reviews are highlighted in turn;
+   hovering the section pauses the scroll so the text is readable. */
+.reviews-marquee {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: review-marquee-scroll linear infinite;
+}
+.reviews-marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+.review-card {
+  margin-right: 1.5rem; /* = gap-6; keeps the -50% loop seamless */
+  width: 340px;
+  flex-shrink: 0;
+  padding: 32px; /* p-8 — matches the static grid card */
+  background: #f9f9f9;
+  border: 1px solid #e8e8e8;
+  border-radius: 16px; /* rounded-2xl */
+}
+.marquee-highlight {
+  animation: review-glow 2.8s ease-in-out infinite;
+  will-change: transform, box-shadow;
+}
+@keyframes review-marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@keyframes review-glow {
+  0%, 100% { transform: translateY(0);    box-shadow: 0 0 0 rgba(0, 0, 0, 0); }
+  50%      { transform: translateY(-6px); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.14); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+  .marquee-highlight { animation: none; }
 }
 
 /* Hero CTA — matches the www.secphils.com "Get Started" button */
