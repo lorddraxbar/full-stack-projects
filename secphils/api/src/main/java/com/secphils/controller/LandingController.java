@@ -224,8 +224,10 @@ public class LandingController {
                 .map(r -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("id", r.getId());
-                    m.put("customerName", r.getCustomerUser() != null ? r.getCustomerUser().getFullName() : null);
-                    m.put("projectName", r.getProject() != null ? r.getProject().getName() : null);
+                    // Privacy: the public marketing page shows the first name only — never the last name.
+                    m.put("customerName", r.getCustomerUser() != null ? r.getCustomerUser().getFirstName() : null);
+                    // Privacy: never expose the client's project/company identity on the public landing.
+                    m.put("projectName", null);
                     m.put("rating", r.getRating());
                     m.put("title", r.getTitle());
                     m.put("body", r.getBody());
