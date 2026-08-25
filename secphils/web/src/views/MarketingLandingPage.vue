@@ -272,6 +272,22 @@ const marqueeReviews = computed(() => [...reviews.value, ...reviews.value])
 // Scale loop time with the count so the scroll speed stays steady
 const marqueeDuration = computed(() => Math.max(20, reviews.value.length * 4) + 's')
 
+// Alternating section shades, derived in DOM order so the rhythm survives the
+// conditional Client Feedback section. The old hardcoded colors made portal
+// (white) sit next to reviews (white) when reviews rendered. Computing each
+// section's shade from its position among the sections actually shown keeps
+// every neighbor pair alternating whether or not reviews are present.
+const sectionShades = computed<Record<string, string>>(() => {
+  const order = ['services', 'portal']
+  if (hasReviews.value) order.push('reviews')
+  order.push('about', 'contact')
+  const shades: Record<string, string> = {}
+  order.forEach((id, i) => {
+    shades[id] = i % 2 === 0 ? '#f9f9f9' : '#ffffff'
+  })
+  return shades
+})
+
 // ---------- Contact form (Get Started / email card) ----------
 const contactOpen = ref(false)
 const sending = ref(false)
@@ -457,7 +473,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- ================= SERVICES (modernized) ================= -->
-    <section id="services" class="scroll-mt-0 py-20" style="background: #f9f9f9">
+    <section id="services" class="scroll-mt-0 py-20" :style="{ background: sectionShades.services }">
       <div class="mx-auto max-w-[1140px] px-4">
         <div class="pb-10">
           <p class="section-eyebrow">What we do</p>
@@ -552,7 +568,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- ================= PORTAL (live client workspace) ================= -->
-    <section id="portal" class="scroll-mt-16 py-20" style="background: #ffffff">
+    <section id="portal" class="scroll-mt-16 py-20" :style="{ background: sectionShades.portal }">
       <div class="mx-auto max-w-[1140px] px-4">
         <div class="pb-10">
           <p class="section-eyebrow">The SECPhils portal</p>
@@ -616,7 +632,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- ================= REVIEWS (conditional — hidden with 0 approved reviews) ================= -->
-    <section v-if="hasReviews" id="reviews" class="py-20 scroll-mt-16" style="background: #ffffff">
+    <section v-if="hasReviews" id="reviews" class="py-20 scroll-mt-16" :style="{ background: sectionShades.reviews }">
       <div class="mx-auto max-w-[1140px] px-4">
         <div class="pb-10 text-center">
           <p class="section-eyebrow">Client feedback</p>
@@ -662,7 +678,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- ================= ABOUT (modernized) ================= -->
-    <section id="about" class="py-20 scroll-mt-16" style="background: #f9f9f9">
+    <section id="about" class="py-20 scroll-mt-16" :style="{ background: sectionShades.about }">
       <div class="mx-auto max-w-[1140px] px-4">
         <div class="pb-10">
           <p class="section-eyebrow">Who we are</p>
@@ -731,7 +747,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- ================= CONTACT ================= -->
-    <section id="contact" class="py-20 scroll-mt-16 text-center" style="background: #ffffff">
+    <section id="contact" class="py-20 scroll-mt-16 text-center" :style="{ background: sectionShades.contact }">
       <div class="mx-auto max-w-[1140px] px-4">
         <div class="pb-10">
           <p class="section-eyebrow">Get in touch</p>
@@ -938,6 +954,10 @@ onBeforeUnmount(() => {
    hovering the section pauses the scroll so the text is readable. */
 .reviews-marquee {
   overflow: hidden;
+  /* Vertical breathing room: the cards lift ~6px on the glow and cast a
+     ~30px downward shadow, and overflow:hidden would otherwise trim both at
+     the top/bottom edges. Pad enough so nothing is clipped. */
+  padding: 24px 0 40px;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
 }
