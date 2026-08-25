@@ -554,8 +554,7 @@ onBeforeUnmount(() => {
           </h1>
           <p class="mt-3 max-w-2xl text-sm leading-6" style="color: #757575">
             Every engagement runs on our private client portal — a secure workspace where you watch
-            progress unfold, talk straight to the engineers working your project, and stay in the
-            loop in real time. No black box. No "what's the status?" emails.
+            progress unfold and stay in the loop.
           </p>
         </div>
 
@@ -581,9 +580,9 @@ onBeforeUnmount(() => {
             >
               <i class="fa-solid fa-comments"></i>
             </div>
-            <h2 class="mt-4 text-xl font-semibold" style="color: #353535">Talk to your team, instantly</h2>
+            <h2 class="mt-4 text-xl font-semibold" style="color: #353535">Messaging built in</h2>
             <p class="mt-2 text-sm leading-6" style="color: #757575">
-              Message the engineers on your project in real time. No phone tag, no gatekeepers —
+              Message us anytime. No phone tag, no gatekeepers —
               just you, us, and the work moving forward.
             </p>
           </div>
@@ -597,14 +596,14 @@ onBeforeUnmount(() => {
             </div>
             <h2 class="mt-4 text-xl font-semibold" style="color: #353535">Locked down, by design</h2>
             <p class="mt-2 text-sm leading-6" style="color: #757575">
-              Encrypted in transit and at rest, with role-based access. Your data never leaves your
-              company's walls — and our side of the lock is just as tight.
+              Encrypted in transit and at rest, with role-based access, Multi-Factor Authentication
+              (MFA), all the good stuff.
             </p>
           </div>
         </div>
 
         <div class="mt-12 text-center">
-          <button class="hero-btn" @click="openContact">Step Inside the Portal</button>
+          <button class="section-btn" @click="router.push('/auth/login')">Portal Login</button>
         </div>
       </div>
     </section>
