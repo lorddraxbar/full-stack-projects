@@ -764,53 +764,68 @@ onBeforeUnmount(() => {
     <!-- ================= CONTACT ================= -->
     <section id="contact" class="py-20 scroll-mt-16" :style="{ background: sectionShades.contact, '--card-bg': cardShades.contact }">
       <div class="mx-auto max-w-[1140px] px-4">
-        <div class="pb-10">
-          <p class="section-eyebrow">Get in touch</p>
-          <h1 class="font-light text-3xl sm:text-4xl md:text-[3em]" style="color: #202020">Say hello to us</h1>
-        </div>
+        <div class="grid gap-12 lg:grid-cols-12 lg:gap-14">
+          <!-- Left: intro + CTA -->
+          <div class="lg:col-span-5">
+            <p class="section-eyebrow">Get in touch</p>
+            <h1 class="font-light text-3xl sm:text-4xl md:text-[3em]" style="color: #202020">Say hello to us</h1>
+            <p class="mt-4 max-w-sm text-base leading-7" style="color: #757575">We reply within a business day.</p>
+            <button type="button" class="c-cta" @click="openContact">
+              Send us a message
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
 
-        <div class="grid gap-6 sm:grid-cols-3">
-          <button
-            type="button"
-            class="contact-card"
-            @click="openContact"
-            title="Open the contact form"
-          >
-            <span class="contact-card-icon"><i class="fas fa-envelope" style="color: var(--bsp)" /></span>
-            <span class="contact-card-body">
-              <p class="text-sm font-semibold" style="color: #202020">Email</p>
-              <p class="break-all text-sm" style="color: #757575">{{ primaryEmail }}</p>
-              <p class="mt-1 text-xs font-semibold" style="color: var(--bsp)">Send us a message →</p>
-            </span>
-          </button>
-          <a :href="`tel:${primaryPhone.replace(/\s/g, '')}`" class="contact-card">
-            <span class="contact-card-icon"><i class="fas fa-phone" style="color: var(--bsp)" /></span>
-            <span class="contact-card-body">
-              <p class="text-sm font-semibold" style="color: #202020">Phone</p>
-              <p v-for="p in phones" :key="p" class="text-sm" style="color: #757575">{{ p }}</p>
-            </span>
-          </a>
-          <div class="contact-card">
-            <span class="contact-card-icon"><i :class="socialLinks[0]?.icon || 'fa-brands fa-facebook-f'" style="color: var(--bsp)" /></span>
-            <span class="contact-card-body">
-              <p class="text-sm font-semibold" style="color: #202020">Follow us</p>
-              <span class="mt-1 flex flex-wrap items-center justify-center gap-2.5">
-                <a
-                  v-for="sl in socialLinks"
-                  :key="sl.url"
-                  :href="sl.url"
-                  target="_blank"
-                  rel="noopener"
-                  class="social-dot"
-                  :title="sl.label"
-                >
-                  <i :class="sl.icon"></i>
-                </a>
-              </span>
-            </span>
+          <!-- Right: contact channels as rows -->
+          <div class="lg:col-span-7">
+            <div>
+              <button
+                type="button"
+                class="c-row"
+                @click="openContact"
+                title="Open the contact form"
+              >
+                <span class="c-row-icon"><i class="fa-solid fa-envelope"></i></span>
+                <span class="c-row-main">
+                  <span class="c-row-label">Email</span>
+                  <span class="c-row-value break-all">{{ primaryEmail }}</span>
+                </span>
+                <i class="fa-solid fa-chevron-right c-row-chevron"></i>
+              </button>
+              <a :href="`tel:${primaryPhone.replace(/\s/g, '')}`" class="c-row">
+                <span class="c-row-icon"><i class="fa-solid fa-phone"></i></span>
+                <span class="c-row-main">
+                  <span class="c-row-label">Phone</span>
+                  <span class="c-row-value">
+                    <span v-for="p in phones" :key="p" class="block">{{ p }}</span>
+                  </span>
+                </span>
+                <i class="fa-solid fa-chevron-right c-row-chevron"></i>
+              </a>
+              <div class="c-row c-row-static">
+                <span class="c-row-icon"><i :class="socialLinks[0]?.icon || 'fa-brands fa-facebook-f'"></i></span>
+                <span class="c-row-main">
+                  <span class="c-row-label">Follow us</span>
+                  <span class="c-row-value">
+                    <span class="mt-2 flex flex-wrap items-center gap-2.5">
+                      <a
+                        v-for="sl in socialLinks"
+                        :key="sl.url"
+                        :href="sl.url"
+                        target="_blank"
+                        rel="noopener"
+                        class="social-dot"
+                        :title="sl.label"
+                      >
+                        <i :class="sl.icon"></i>
+                      </a>
+                    </span>
+                  </span>
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-
       </div>
     </section>
 
@@ -1106,7 +1121,7 @@ onBeforeUnmount(() => {
   background: var(--bsp);
   color: #ffffff;
 }
-.contact-card .social-dot {
+.c-row .social-dot {
   width: 34px;
   height: 34px;
   font-size: 15px;
@@ -1126,47 +1141,93 @@ onBeforeUnmount(() => {
   font-size: 19px;
 }
 
-/* Say hello cards (button variant for the email card) — icon left, content centered */
-.contact-card {
+/* Say hello — split layout: CTA button + contact-channel rows */
+.c-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 28px;
+  background: var(--bsp);
+  color: #ffffff;
+  border: 0;
+  border-radius: 9999px;
+  padding: 14px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s, transform 0.2s;
+}
+.c-cta:hover {
+  background: #1f9e6f;
+  transform: translateY(-1px);
+}
+.c-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: var(--card-bg); /* opposite of the contact section shade → always visible */
-  padding: 24px 20px;
-  border-radius: 14px;
+  gap: 16px;
+  padding: 20px 0;
+  border-top: 1px solid #ececec;
   text-decoration: none;
-  border: 1px solid #e8e8e8;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-  width: 100%;
-  transition: box-shadow 0.25s, transform 0.25s;
-  cursor: pointer;
+  color: inherit;
   font-family: inherit;
   appearance: none;
   -webkit-appearance: none;
-  color: inherit;
-  line-height: 1.4;
+  width: 100%;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: opacity 0.2s;
 }
-.contact-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  transform: translateY(-2px);
+.c-row:last-child {
+  border-bottom: 1px solid #ececec;
 }
-/* Avatar/icon pinned to the left edge */
-.contact-card-icon {
-  flex-shrink: 0;
-  width: 42px;
-  height: 42px;
+.c-row-static {
+  cursor: default;
+}
+.c-row:hover:not(.c-row-static) {
+  opacity: 0.85;
+}
+.c-row-icon {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--bsp-soft);
-  font-size: 18px;
+  color: var(--bsp);
+  font-size: 17px;
 }
-/* Text content fills the remaining width and centers */
-.contact-card-body {
+.c-row-main {
   flex: 1;
   min-width: 0;
-  text-align: center;
+}
+.c-row-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #757575;
+  margin-bottom: 6px;
+}
+.c-row-value {
+  display: block;
+  font-size: 18px;
+  color: #202020;
+  line-height: 1.4;
+}
+.c-row-chevron {
+  flex: 0 0 auto;
+  font-size: 13px;
+  color: #c9c9c9;
+  transition: transform 0.2s, color 0.2s;
+}
+.c-row:hover:not(.c-row-static) .c-row-chevron {
+  transform: translateX(4px);
+  color: var(--bsp);
 }
 
 /* Green pill button (template .section-btn) */

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact — C. Unified card</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style>
+  :root {
+    --bsp: #29ca8e;
+    --bsp-hover: #1fa873;
+    --bsp-soft: rgba(41, 202, 142, 0.12);
+    --ink: #202020;
+    --muted: #757575;
+    --line: #e8e8e8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Raleway', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: var(--ink);
+    background: #f9f9f9;
+    line-height: 1.5;
+  }
+  .section { background: #f9f9f9; padding: 80px 0; }
+  .container { max-width: 1140px; margin: 0 auto; padding: 0 16px; }
+  .eyebrow {
+    font-size: 0.8rem; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--bsp); margin-bottom: 12px;
+  }
+  h1 { font-size: 3em; font-weight: 300; line-height: 1.1; margin-bottom: 40px; }
+
+  /* one card, three columns */
+  .card {
+    background: #ffffff;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease;
+  }
+  .card:hover {
+    box-shadow: 0 16px 36px -14px rgba(41, 202, 142, 0.38);
+    border-color: rgba(41, 202, 142, 0.45);
+    transform: translateY(-3px);
+  }
+  .col {
+    position: relative;
+    display: flex; align-items: center; gap: 12px;
+    padding: 34px 28px;
+    text-decoration: none; color: inherit;
+    transition: background .2s ease;
+  }
+  .col + .col { border-left: 1px solid var(--line); }
+  .col:hover { background: rgba(41, 202, 142, 0.05); }
+  .col:not(.no-link) { cursor: pointer; }
+  .icon {
+    width: 42px; height: 42px; flex: 0 0 42px;
+    border-radius: 999px;
+    background: var(--bsp-soft);
+    display: grid; place-items: center;
+    color: var(--bsp); font-size: 1rem;
+    transition: background .2s ease, color .2s ease;
+  }
+  .col:hover .icon { background: var(--bsp); color: #fff; }
+  .body { flex: 1; text-align: center; }
+  .label { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; }
+  .value { font-size: 0.9rem; color: var(--muted); word-break: break-all; }
+  .value a { color: var(--bsp); text-decoration: none; }
+  .value a:hover { text-decoration: underline; }
+  .hint { margin-top: 6px; font-size: 0.8rem; font-weight: 600; color: var(--bsp); }
+  .hint i { margin-left: 4px; display: inline-block; transition: transform .2s ease; }
+  .col:hover .hint i { transform: translateX(3px); }
+  .socials { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+  .dot {
+    width: 32px; height: 32px; border-radius: 999px;
+    border: 1px solid var(--line);
+    display: grid; place-items: center;
+    color: var(--bsp); font-size: 0.85rem;
+    transition: background .18s ease, color .18s ease, border-color .18s ease, transform .18s ease;
+  }
+  .dot:hover { background: var(--bsp); color: #fff; border-color: var(--bsp); transform: translateY(-2px); }
+
+  @media (max-width: 820px) {
+    .card { grid-template-columns: 1fr; }
+    .col { align-items: flex-start; flex-direction: column; text-align: center; }
+    .col + .col { border-left: 0; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+  <div class="section">
+    <div class="container">
+      <p class="eyebrow">Get in touch</p>
+      <h1>Say hello to us</h1>
+
+      <div class="card">
+        <a class="col" href="mailto:manager@secphils.com">
+          <span class="icon"><i class="fa-solid fa-envelope"></i></span>
+          <span class="body">
+            <p class="label">Email</p>
+            <p class="value"><a href="mailto:manager@secphils.com">manager@secphils.com</a></p>
+            <p class="hint">Send us a message <i class="fa-solid fa-arrow-right"></i></p>
+          </span>
+        </a>
+        <a class="col" href="tel:+639455105172">
+          <span class="icon"><i class="fa-solid fa-phone"></i></span>
+          <span class="body">
+            <p class="label">Phone</p>
+            <p class="value"><a href="tel:+639455105172">+63 945 510 5172</a></p>
+          </span>
+        </a>
+        <div class="col no-link">
+          <span class="icon"><i class="fa-brands fa-facebook-f"></i></span>
+          <span class="body">
+            <p class="label">Follow us</p>
+            <div class="socials">
+              <a class="dot" href="https://www.facebook.com/strategicengineeringconsultancy/" target="_blank" title="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+              <a class="dot" href="#" title="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+              <a class="dot" href="#" title="Instagram"><i class="fa-brands fa-instagram"></i></a>
+              <a class="dot" href="#" title="X"><i class="fa-brands fa-x-twitter"></i></a>
+            </div>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
