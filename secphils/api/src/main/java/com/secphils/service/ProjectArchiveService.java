@@ -7,6 +7,7 @@ import com.secphils.entity.Notification;
 import com.secphils.entity.NotificationPreference;
 import com.secphils.entity.Project;
 import com.secphils.entity.User;
+import com.secphils.policy.DisplayNamePolicy;
 import com.secphils.repository.MessageRepository;
 import com.secphils.repository.NotificationPreferenceRepository;
 import com.secphils.repository.NotificationRepository;
@@ -101,13 +102,13 @@ public class ProjectArchiveService {
         projects.save(p);
 
         systemMessage(p, actor,
-                "Project was archived by " + actor.email()
+                "Project was archived by " + actorName(actor)
                         + ". It will be permanently deleted on "
                         + p.getDeleteAt().toLocalDate() + " unless restored earlier.");
 
         notifyCompany(p, actor,
                 "Project archived: " + p.getName(),
-                "The project '" + p.getName() + "' has been archived by " + actor.email()
+                "The project '" + p.getName() + "' has been archived by " + actorName(actor)
                         + ". It will be permanently removed on " + p.getDeleteAt().toLocalDate()
                         + " unless restored earlier.");
         log.info("Archived project {} ({}), hard-delete at {}", p.getId(), p.getName(), p.getDeleteAt());
@@ -131,10 +132,10 @@ public class ProjectArchiveService {
         relocateFromArchive(p);
         projects.save(p);
 
-        systemMessage(p, actor, "Project was restored by " + actor.email() + ".");
+        systemMessage(p, actor, "Project was restored by " + actorName(actor) + ".");
         notifyCompany(p, actor,
                 "Project restored: " + p.getName(),
-                "The project '" + p.getName() + "' has been restored by " + actor.email() + ".");
+                "The project '" + p.getName() + "' has been restored by " + actorName(actor) + ".");
         log.info("Restored project {}", p.getId());
         return p;
     }
@@ -295,9 +296,15 @@ public class ProjectArchiveService {
                 notifications.save(n);
             }
             if (email && u.getEmail() != null && !u.getEmail().isBlank()) {
-                mail.sendHtml(u.getEmail(), title, lifecycleEmail(title, body, link), link, actor.email());
+                mail.sendHtml(u.getEmail(), title, lifecycleEmail(title, body, link), link,
+                        users.findById(actor.id()).map(DisplayNamePolicy::emailFor).orElse(DisplayNamePolicy.NO_REPLY_EMAIL));
             }
         }
+    }
+
+    /** Actor's display name under the policy (staff actor → brand; client actor → real name). */
+    private String actorName(AuthUser actor) {
+        return users.findById(actor.id()).map(DisplayNamePolicy::nameFor).orElse(actor.email());
     }
 
     private boolean prefAllows(String channelJson) {

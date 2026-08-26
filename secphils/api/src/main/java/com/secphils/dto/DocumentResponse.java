@@ -1,6 +1,7 @@
 package com.secphils.dto;
 
 import com.secphils.entity.Document;
+import com.secphils.policy.DisplayNamePolicy;
 
 import java.time.LocalDateTime;
 
@@ -22,7 +23,7 @@ public record DocumentResponse(
         return new DocumentResponse(d.getId(),
                 d.getProject() != null ? d.getProject().getId() : null,
                 d.getUploader() != null ? d.getUploader().getId() : null,
-                d.getUploader() != null ? d.getUploader().getFullName() : null,
+                DisplayNamePolicy.nameFor(d.getUploader()),
                 d.getTitle(), d.getDescription(), d.getCategory(), d.getFileUrl(),
                 d.getFileSize(), d.getVersion(), d.getIsLatest(), d.getUploadedAt());
     }

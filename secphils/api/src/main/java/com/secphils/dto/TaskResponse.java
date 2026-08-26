@@ -3,6 +3,7 @@ package com.secphils.dto;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.secphils.entity.Task;
+import com.secphils.policy.DisplayNamePolicy;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -40,7 +41,7 @@ public record TaskResponse(
         return new TaskResponse(t.getId(),
                 t.getProject() != null ? t.getProject().getId() : null,
                 t.getAssignee() != null ? t.getAssignee().getId() : null,
-                t.getAssignee() != null ? t.getAssignee().getFullName() : null,
+                DisplayNamePolicy.nameFor(t.getAssignee()),
                 t.getTitle(), t.getDescription(), t.getStatus(), t.getPriority(),
                 t.getDueDate(), subtasksOf(t.getSubtasks()), t.getCreatedAt(), t.getUpdatedAt());
     }

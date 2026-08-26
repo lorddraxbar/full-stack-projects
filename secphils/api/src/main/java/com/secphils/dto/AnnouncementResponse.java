@@ -1,6 +1,7 @@
 package com.secphils.dto;
 
 import com.secphils.entity.Announcement;
+import com.secphils.policy.DisplayNamePolicy;
 
 import java.time.LocalDateTime;
 
@@ -26,7 +27,7 @@ public record AnnouncementResponse(
                 a.getTitle(), a.getBody(), a.getCategory(), a.getAudience(),
                 a.getIsPublished(),
                 a.getCreatedBy() != null ? a.getCreatedBy().getId() : null,
-                a.getCreatedBy() != null ? a.getCreatedBy().getFullName() : null,
+                DisplayNamePolicy.nameFor(a.getCreatedBy()),
                 a.getCreatedAt());
     }
 }

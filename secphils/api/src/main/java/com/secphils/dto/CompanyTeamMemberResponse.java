@@ -1,6 +1,7 @@
 package com.secphils.dto;
 
 import com.secphils.entity.User;
+import com.secphils.policy.DisplayNamePolicy;
 
 /**
  * A member of the caller's company (Settings - Team &amp; Invitations UI).
@@ -23,7 +24,7 @@ public record CompanyTeamMemberResponse(
         } else {
             status = "Active";
         }
-        return new CompanyTeamMemberResponse(u.getId(), u.getFullName(), u.getEmail(),
+        return new CompanyTeamMemberResponse(u.getId(), DisplayNamePolicy.nameFor(u), u.getEmail(),
                 u.getRole(), status, u.getLastLogin());
     }
 }

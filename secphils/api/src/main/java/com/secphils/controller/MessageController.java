@@ -11,6 +11,7 @@ import com.secphils.entity.Message;
 import com.secphils.entity.Notification;
 import com.secphils.entity.NotificationPreference;
 import com.secphils.entity.Project;
+import com.secphils.policy.DisplayNamePolicy;
 import com.secphils.repository.DocumentRepository;
 import com.secphils.repository.MessageRepository;
 import com.secphils.repository.UserRepository;
@@ -237,7 +238,7 @@ public class MessageController {
         Company company = project.getCompany();
         if (company == null) return; // no company -> nothing to fan out to
 
-        String title = "New message from " + sender.getFullName() + " · " + project.getName();
+        String title = "New message from " + DisplayNamePolicy.nameFor(sender) + " · " + project.getName();
         String body = m.getBody() == null ? "" : m.getBody();
         String link = portalBaseUrl.endsWith("/") ? portalBaseUrl + "messages" : portalBaseUrl + "/messages";
 
@@ -262,8 +263,8 @@ public class MessageController {
                 notificationRepository.save(n);
             }
             if (email && u.getEmail() != null && !u.getEmail().isBlank()) {
-                mailService.sendHtml(u.getEmail(), "New message from " + sender.getFullName() + " — " + project.getName(),
-                        messageEmail(sender, project, body, link), link, sender.getEmail());
+                mailService.sendHtml(u.getEmail(), "New message from " + DisplayNamePolicy.nameFor(sender) + " — " + project.getName(),
+                        messageEmail(sender, project, body, link), link, DisplayNamePolicy.emailFor(sender));
             }
         }
     }
@@ -274,7 +275,7 @@ public class MessageController {
                 + "<div style=\"max-width:560px;margin:32px auto;padding:32px;background:#ffffff;"
                 + "border-radius:12px;border:1px solid #e5e7eb;\">"
                 + "<p style=\"margin:0 0 8px;font-size:13px;color:#059669;font-weight:bold;\">SecPhils · " + esc(project.getName()) + "</p>"
-                + "<h1 style=\"margin:0 0 16px;font-size:18px;font-weight:600;\">New message from " + esc(sender.getFullName()) + "</h1>"
+                + "<h1 style=\"margin:0 0 16px;font-size:18px;font-weight:600;\">New message from " + esc(DisplayNamePolicy.nameFor(sender)) + "</h1>"
                 + "<p style=\"margin:0 0 16px;font-size:14px;line-height:1.6;\">" + esc(body).replace("\n", "<br>") + "</p>"
                 + "<p style=\"margin:0 0 8px;font-size:14px;line-height:1.6;\"><a href=\"" + link + "\" style=\"color:#059669;\">Open the conversation →</a></p>"
                 + "<p style=\"margin:16px 0 0;font-size:12px;color:#9ca3af;\">You're receiving this as a member of the project's company. Manage your notification preferences in the portal.</p>"

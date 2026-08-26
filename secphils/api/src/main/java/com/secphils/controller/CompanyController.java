@@ -6,6 +6,7 @@ import com.secphils.dto.*;
 import com.secphils.entity.Company;
 import com.secphils.entity.SystemSettings;
 import com.secphils.entity.User;
+import com.secphils.policy.DisplayNamePolicy;
 import com.secphils.repository.CompanyRepository;
 import com.secphils.repository.SystemSettingsRepository;
 import com.secphils.repository.UserRepository;
@@ -173,13 +174,13 @@ public class CompanyController {
         String link = resolveInviteBaseUrl(http) + "/auth/set-password?token=" + token;
         mailService.sendHtml(invitee.getEmail(), "Your SECPhils Portal access is ready",
                 mailService.inviteEmail(invitee.getFirstName(), invitee.getFullName(), link,
-                        actor.getFullName(), company.getName()),
+                        DisplayNamePolicy.nameFor(actor), company.getName()),
                 link);
         auditService.audit(me, "COMPANY_TEAM_INVITE", "User", invitee.getId(),
                 "Email: " + invitee.getEmail() + " -> " + company.getName(), http);
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "id", invitee.getId(),
-                "name", invitee.getFullName(),
+                "name", DisplayNamePolicy.nameFor(invitee),
                 "email", invitee.getEmail(),
                 "role", invitee.getRole(),
                 "status", CompanyTeamMemberResponse.from(invitee).status()));

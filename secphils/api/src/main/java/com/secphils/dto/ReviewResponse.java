@@ -1,6 +1,7 @@
 package com.secphils.dto;
 
 import com.secphils.entity.Review;
+import com.secphils.policy.DisplayNamePolicy;
 
 import java.time.LocalDateTime;
 
@@ -21,7 +22,7 @@ public record ReviewResponse(
                 r.getProject() != null ? r.getProject().getId() : null,
                 r.getProject() != null ? r.getProject().getName() : null,
                 r.getCustomerUser() != null ? r.getCustomerUser().getId() : null,
-                r.getCustomerUser() != null ? r.getCustomerUser().getFullName() : null,
+                DisplayNamePolicy.nameFor(r.getCustomerUser()),
                 r.getRating(), r.getTitle(), r.getBody(), r.getStatus(), r.getCreatedAt());
     }
 }

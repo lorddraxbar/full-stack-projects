@@ -2,6 +2,7 @@ package com.secphils.dto;
 
 import com.secphils.entity.Company;
 import com.secphils.entity.User;
+import com.secphils.policy.DisplayNamePolicy;
 
 import java.time.LocalDateTime;
 
@@ -38,7 +39,7 @@ public record CompanyResponse(
                 c.getBankingDetails(), c.getOperationalFields(), c.getBrandPrimary(),
                 c.getBrandSecondary(), c.getLogoUrl(), c.getContactDetails(),
                 rep != null ? rep.getId() : null,
-                rep != null ? rep.getFullName() : null,
+                DisplayNamePolicy.nameFor(rep),
                 c.getCreatedAt(), c.getUpdatedAt());
     }
 }
