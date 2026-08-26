@@ -9,7 +9,7 @@ import NewProjectWizard from '@/components/NewProjectWizard.vue'
 import type { WizardData } from '@/components/NewProjectWizard.vue'
 import { useRole } from '@/composables/useRole'
 import { useGetMe, useGetProjects, useCreateProject, useCreateCompany, useUpdateCompany } from '@/services/api'
-import { projectStatusLabel, PROJECT_STATUS_COLORS, formatDate } from '@/lib/labels'
+import { projectStatusLabel, PROJECT_STATUS_COLORS } from '@/lib/labels'
 
 const { isClient } = useRole()
 const router = useRouter()
@@ -27,7 +27,6 @@ interface ProjectRow {
   serviceType: string
   status: string
   progress: number
-  dueDate: string
 }
 
 const projects = ref<ProjectRow[]>([])
@@ -42,7 +41,6 @@ function mapProject(p: any): ProjectRow {
     serviceType: p.serviceName || '—',
     status: projectStatusLabel(p.status),
     progress: p.progress ?? 0,
-    dueDate: formatDate(p.dueDate),
   }
 }
 
@@ -153,7 +151,6 @@ const handleWizardSubmit = async (data: WizardData) => {
       serviceId: data.project.serviceId,
       name: data.project.name,
       scope: data.project.scope,
-      dueDate: data.project.dueDate,
     })
     showWizard.value = false
     await loadProjects()
@@ -246,7 +243,6 @@ onMounted(init)
               <span>
                 <i class="fas fa-tag text-xs mr-1 text-gray-400" />{{ project.serviceType }}
               </span>
-              <span class="text-gray-600">Due: {{ project.dueDate }}</span>
             </div>
             <div class="flex items-center gap-3 text-sm">
               <span class="text-gray-600 w-24 shrink-0">{{ project.progress }}% complete</span>

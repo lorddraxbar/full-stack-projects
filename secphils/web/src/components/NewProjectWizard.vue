@@ -36,7 +36,6 @@ export interface WizardData {
     name: string
     serviceId: number | null
     scope: string
-    dueDate: string
   }
 }
 
@@ -86,7 +85,6 @@ const projectForm = ref({
   name: '',
   serviceId: '' as string, // real Service id (string from Select)
   scope: '',
-  dueDate: '',
 })
 
 // Real catalog lookups (backend /companies, /services)
@@ -234,7 +232,7 @@ const resetForm = () => {
   scenario.value = 'new'
   companyForm.value = { name: '', location: '', owner: '', description: '' }
   repForm.value = { name: '', email: '' }
-  projectForm.value = { name: '', serviceId: '', scope: '', dueDate: '' }
+  projectForm.value = { name: '', serviceId: '', scope: '' }
   selectedCompanyId.value = null
   selectedRepId.value = null
   clientTeam.value = []
@@ -325,7 +323,6 @@ async function addRep() {
 function validateProject(): string | null {
   if (!projectForm.value.name.trim()) return 'Project name is required.'
   if (!projectForm.value.scope.trim()) return 'Scope is required.'
-  if (!projectForm.value.dueDate) return 'Due date is required.'
   return null
 }
 
@@ -364,7 +361,6 @@ const handleSubmit = () => {
       name: projectForm.value.name.trim(),
       serviceId: projectForm.value.serviceId ? Number(projectForm.value.serviceId) : null,
       scope: projectForm.value.scope.trim(),
-      dueDate: projectForm.value.dueDate,
     },
   }
   emit('submit', data)
@@ -618,11 +614,6 @@ const handleClose = () => {
           <div class="space-y-2">
             <Label for="scope">Scope *</Label>
             <Textarea v-model="projectForm.scope" placeholder="What will be done for this project?" rows="3" />
-          </div>
-
-          <div class="space-y-2">
-            <Label for="dueDate">Due Date *</Label>
-            <Input id="dueDate" v-model="projectForm.dueDate" type="date" />
           </div>
 
           <!-- Review summary -->

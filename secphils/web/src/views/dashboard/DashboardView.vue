@@ -24,7 +24,6 @@ interface ProjectRow {
   status: string
   statusLabel: string
   progress: number
-  dueDate: string | null
 }
 
 interface TaskRow {
@@ -90,7 +89,6 @@ function mapProject(p: any): ProjectRow {
     status: p.status,
     statusLabel: projectStatusLabel(p.status),
     progress: p.progress ?? 0,
-    dueDate: p.dueDate ?? null,
   }
 }
 
@@ -312,7 +310,6 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
               </div>
               <div class="flex items-center justify-between text-sm text-gray-600">
                 <span>{{ project.serviceName || '—' }}</span>
-                <span>Due: {{ formatDate(project.dueDate) }}</span>
               </div>
               <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
                 <div class="bg-emerald-600 h-2 rounded-full transition-all" :style="{ width: project.progress + '%' }" />
@@ -457,7 +454,6 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
               </div>
               <div class="flex items-center justify-between text-sm text-gray-600">
                 <span>{{ project.companyName || '—' }}</span>
-                <span>Due: {{ formatDate(project.dueDate) }}</span>
               </div>
               <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
                 <div class="bg-emerald-600 h-2 rounded-full transition-all" :style="{ width: project.progress + '%' }" />

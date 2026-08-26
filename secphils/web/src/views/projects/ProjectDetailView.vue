@@ -194,7 +194,6 @@ const adminForm = ref({
   status: '',
   scope: '',
   objectives: '',
-  dueDate: '',
   progress: 0,
 })
 const adminReady = ref(false)
@@ -206,7 +205,6 @@ function initAdminForm() {
     status: project.value.status || 'NOT_STARTED',
     scope: project.value.scope || '',
     objectives: project.value.objectives || '',
-    dueDate: project.value.dueDate ? String(project.value.dueDate).slice(0, 10) : '',
     progress: project.value.progress ?? 0,
   }
   adminReady.value = true
@@ -232,7 +230,6 @@ async function saveAdminChanges() {
       wasteMaterials: project.value.wasteMaterials ?? null,
       manufacturingProcedure: project.value.manufacturingProcedure ?? null,
       productionFlowchartUrl: project.value.productionFlowchartUrl ?? null,
-      dueDate: adminForm.value.dueDate || null,
       progress: adminForm.value.progress,
     })
     project.value = updated
@@ -270,11 +267,8 @@ async function saveAdminChanges() {
           </span>
         </div>
 
-        <div class="flex items-center gap-6 text-sm text-gray-600">
-          <span><i class="fas fa-bullseye mr-1"></i>Due: {{ formatDate(project.dueDate) }}</span>
-          <span v-if="!isClient && project.totalCost != null">
-            <i class="fas fa-coins mr-1"></i>Contract: ${{ Number(project.totalCost).toLocaleString() }}
-          </span>
+        <div class="flex items-center gap-6 text-sm text-gray-600" v-if="!isClient && project.totalCost != null">
+          <i class="fas fa-coins mr-1"></i>Contract: ${{ Number(project.totalCost).toLocaleString() }}
         </div>
 
         <div class="mt-4 w-full bg-gray-200 rounded-full h-2">
@@ -528,15 +522,6 @@ async function saveAdminChanges() {
             >
               <option v-for="s in projectStatusCodes" :key="s" :value="s">{{ projectStatusLabel(s) }}</option>
             </select>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Timeline (Due Date)</label>
-            <input
-              v-model="adminForm.dueDate"
-              type="date"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
           </div>
 
           <div>

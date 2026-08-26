@@ -11,7 +11,6 @@ interface ProjectRow {
   client: string
   status: string
   progress: number
-  dueDate: string
 }
 
 function mapProject(p: any): ProjectRow {
@@ -21,7 +20,6 @@ function mapProject(p: any): ProjectRow {
     client: p.companyName || '—',
     status: projectStatusLabel(p.status),
     progress: p.progress ?? 0,
-    dueDate: p.dueDate || '',
   }
 }
 
