@@ -4,7 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useRole } from '../composables/useRole'
 import { useGetNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '../services/api'
 
-const { role } = useRole()
+const { role, setRole } = useRole()
 const router = useRouter()
 
 const allNavItems = [
@@ -141,9 +141,9 @@ const roleLabel = computed(() =>
 )
 
 const logout = () => {
+  setRole(null)
   localStorage.removeItem('accessToken')
   localStorage.removeItem('refreshToken')
-  localStorage.removeItem('userRole')
   localStorage.removeItem('userName')
   localStorage.removeItem('userId')
   router.push('/auth/login')

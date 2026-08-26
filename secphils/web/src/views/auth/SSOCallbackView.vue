@@ -2,8 +2,11 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGoogleSsoCallback } from '@/services/api'
+import { useRole } from '@/composables/useRole'
 
 const router = useRouter()
+const { setRole } = useRole()
+
 const status = ref('Completing Google sign-in…')
 const error = ref('')
 const redirecting = ref(false)
@@ -11,7 +14,7 @@ const redirecting = ref(false)
 function storeSession(data: any) {
   localStorage.setItem('accessToken', data.accessToken)
   localStorage.setItem('refreshToken', data.refreshToken)
-  localStorage.setItem('userRole', data.user?.role || 'CLIENT')
+  setRole(data.user?.role || 'CLIENT')
   localStorage.setItem('userName', data.user?.fullName || 'User')
   if (data.user?.id) localStorage.setItem('userId', String(data.user.id))
 }

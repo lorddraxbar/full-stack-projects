@@ -2,8 +2,10 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGetSsoStatus, useGoogleSsoAuthorize } from '@/services/api'
+import { useRole } from '@/composables/useRole'
 
 const router = useRouter()
+const { setRole } = useRole()
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
@@ -41,7 +43,7 @@ const verifyLoading = ref(false)
 function storeSession(data: any) {
   localStorage.setItem('accessToken', data.accessToken)
   localStorage.setItem('refreshToken', data.refreshToken)
-  localStorage.setItem('userRole', data.user?.role || 'CLIENT')
+  setRole(data.user?.role || 'CLIENT')
   localStorage.setItem('userName', data.user?.fullName || 'User')
   if (data.user?.id) localStorage.setItem('userId', String(data.user.id))
 }
