@@ -291,7 +291,10 @@ async function addRep() {
     return
   }
   const companyId = selectedCompanyIdNum.value
-  if (companyId == null) return
+  if (companyId == null) {
+    repError.value = 'Select a customer company first.'
+    return
+  }
   addRepBusy.value = true
   try {
     const created = (await useInviteCustomerRep(companyId, {
@@ -451,8 +454,14 @@ const handleClose = () => {
               </div>
             </div>
 
+            <!-- Rep selection only makes sense for a chosen company. Until one is
+                 picked, the add-rep link/picker would target nothing, so they stay
+                 hidden and a placeholder nudges toward selecting a company first. -->
             <Separator class="my-4" />
-
+            <div v-if="!selectedCompany" class="text-sm text-muted-foreground">
+              Pick a customer company above to choose its authorized representative.
+            </div>
+            <template v-else>
             <div class="flex items-center justify-between">
               <h3 class="text-lg font-semibold">
                 Authorized Representative <span class="text-sm font-normal text-red-500">*</span>
@@ -468,7 +477,7 @@ const handleClose = () => {
             </div>
             <p class="text-sm text-muted-foreground">
               The authorized representative reviews this customer's onboarding, so one is required.
-              Pick a client user from {{ selectedCompany?.name }}, or add a new one.
+              Pick a client user from {{ selectedCompany.name }}, or add a new one.
             </p>
             <div v-if="teamLoading" class="text-sm text-muted-foreground">Loading client users…</div>
             <div v-else-if="teamError" class="text-sm text-red-600">{{ teamError }}</div>
@@ -532,6 +541,7 @@ const handleClose = () => {
                 authorized representative.
               </p>
             </div>
+            </template>
           </template>
         </div>
 
