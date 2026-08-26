@@ -144,6 +144,7 @@ public class CompanyController {
     /**
      * Portal team of a customer company, browsable by staff/admin (the client-facing
      * counterpart is GET /companies/me/team, which is locked to the caller's own company).
+     * Staff see real names — the brand-collapsing client policy does not apply here.
      */
     @GetMapping("/{id}/team")
     @Transactional(readOnly = true)
@@ -154,10 +155,15 @@ public class CompanyController {
         }
         Company company = companyRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Company"));
+        // Only CLIENT-role users are valid authorized reps for a customer company.
+        // Real production customer companies contain just CLIENT users, so this is a
+        // no-op there — it guards against provider (ADMIN/USER) accounts that have been
+        // (mis)assigned a customer companyId, which must not become that company's rep.
         List<CompanyTeamMemberResponse> team = userRepository
                 .findByCompanyIdOrderByEmail(company.getId())
                 .stream()
-                .map(CompanyTeamMemberResponse::from)
+                .filter(u -> u.getRole() != null && u.getRole().trim().equalsIgnoreCase("CLIENT"))
+                .map(CompanyTeamMemberResponse::fromStaff)
                 .toList();
         return ResponseEntity.ok(team);
     }

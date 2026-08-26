@@ -16,15 +16,24 @@ public record CompanyTeamMemberResponse(
         java.time.LocalDateTime lastLogin
 ) {
     public static CompanyTeamMemberResponse from(User u) {
-        String status;
-        if (!Boolean.TRUE.equals(u.getIsActive())) {
-            status = "Inactive";
-        } else if (u.getLastLogin() == null) {
-            status = "Invited";
-        } else {
-            status = "Active";
-        }
         return new CompanyTeamMemberResponse(u.getId(), DisplayNamePolicy.nameFor(u), u.getEmail(),
-                u.getRole(), status, u.getLastLogin());
+                u.getRole(), statusFor(u), u.getLastLogin());
+    }
+
+    /**
+     * Staff/admin-facing mapping (e.g. the project wizard picking a client user for a
+     * customer company): real names always — provider-identity anonymization is a
+     * client-facing policy only (see DisplayNamePolicy javadoc).
+     */
+    public static CompanyTeamMemberResponse fromStaff(User u) {
+        String name = u.getFullName();
+        if (name == null || name.isBlank()) name = u.getEmail();
+        return new CompanyTeamMemberResponse(u.getId(), name, u.getEmail(),
+                u.getRole(), statusFor(u), u.getLastLogin());
+    }
+
+    private static String statusFor(User u) {
+        if (!Boolean.TRUE.equals(u.getIsActive())) return "Inactive";
+        return u.getLastLogin() == null ? "Invited" : "Active";
     }
 }
