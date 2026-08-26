@@ -9,6 +9,7 @@ interface ProjectRow {
   id: number
   name: string
   client: string
+  serviceType: string
   status: string
   progress: number
 }
@@ -18,6 +19,7 @@ function mapProject(p: any): ProjectRow {
     id: p.id,
     name: p.name,
     client: p.companyName || '—',
+    serviceType: p.serviceName || '—',
     status: projectStatusLabel(p.status),
     progress: p.progress ?? 0,
   }

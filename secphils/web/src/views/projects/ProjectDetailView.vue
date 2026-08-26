@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRole } from '@/composables/useRole'
 import RowActionsMenu from '@/components/RowActionsMenu.vue'
+import BackToListButton from '@/components/BackToListButton.vue'
 import {
   useGetMe, useGetProject, useGetCompany, useGetProjectTeam,
   useGetDocuments, useCreateDocument, useDeleteDocument,
@@ -192,7 +193,7 @@ async function deleteDocument(id: number) {
 // ---------- Admin controls ----------
 const adminForm = ref({
   status: '',
-  scope: '',
+  notes: '',
   objectives: '',
   progress: 0,
 })
@@ -203,7 +204,7 @@ function initAdminForm() {
   if (!project.value) return
   adminForm.value = {
     status: project.value.status || 'NOT_STARTED',
-    scope: project.value.scope || '',
+    notes: project.value.notes || '',
     objectives: project.value.objectives || '',
     progress: project.value.progress ?? 0,
   }
@@ -219,7 +220,7 @@ async function saveAdminChanges() {
       companyId: project.value.companyId,
       serviceId: project.value.serviceId ?? null,
       name: project.value.name,
-      scope: adminForm.value.scope,
+      notes: adminForm.value.notes,
       objectives: adminForm.value.objectives,
       deliverables: project.value.deliverables ?? null,
       status: adminForm.value.status,
@@ -255,6 +256,9 @@ async function saveAdminChanges() {
     <div v-else-if="project">
       <!-- Header -->
       <div class="mb-6">
+        <div class="mb-3">
+          <BackToListButton to="Projects" />
+        </div>
         <div class="flex items-center justify-between mb-4">
           <div>
             <h1 class="text-2xl font-bold text-gray-900">{{ project.name }}</h1>
@@ -300,8 +304,8 @@ async function saveAdminChanges() {
       <div v-if="activeTab === 'Overview'">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div class="bg-white rounded-lg shadow p-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Scope</h2>
-            <p class="text-gray-700">{{ project.scope || '—' }}</p>
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Notes</h2>
+            <p class="text-gray-700">{{ project.notes || '—' }}</p>
           </div>
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4">Objectives</h2>
@@ -537,9 +541,9 @@ async function saveAdminChanges() {
           </div>
 
           <div class="lg:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Scope</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
             <textarea
-              v-model="adminForm.scope"
+              v-model="adminForm.notes"
               rows="4"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />

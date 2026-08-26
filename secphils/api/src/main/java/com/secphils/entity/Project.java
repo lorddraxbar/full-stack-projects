@@ -34,7 +34,7 @@ public class Project {
     private String name;
 
     @Column(columnDefinition = "TEXT")
-    private String scope;
+    private String notes;
 
     @Column(columnDefinition = "TEXT")
     private String objectives;

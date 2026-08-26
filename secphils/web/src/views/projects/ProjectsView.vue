@@ -150,7 +150,7 @@ const handleWizardSubmit = async (data: WizardData) => {
       companyId,
       serviceId: data.project.serviceId,
       name: data.project.name,
-      scope: data.project.scope,
+      notes: data.project.notes,
     })
     showWizard.value = false
     await loadProjects()

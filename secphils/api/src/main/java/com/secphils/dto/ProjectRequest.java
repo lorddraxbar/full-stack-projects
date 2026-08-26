@@ -7,9 +7,9 @@ import java.math.BigDecimal;
 
 public record ProjectRequest(
         @NotNull Long companyId,
-        Long serviceId,
+        Long serviceId, // required on create (enforced in the controller); null-safe on update
         @NotBlank String name,
-        String scope,
+        String notes,
         String objectives,
         String deliverables,
         String status,

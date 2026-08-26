@@ -90,6 +90,9 @@ public class ProjectController {
     public ResponseEntity<ProjectResponse> create(@Valid @RequestBody ProjectRequest req,
                                                   HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
+        if (req.serviceId() == null) {
+            throw ApiException.badRequest("Service type is required");
+        }
         if (!actor.isAdmin() && (req.companyId() == null || !req.companyId().equals(actor.getCompanyId()))) {
             throw ApiException.forbidden("You can only create projects for your own company");
         }
@@ -179,7 +182,7 @@ public class ProjectController {
             project.setService(service);
         }
         project.setName(req.name());
-        project.setScope(req.scope());
+        project.setNotes(req.notes());
         project.setObjectives(req.objectives());
         project.setDeliverables(req.deliverables());
         if (req.status() != null && !req.status().isBlank()) project.setStatus(req.status());

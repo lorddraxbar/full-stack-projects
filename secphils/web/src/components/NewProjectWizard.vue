@@ -15,7 +15,7 @@ import { useGetCompanies, useGetCompanyTeamFor, useGetServices, useInviteCustome
  * - new:      parent creates a Company (name/location/owner/description/email)
  *             then a Project against the returned companyId.
  * - existing: parent creates a Project against the selected companyId.
- * serviceId is a real Service id from /services (or null).
+ * serviceId is a required real Service id from /services; notes is free text (optional).
  */
 export interface WizardData {
   scenario: 'new' | 'existing'
@@ -34,8 +34,8 @@ export interface WizardData {
   }
   project: {
     name: string
-    serviceId: number | null
-    scope: string
+    serviceId: number
+    notes: string
   }
 }
 
@@ -84,7 +84,7 @@ const repForm = ref({
 const projectForm = ref({
   name: '',
   serviceId: '' as string, // real Service id (string from Select)
-  scope: '',
+  notes: '',
 })
 
 // Real catalog lookups (backend /companies, /services)
@@ -232,7 +232,7 @@ const resetForm = () => {
   scenario.value = 'new'
   companyForm.value = { name: '', location: '', owner: '', description: '' }
   repForm.value = { name: '', email: '' }
-  projectForm.value = { name: '', serviceId: '', scope: '' }
+  projectForm.value = { name: '', serviceId: '', notes: '' }
   selectedCompanyId.value = null
   selectedRepId.value = null
   clientTeam.value = []
@@ -322,7 +322,7 @@ async function addRep() {
 
 function validateProject(): string | null {
   if (!projectForm.value.name.trim()) return 'Project name is required.'
-  if (!projectForm.value.scope.trim()) return 'Scope is required.'
+  if (!projectForm.value.serviceId) return 'Service type is required.'
   return null
 }
 
@@ -359,8 +359,9 @@ const handleSubmit = () => {
     rep,
     project: {
       name: projectForm.value.name.trim(),
-      serviceId: projectForm.value.serviceId ? Number(projectForm.value.serviceId) : null,
-      scope: projectForm.value.scope.trim(),
+      // validateProject() guarantees a service is selected before this runs.
+      serviceId: Number(projectForm.value.serviceId),
+      notes: projectForm.value.notes.trim(),
     },
   }
   emit('submit', data)
@@ -594,10 +595,10 @@ const handleClose = () => {
           </div>
 
           <div class="space-y-2">
-            <Label for="service">Service Type</Label>
+            <Label for="service">Service Type *</Label>
             <Select v-model="projectForm.serviceId">
               <SelectTrigger>
-                <SelectValue placeholder="Select a service (optional)..." />
+                <SelectValue placeholder="Select a service..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -612,8 +613,8 @@ const handleClose = () => {
           </div>
 
           <div class="space-y-2">
-            <Label for="scope">Scope *</Label>
-            <Textarea v-model="projectForm.scope" placeholder="What will be done for this project?" rows="3" />
+            <Label for="notes">Notes</Label>
+            <Textarea v-model="projectForm.notes" placeholder="Anything else the team should know (optional)..." rows="3" />
           </div>
 
           <!-- Review summary -->
