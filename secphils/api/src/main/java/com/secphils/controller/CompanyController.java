@@ -141,6 +141,27 @@ public class CompanyController {
         return ResponseEntity.ok(team);
     }
 
+    /**
+     * Portal team of a customer company, browsable by staff/admin (the client-facing
+     * counterpart is GET /companies/me/team, which is locked to the caller's own company).
+     */
+    @GetMapping("/{id}/team")
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<CompanyTeamMemberResponse>> team(@PathVariable Long id) {
+        AuthUser actor = CurrentUser.require();
+        if (!actor.isUserOrAdmin()) {
+            throw ApiException.forbidden("Only staff can browse customer teams");
+        }
+        Company company = companyRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Company"));
+        List<CompanyTeamMemberResponse> team = userRepository
+                .findByCompanyIdOrderByEmail(company.getId())
+                .stream()
+                .map(CompanyTeamMemberResponse::from)
+                .toList();
+        return ResponseEntity.ok(team);
+    }
+
     @PostMapping("/me/team/invite")
     @Transactional
     public ResponseEntity<Map<String, Object>> inviteTeamMember(@Valid @RequestBody TeamInviteRequest req,
@@ -202,25 +223,29 @@ public class CompanyController {
         company.setContactDetails(req.contactDetails());
     }
 
+    /**
+     * Null-safe field application: sparse updates (e.g. the project wizard bumping only
+     * the authorized rep) must not clobber fields the caller did not send.
+     */
     private void apply(Company company, CompanyRequest req) {
-        company.setName(req.name());
-        company.setLocation(req.location());
-        company.setOwner(req.owner());
-        company.setDescription(req.description());
-        company.setTagline(req.tagline());
-        company.setIndustrySectors(req.industrySectors());
-        company.setHeadquarters(req.headquarters());
-        company.setPhone(req.phone());
-        company.setEmail(req.email());
-        company.setWebsite(req.website());
-        company.setSocialLinks(req.socialLinks());
-        company.setTaxNumber(req.taxNumber());
-        company.setBankingDetails(req.bankingDetails());
-        company.setOperationalFields(req.operationalFields());
-        company.setBrandPrimary(req.brandPrimary());
-        company.setBrandSecondary(req.brandSecondary());
-        company.setLogoUrl(req.logoUrl());
-        company.setContactDetails(req.contactDetails());
+        if (req.name() != null) company.setName(req.name());
+        if (req.location() != null) company.setLocation(req.location());
+        if (req.owner() != null) company.setOwner(req.owner());
+        if (req.description() != null) company.setDescription(req.description());
+        if (req.tagline() != null) company.setTagline(req.tagline());
+        if (req.industrySectors() != null) company.setIndustrySectors(req.industrySectors());
+        if (req.headquarters() != null) company.setHeadquarters(req.headquarters());
+        if (req.phone() != null) company.setPhone(req.phone());
+        if (req.email() != null) company.setEmail(req.email());
+        if (req.website() != null) company.setWebsite(req.website());
+        if (req.socialLinks() != null) company.setSocialLinks(req.socialLinks());
+        if (req.taxNumber() != null) company.setTaxNumber(req.taxNumber());
+        if (req.bankingDetails() != null) company.setBankingDetails(req.bankingDetails());
+        if (req.operationalFields() != null) company.setOperationalFields(req.operationalFields());
+        if (req.brandPrimary() != null) company.setBrandPrimary(req.brandPrimary());
+        if (req.brandSecondary() != null) company.setBrandSecondary(req.brandSecondary());
+        if (req.logoUrl() != null) company.setLogoUrl(req.logoUrl());
+        if (req.contactDetails() != null) company.setContactDetails(req.contactDetails());
     }
 
     private String resolveInviteBaseUrl(HttpServletRequest http) {

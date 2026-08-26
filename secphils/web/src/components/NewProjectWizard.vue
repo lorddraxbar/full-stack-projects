@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
-import { useGetCompanies, useGetServices } from '@/services/api'
+import { useGetCompanies, useGetCompanyTeamFor, useGetServices } from '@/services/api'
 
 /**
  * Wizard output, shaped for backend orchestration in ProjectsView:
@@ -29,6 +29,8 @@ export interface WizardData {
   rep: {
     name: string
     email: string
+    /** Portal user id picked from the customer's client team (existing scenario); null otherwise. */
+    userId: number | null
   }
   project: {
     name: string
@@ -88,13 +90,55 @@ const projectForm = ref({
 })
 
 // Real catalog lookups (backend /companies, /services)
-const existingCompanies = ref<{ id: number; name: string; location: string | null; owner: string | null }[]>([])
+const existingCompanies = ref<{ id: number; name: string; location: string | null; owner: string | null; authorizedRepId: number | null; authorizedRepName: string | null }[]>([])
 const services = ref<{ id: number; name: string; category: string | null }[]>([])
 const loadingLookups = ref(false)
 const selectedCompanyId = ref<string | null>(null)
 const selectedCompanyIdNum = computed<number | null>(() =>
   selectedCompanyId.value ? Number(selectedCompanyId.value) : null
 )
+
+// Client users of the selected customer company (existing scenario)
+const clientTeam = ref<{ id: number; name: string; email: string; role: string; status: string }[]>([])
+const teamLoading = ref(false)
+const teamError = ref('')
+const selectedRepId = ref<string | null>(null)
+
+const selectedTeamMember = computed(() =>
+  clientTeam.value.find(m => m.id === (selectedRepId.value ? Number(selectedRepId.value) : null))
+)
+
+async function loadTeam() {
+  teamError.value = ''
+  if (selectedCompanyIdNum.value == null) {
+    clientTeam.value = []
+    selectedRepId.value = null
+    return
+  }
+  teamLoading.value = true
+  try {
+    const team = await useGetCompanyTeamFor(selectedCompanyIdNum.value)
+    clientTeam.value = (team as any[]).map(m => ({
+      id: m.id, name: m.name, email: m.email, role: m.role, status: m.status,
+    }))
+  } catch (e: any) {
+    teamError.value = e?.response?.data?.message || 'Failed to load the client users for this company'
+    clientTeam.value = []
+  } finally {
+    teamLoading.value = false
+    // Pre-select the company's current representative when present in the team.
+    const currentRepId = selectedCompany.value?.authorizedRepId ?? null
+    if (currentRepId != null && clientTeam.value.some(m => m.id === currentRepId)) {
+      selectedRepId.value = String(currentRepId)
+    } else {
+      selectedRepId.value = null
+    }
+  }
+}
+
+watch(selectedCompanyIdNum, (val, prev) => {
+  if (val != null && val !== prev) void loadTeam()
+})
 
 async function loadLookups() {
   loadingLookups.value = true
@@ -103,7 +147,14 @@ async function loadLookups() {
     const [comps, svcs] = await Promise.all([useGetCompanies(), useGetServices()])
     existingCompanies.value = (comps as any[])
       .filter(c => c != null && c.id != null)
-      .map(c => ({ id: c.id, name: c.name, location: c.location ?? null, owner: c.owner ?? null }))
+      .map(c => ({
+        id: c.id,
+        name: c.name,
+        location: c.location ?? null,
+        owner: c.owner ?? null,
+        authorizedRepId: c.authorizedRepId ?? null,
+        authorizedRepName: c.authorizedRepName ?? null,
+      }))
     services.value = (svcs as any[])
       .filter(s => s != null && s.id != null && (s.isActive !== false))
       .map(s => ({ id: s.id, name: s.name, category: s.category ?? null }))
@@ -132,6 +183,9 @@ const resetForm = () => {
   repForm.value = { name: '', email: '' }
   projectForm.value = { name: '', serviceId: '', scope: '', dueDate: '' }
   selectedCompanyId.value = null
+  selectedRepId.value = null
+  clientTeam.value = []
+  teamError.value = ''
   loadError.value = ''
 }
 
@@ -192,14 +246,19 @@ const handleSubmit = () => {
           description: '',
         }
       : { ...companyForm.value }
+  const rep =
+    scenario.value === 'existing' && selectedTeamMember.value
+      ? { name: selectedTeamMember.value.name, email: selectedTeamMember.value.email, userId: selectedTeamMember.value.id }
+      : {
+          name: repForm.value.name.trim(),
+          email: repForm.value.email.trim(),
+          userId: null,
+        }
   const data: WizardData = {
     scenario: scenario.value,
     companyId: scenario.value === 'existing' ? selectedCompanyIdNum.value : null,
     company,
-    rep: {
-      name: repForm.value.name.trim(),
-      email: repForm.value.email.trim(),
-    },
+    rep,
     project: {
       name: projectForm.value.name.trim(),
       serviceId: projectForm.value.serviceId ? Number(projectForm.value.serviceId) : null,
@@ -290,6 +349,7 @@ const handleClose = () => {
               <div class="text-sm text-muted-foreground space-y-1">
                 <p v-if="selectedCompany.location">Location: {{ selectedCompany.location }}</p>
                 <p v-if="selectedCompany.owner">Owner: {{ selectedCompany.owner }}</p>
+                <p v-if="selectedCompany.authorizedRepName">Current rep: {{ selectedCompany.authorizedRepName }}</p>
               </div>
             </div>
 
@@ -297,17 +357,44 @@ const handleClose = () => {
 
             <h3 class="text-lg font-semibold">Authorized Representative <span class="text-sm font-normal text-muted-foreground">(optional)</span></h3>
             <p class="text-sm text-muted-foreground">
-              Contact for this project. Leave empty to keep the company's current representative.
+              Pick a client user from {{ selectedCompany?.name }} to act as the contact for this
+              project. Leave unselected to keep the company's current representative.
             </p>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div class="space-y-2">
-                <Label for="repName">Full Name</Label>
-                <Input id="repName" v-model="repForm.name" placeholder="Enter full name" />
-              </div>
-              <div class="space-y-2">
-                <Label for="repEmail">Email Address</Label>
-                <Input id="repEmail" v-model="repForm.email" type="email" placeholder="email@company.com" />
-              </div>
+            <div v-if="teamLoading" class="text-sm text-muted-foreground">Loading client users…</div>
+            <div v-else-if="teamError" class="text-sm text-red-600">{{ teamError }}</div>
+            <div v-else-if="clientTeam.length === 0" class="text-sm text-muted-foreground">
+              No client users on file for this company yet. You can invite them from the customer's
+              Team &amp; Invitations settings.
+            </div>
+            <div v-else class="max-h-56 overflow-y-auto rounded-lg border divide-y">
+              <label
+                v-for="member in clientTeam"
+                :key="member.id"
+                class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted transition-colors"
+              >
+                <!-- :checked + @change (not v-model) so the selection can also be cleared -->
+                <input
+                  type="radio"
+                  name="authorizedRep"
+                  class="h-4 w-4 accent-emerald-600"
+                  :checked="selectedRepId === member.id.toString()"
+                  @change="selectedRepId = member.id.toString()"
+                />
+                <span class="flex-1">
+                  <span class="text-sm font-medium">{{ member.name }}</span>
+                  <span class="text-xs text-muted-foreground"> · {{ member.email }}</span>
+                </span>
+                <span class="text-xs text-muted-foreground">{{ member.status }}</span>
+              </label>
+            </div>
+            <div v-if="selectedRepId" class="flex items-center justify-between">
+              <button
+                type="button"
+                class="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                @click="selectedRepId = null"
+              >
+                Clear selection — keep the company's current representative
+              </button>
             </div>
           </template>
         </div>
@@ -372,7 +459,8 @@ const handleClose = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="" disabled class="hidden" />
+                  <!-- sentinel value: shadcn SelectItem rejects value="" (used to clear the model) -->
+                  <SelectItem value="none" disabled class="hidden" />
                   <SelectItem v-for="service in services" :key="service.id" :value="service.id.toString()">
                     {{ service.name }}
                   </SelectItem>
@@ -408,20 +496,28 @@ const handleClose = () => {
                 </p>
               </CardContent>
             </Card>
-            <Card v-if="repForm.name || repForm.email">
+            <Card v-if="(isScenarioNew && (repForm.name || repForm.email)) || (!isScenarioNew && selectedTeamMember)">
               <CardHeader>
                 <CardTitle class="text-base">Authorized Representative</CardTitle>
               </CardHeader>
               <CardContent class="space-y-1 text-sm">
-                <p><strong>Name:</strong> {{ repForm.name || '—' }}</p>
-                <p><strong>Email:</strong> {{ repForm.email || '—' }}</p>
+                <p><strong>Name:</strong> {{ isScenarioNew ? (repForm.name || '—') : selectedTeamMember?.name }}</p>
+                <p><strong>Email:</strong> {{ isScenarioNew ? (repForm.email || '—') : selectedTeamMember?.email }}</p>
               </CardContent>
             </Card>
             <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
-              <p class="text-sm text-emerald-800">
+              <p class="text-sm text-emerald-800" v-if="isScenarioNew">
                 <strong>Next steps:</strong> The contact email is saved on the customer's company
                 profile. Once the customer activates a portal account with that address, they become
                 the company's authorized representative and can see this project in their workspace.
+              </p>
+              <p class="text-sm text-emerald-800" v-else-if="selectedTeamMember">
+                <strong>Next steps:</strong> {{ selectedTeamMember.name }} ({{ selectedTeamMember.email }})
+                becomes the company's authorized representative and will see this project in their workspace.
+              </p>
+              <p class="text-sm text-emerald-800" v-else>
+                <strong>Next steps:</strong> The company's current representative will see this
+                project in their workspace.
               </p>
             </div>
           </div>

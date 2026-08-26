@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import NewProjectWizard from '@/components/NewProjectWizard.vue'
 import type { WizardData } from '@/components/NewProjectWizard.vue'
 import { useRole } from '@/composables/useRole'
-import { useGetMe, useGetProjects, useCreateProject, useCreateCompany } from '@/services/api'
+import { useGetMe, useGetProjects, useCreateProject, useCreateCompany, useUpdateCompany } from '@/services/api'
 import { projectStatusLabel, PROJECT_STATUS_COLORS, formatDate } from '@/lib/labels'
 
 const { isClient } = useRole()
@@ -125,7 +125,8 @@ const goToProject = (id: number) => {
 }
 
 // Wizard orchestration:
-// - existing customer -> POST /projects against the selected companyId
+// - existing customer -> PUT /companies/{id} when a new rep was picked
+//                        then POST /projects against the selected companyId
 // - new customer      -> POST /companies (rep email becomes the company contact)
 //                        then POST /projects against the returned companyId
 const handleWizardSubmit = async (data: WizardData) => {
@@ -140,6 +141,12 @@ const handleWizardSubmit = async (data: WizardData) => {
         email: data.rep.email || null,
       })
       companyId = (company as any).id
+    } else if (companyId != null && data.rep.userId != null) {
+      // Persist the client user picked in the wizard as the company's authorized rep.
+      await useUpdateCompany(companyId, {
+        name: data.company.name,
+        authorizedRepId: data.rep.userId,
+      })
     }
     await useCreateProject({
       companyId,

@@ -19,6 +19,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /** Active members of a company — recipients for company-wide notifications. */
     List<User> findByCompanyIdAndIsActiveTrue(Long companyId);
 
+    /** All portal accounts belonging to a company (any status) — staff-side team browser. */
+    List<User> findByCompanyIdOrderByEmail(Long companyId);
+
     /** Number of portal accounts currently holding this role name. */
     long countByRole(String role);
 

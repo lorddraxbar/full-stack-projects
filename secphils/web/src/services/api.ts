@@ -246,6 +246,12 @@ export async function useGetCompany(id: number) {
   return response.data
 }
 
+/** Portal accounts of a given customer company (staff/admin only — see GET /companies/{id}/team). */
+export async function useGetCompanyTeamFor(companyId: number) {
+  const response = await api.get(`/companies/${companyId}/team`)
+  return response.data as CompanyTeamMember[]
+}
+
 export async function useCreateCompany(data: Record<string, unknown>) {
   const response = await api.post('/companies', data)
   return response.data

@@ -54,6 +54,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/v1/companies").hasAnyRole("ADMIN", "USER")
                 .requestMatchers("/api/v1/companies/me/**").authenticated()
+                // browsing another company's client team is staff-only; clients use /companies/me/team
+                .requestMatchers(HttpMethod.GET, "/api/v1/companies/*/team").hasAnyRole("ADMIN", "USER")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/companies/**").hasAnyRole("ADMIN", "USER")
                 .requestMatchers(HttpMethod.POST, "/api/v1/services", "/api/v1/dropdowns/**").hasAnyRole("ADMIN", "USER")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/services/**", "/api/v1/dropdowns/**").hasAnyRole("ADMIN", "USER")
