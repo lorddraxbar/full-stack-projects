@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
-import { useGetCompanies, useGetCompanyTeamFor, useGetServices } from '@/services/api'
+import { useGetCompanies, useGetCompanyTeamFor, useGetServices, useInviteCustomerRep } from '@/services/api'
 
 /**
  * Wizard output, shaped for backend orchestration in ProjectsView:
@@ -98,6 +98,13 @@ const selectedCompanyIdNum = computed<number | null>(() =>
   selectedCompanyId.value ? Number(selectedCompanyId.value) : null
 )
 
+// Declared before repResolved below: its getter reads selectedCompany, and a
+// watch on repResolved evaluates it during setup — before later declarations
+// run — so any forward reference here is a TDZ ReferenceError at first render.
+const selectedCompany = computed(() =>
+  existingCompanies.value.find(c => c.id === selectedCompanyIdNum.value)
+)
+
 // Client users of the selected customer company (existing scenario)
 const clientTeam = ref<{ id: number; name: string; email: string; role: string; status: string }[]>([])
 const teamLoading = ref(false)
@@ -108,6 +115,49 @@ const selectedTeamMember = computed(() =>
   clientTeam.value.find(m => m.id === (selectedRepId.value ? Number(selectedRepId.value) : null))
 )
 
+// The representative this project will be submitted with (existing customer):
+// the client the staff member picked, else — when no one is picked — the
+// company's current rep (keeps it). The rep is REQUIRED, so with no team and no
+// current rep the form must add a new one before the project can proceed.
+const resolvedRep = computed(() => {
+  const picked = selectedTeamMember.value
+  if (picked) return picked
+  const currentId = selectedCompany.value?.authorizedRepId
+  return currentId ? clientTeam.value.find(m => m.id === currentId) ?? null : null
+})
+
+// The picker only earns its space when there is more than one client user to
+// choose between. Exactly one -> auto-selected (rendered in the template); zero -> add-a-new only.
+const showPicker = computed(() => clientTeam.value.length > 1)
+const repResolved = computed(() => resolvedRep.value != null)
+// A blocked Next stores the "rep required" copy in the red loadError banner;
+// once the requirement is satisfied (pick or add a rep) that banner is stale — clear it.
+watch(repResolved, (ok) => {
+  if (ok) loadError.value = ''
+})
+
+const repRequiredMessage = computed(() => {
+  if (clientTeam.value.length === 0)
+    return 'This company has no client users yet and no representative on file. Add a new authorized representative to continue.'
+  if (selectedCompany.value?.authorizedRepId == null)
+    return 'An authorized representative is required — they review this customer\u2019s onboarding. Pick a client user or add a new one.'
+  return ''
+})
+
+// Add-a-new-rep form (always available in the existing-customer flow).
+const addingRep = ref(false)
+const repError = ref('')
+const addRepForm = ref({ name: '', email: '' })
+const addRepBusy = ref(false)
+const newRepFormValid = computed(() =>
+  addRepForm.value.name.trim() !== '' && addRepForm.value.email.trim() !== ''
+)
+// The new-customer rep step binds repForm (the contact that becomes the company's
+// rep on activation) — distinct from the add-rep form used in the existing flow.
+const newCustomerRepValid = computed(() =>
+  repForm.value.name.trim() !== '' && repForm.value.email.trim() !== ''
+)
+
 async function loadTeam() {
   teamError.value = ''
   if (selectedCompanyIdNum.value == null) {
@@ -116,6 +166,10 @@ async function loadTeam() {
     return
   }
   teamLoading.value = true
+  selectedRepId.value = null
+  addingRep.value = false
+  addRepForm.value = { name: '', email: '' }
+  repError.value = ''
   try {
     const team = await useGetCompanyTeamFor(selectedCompanyIdNum.value)
     clientTeam.value = (team as any[]).map(m => ({
@@ -126,12 +180,15 @@ async function loadTeam() {
     clientTeam.value = []
   } finally {
     teamLoading.value = false
-    // Pre-select the company's current representative when present in the team.
+    // Pre-select the company's current representative so "keep current" is the
+    // default; the picker can be overridden when there is more than one client.
     const currentRepId = selectedCompany.value?.authorizedRepId ?? null
     if (currentRepId != null && clientTeam.value.some(m => m.id === currentRepId)) {
       selectedRepId.value = String(currentRepId)
-    } else {
-      selectedRepId.value = null
+    } else if (clientTeam.value.length === 1) {
+      // Exactly one client user: there is no choice to make — they are the rep.
+      // (Overridable via "add a new one".)
+      selectedRepId.value = String(clientTeam.value[0].id)
     }
   }
 }
@@ -165,10 +222,6 @@ async function loadLookups() {
   }
 }
 
-const selectedCompany = computed(() =>
-  existingCompanies.value.find(c => c.id === selectedCompanyIdNum.value)
-)
-
 // Steps:
 //   new:      0 scenario -> 1 company details -> 2 representative -> 3 project
 //   existing: 0 scenario -> 1 company + representative -> 2 project
@@ -186,6 +239,9 @@ const resetForm = () => {
   selectedRepId.value = null
   clientTeam.value = []
   teamError.value = ''
+  addingRep.value = false
+  addRepForm.value = { name: '', email: '' }
+  repError.value = ''
   loadError.value = ''
 }
 
@@ -196,13 +252,17 @@ const nextStep = () => {
       loadError.value = 'Company name is required.'
       return
     }
-    if (currentStep.value === 2 && !repForm.value.email.trim()) {
-      loadError.value = 'The representative email is required (it becomes the company contact email).'
+    if (currentStep.value === 2 && !newCustomerRepValid.value) {
+      loadError.value = 'The representative name and email are required (the email becomes the company contact and invites them to the portal).'
       return
     }
   } else {
     if (currentStep.value === 1 && selectedCompanyId.value == null) {
       loadError.value = 'Select a customer company first.'
+      return
+    }
+    if (currentStep.value === 1 && !repResolved.value) {
+      loadError.value = repRequiredMessage.value
       return
     }
   }
@@ -222,6 +282,41 @@ const selectScenario = (value: string) => {
   loadError.value = ''
   scenario.value = value === 'new' ? 'new' : 'existing'
   currentStep.value = 1
+}
+
+async function addRep() {
+  repError.value = ''
+  if (!newRepFormValid.value) {
+    repError.value = 'Enter the new representative\u2019s full name and email.'
+    return
+  }
+  const companyId = selectedCompanyIdNum.value
+  if (companyId == null) return
+  addRepBusy.value = true
+  try {
+    const created = (await useInviteCustomerRep(companyId, {
+      name: addRepForm.value.name.trim(),
+      email: addRepForm.value.email.trim(),
+      setAsRep: true,
+    })) as any
+    addRepForm.value = { name: '', email: '' }
+    addingRep.value = false
+    // Refresh the team list, then pin the selection to the rep we just added:
+    // loadTeam() re-preselects from the (stale) company cache, which still
+    // points at the previous rep.
+    await loadTeam()
+    if (created?.id != null) selectedRepId.value = String(created.id)
+    // Keep the cached company row in sync so the review step names the new rep.
+    const comp = selectedCompany.value
+    if (comp && created?.id != null) {
+      comp.authorizedRepId = created.id
+      comp.authorizedRepName = created.name ?? null
+    }
+  } catch (e: any) {
+    repError.value = e?.response?.data?.message || 'Failed to add the new representative.'
+  } finally {
+    addRepBusy.value = false
+  }
 }
 
 function validateProject(): string | null {
@@ -246,14 +341,17 @@ const handleSubmit = () => {
           description: '',
         }
       : { ...companyForm.value }
-  const rep =
-    scenario.value === 'existing' && selectedTeamMember.value
-      ? { name: selectedTeamMember.value.name, email: selectedTeamMember.value.email, userId: selectedTeamMember.value.id }
-      : {
-          name: repForm.value.name.trim(),
-          email: repForm.value.email.trim(),
-          userId: null,
-        }
+  let rep: WizardData['rep']
+  if (scenario.value === 'new') {
+    rep = { name: repForm.value.name.trim(), email: repForm.value.email.trim(), userId: null }
+  } else if (selectedTeamMember.value) {
+    rep = { name: selectedTeamMember.value.name, email: selectedTeamMember.value.email, userId: selectedTeamMember.value.id }
+  } else {
+    // No one picked explicitly — keep the company's current rep. The step gate
+    // guarantees repResolved here, so resolvedRep is non-null.
+    const r = resolvedRep.value!
+    rep = { name: r.name, email: r.email, userId: r.id }
+  }
   const data: WizardData = {
     scenario: scenario.value,
     companyId: scenario.value === 'existing' ? selectedCompanyIdNum.value : null,
@@ -355,46 +453,84 @@ const handleClose = () => {
 
             <Separator class="my-4" />
 
-            <h3 class="text-lg font-semibold">Authorized Representative <span class="text-sm font-normal text-muted-foreground">(optional)</span></h3>
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-semibold">
+                Authorized Representative <span class="text-sm font-normal text-red-500">*</span>
+              </h3>
+              <button
+                type="button"
+                class="text-sm font-medium text-emerald-700 hover:text-emerald-800 underline underline-offset-2"
+                :class="{ 'pointer-events-none opacity-50': teamLoading || !!teamError }"
+                @click="addingRep = !addingRep"
+              >
+                + Add a new representative
+              </button>
+            </div>
             <p class="text-sm text-muted-foreground">
-              Pick a client user from {{ selectedCompany?.name }} to act as the contact for this
-              project. Leave unselected to keep the company's current representative.
+              The authorized representative reviews this customer's onboarding, so one is required.
+              Pick a client user from {{ selectedCompany?.name }}, or add a new one.
             </p>
             <div v-if="teamLoading" class="text-sm text-muted-foreground">Loading client users…</div>
             <div v-else-if="teamError" class="text-sm text-red-600">{{ teamError }}</div>
-            <div v-else-if="clientTeam.length === 0" class="text-sm text-muted-foreground">
-              No client users on file for this company yet. You can invite them from the customer's
-              Team &amp; Invitations settings.
+            <template v-else>
+              <!-- 2+ client users: a picker to choose the reviewer -->
+              <div v-if="showPicker" class="max-h-56 overflow-y-auto rounded-lg border divide-y">
+                <label
+                  v-for="member in clientTeam"
+                  :key="member.id"
+                  class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted transition-colors"
+                >
+                  <input
+                    type="radio"
+                    name="authorizedRep"
+                    class="h-4 w-4 accent-emerald-600"
+                    :checked="selectedRepId === member.id.toString()"
+                    @change="selectedRepId = member.id.toString()"
+                  />
+                  <span class="flex-1">
+                    <span class="text-sm font-medium">{{ member.name }}</span>
+                    <span class="text-xs text-muted-foreground"> · {{ member.email }}</span>
+                  </span>
+                  <span class="text-xs text-muted-foreground">{{ member.status }}</span>
+                </label>
+              </div>
+              <!-- exactly one client user: auto-selected, no picker needed -->
+              <div v-else-if="clientTeam.length === 1" class="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                <span class="font-medium">{{ clientTeam[0].name }}</span>
+                <span class="text-xs text-muted-foreground"> · {{ clientTeam[0].email }}</span>
+                <span class="text-xs text-emerald-700 ml-2">selected</span>
+              </div>
+              <!-- zero client users: must add one -->
+              <div v-else class="text-sm text-muted-foreground">
+                No client users on file for this company yet. Add a new representative to continue.
+              </div>
+            </template>
+            <div v-if="!repResolved && !teamLoading && !teamError" class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              {{ repRequiredMessage }}
             </div>
-            <div v-else class="max-h-56 overflow-y-auto rounded-lg border divide-y">
-              <label
-                v-for="member in clientTeam"
-                :key="member.id"
-                class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted transition-colors"
-              >
-                <!-- :checked + @change (not v-model) so the selection can also be cleared -->
-                <input
-                  type="radio"
-                  name="authorizedRep"
-                  class="h-4 w-4 accent-emerald-600"
-                  :checked="selectedRepId === member.id.toString()"
-                  @change="selectedRepId = member.id.toString()"
-                />
-                <span class="flex-1">
-                  <span class="text-sm font-medium">{{ member.name }}</span>
-                  <span class="text-xs text-muted-foreground"> · {{ member.email }}</span>
-                </span>
-                <span class="text-xs text-muted-foreground">{{ member.status }}</span>
-              </label>
-            </div>
-            <div v-if="selectedRepId" class="flex items-center justify-between">
-              <button
-                type="button"
-                class="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                @click="selectedRepId = null"
-              >
-                Clear selection — keep the company's current representative
-              </button>
+            <!-- Add-a-new-rep form (always available in the existing-customer flow) -->
+            <div v-if="addingRep" class="rounded-lg border p-4 space-y-3 bg-muted/30">
+              <div class="grid gap-3 sm:grid-cols-2">
+                <div class="space-y-1">
+                  <Label class="text-xs">Full Name *</Label>
+                  <Input v-model="addRepForm.name" placeholder="Full name" />
+                </div>
+                <div class="space-y-1">
+                  <Label class="text-xs">Email Address *</Label>
+                  <Input v-model="addRepForm.email" type="email" placeholder="email@company.com" />
+                </div>
+              </div>
+              <div v-if="repError" class="text-sm text-red-600">{{ repError }}</div>
+              <div class="flex items-center gap-2">
+                <Button size="sm" :disabled="addRepBusy" @click="addRep()">
+                  {{ addRepBusy ? 'Adding…' : 'Add & set as representative' }}
+                </Button>
+                <Button size="sm" variant="ghost" @click="addingRep = false">Cancel</Button>
+              </div>
+              <p class="text-xs text-muted-foreground">
+                This sends the representative an invite to the portal and makes them the company's
+                authorized representative.
+              </p>
             </div>
           </template>
         </div>
@@ -432,7 +568,7 @@ const handleClose = () => {
           </p>
 
           <div class="space-y-2">
-            <Label for="fullName">Full Name</Label>
+            <Label for="fullName">Full Name *</Label>
             <Input id="fullName" v-model="repForm.name" placeholder="Enter full name" />
           </div>
 
@@ -496,13 +632,13 @@ const handleClose = () => {
                 </p>
               </CardContent>
             </Card>
-            <Card v-if="(isScenarioNew && (repForm.name || repForm.email)) || (!isScenarioNew && selectedTeamMember)">
+            <Card v-if="(isScenarioNew && (repForm.name || repForm.email)) || (!isScenarioNew && resolvedRep)">
               <CardHeader>
                 <CardTitle class="text-base">Authorized Representative</CardTitle>
               </CardHeader>
               <CardContent class="space-y-1 text-sm">
-                <p><strong>Name:</strong> {{ isScenarioNew ? (repForm.name || '—') : selectedTeamMember?.name }}</p>
-                <p><strong>Email:</strong> {{ isScenarioNew ? (repForm.email || '—') : selectedTeamMember?.email }}</p>
+                <p><strong>Name:</strong> {{ isScenarioNew ? (repForm.name || '—') : (resolvedRep?.name || '—') }}</p>
+                <p><strong>Email:</strong> {{ isScenarioNew ? (repForm.email || '—') : (resolvedRep?.email || '—') }}</p>
               </CardContent>
             </Card>
             <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
@@ -511,13 +647,13 @@ const handleClose = () => {
                 profile. Once the customer activates a portal account with that address, they become
                 the company's authorized representative and can see this project in their workspace.
               </p>
-              <p class="text-sm text-emerald-800" v-else-if="selectedTeamMember">
+              <p class="text-sm text-emerald-800" v-else-if="selectedTeamMember && selectedRepId">
                 <strong>Next steps:</strong> {{ selectedTeamMember.name }} ({{ selectedTeamMember.email }})
                 becomes the company's authorized representative and will see this project in their workspace.
               </p>
               <p class="text-sm text-emerald-800" v-else>
-                <strong>Next steps:</strong> The company's current representative will see this
-                project in their workspace.
+                <strong>Next steps:</strong> {{ (resolvedRep?.name || `The company's current representative`) }} will
+                review this customer's onboarding and see this project in their workspace.
               </p>
             </div>
           </div>

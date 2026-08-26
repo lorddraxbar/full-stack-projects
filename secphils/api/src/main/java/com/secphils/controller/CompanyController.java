@@ -185,32 +185,77 @@ public class CompanyController {
 
         User invitee = new User();
         invitee.setEmail(req.email());
-        invitee.setFirstName(fullName(req.name()));
-        invitee.setLastName("");
+        String[] inviteeName = splitName(req.name());
+        invitee.setFirstName(inviteeName[0]);
+        invitee.setLastName(inviteeName[1]);
         invitee.setRole(req.role() != null && !req.role().isBlank() ? req.role() : "CLIENT");
         invitee.setCompanyId(company.getId());
         invitee.setIsActive(false);
         invitee = userRepository.save(invitee);
 
-        String token = newToken();
-        invitee.setPasswordResetToken(token);
-        invitee.setPasswordResetExpiresAt(LocalDateTime.now().plus(inviteTtl));
-        invitee.setPasswordResetRequestedAt(LocalDateTime.now());
-        userRepository.save(invitee);
-
-        String link = resolveInviteBaseUrl(http) + "/auth/set-password?token=" + token;
-        mailService.sendHtml(invitee.getEmail(), "Your SECPhils Portal access is ready",
-                mailService.inviteEmail(invitee.getFirstName(), invitee.getFullName(), link,
-                        DisplayNamePolicy.nameFor(actor), company.getName()),
-                link);
-        auditService.audit(me, "COMPANY_TEAM_INVITE", "User", invitee.getId(),
-                "Email: " + invitee.getEmail() + " -> " + company.getName(), http);
+        sendInvite(me, actor, invitee, company, http, "COMPANY_TEAM_INVITE");
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "id", invitee.getId(),
                 "name", DisplayNamePolicy.nameFor(invitee),
                 "email", invitee.getEmail(),
                 "role", invitee.getRole(),
                 "status", CompanyTeamMemberResponse.from(invitee).status()));
+    }
+
+    /**
+     * Staff/admin invites a NEW client user to a customer company from the project wizard.
+     * The invitee is created as an inactive CLIENT on that company and, when setAsRep, is
+     * also made the company's authorized representative (the onboarding reviewer).
+     */
+    @PostMapping("/{id}/team/invite")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> addCustomerRep(@Valid @RequestBody CustomerRepInviteRequest req,
+                                                              @PathVariable Long id,
+                                                              HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        User actorUser = userRepository.findById(actor.id()).orElseThrow(() -> ApiException.notFound("User"));
+        Company company = companyRepository.findById(id).orElseThrow(() -> ApiException.notFound("Company"));
+        if (userRepository.findByEmail(req.email()).isPresent()) {
+            throw ApiException.conflict("A user with this email already exists");
+        }
+        User invitee = new User();
+        invitee.setEmail(req.email());
+        String[] inviteeName = splitName(req.name());
+        invitee.setFirstName(inviteeName[0]);
+        invitee.setLastName(inviteeName[1]);
+        // The onboarding reviewer must be a client of this company — never a provider account.
+        invitee.setRole("CLIENT");
+        invitee.setCompanyId(company.getId());
+        invitee.setIsActive(false);
+        invitee = userRepository.save(invitee);
+        sendInvite(actor, actorUser, invitee, company, http, "COMPANY_CUSTOMER_REP_INVITE");
+        if (req.setAsRep()) {
+            company.setAuthorizedRep(invitee);
+            companyRepository.save(company);
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "id", invitee.getId(),
+                "name", CompanyTeamMemberResponse.fromStaff(invitee).name(),
+                "email", invitee.getEmail(),
+                "role", invitee.getRole(),
+                "status", CompanyTeamMemberResponse.from(invitee).status()));
+    }
+
+    /** Create the one-time password-reset token and send the branded invite email. */
+    private void sendInvite(AuthUser actor, User actorUser, User invitee, Company company,
+                            HttpServletRequest http, String auditAction) {
+        String token = newToken();
+        invitee.setPasswordResetToken(token);
+        invitee.setPasswordResetExpiresAt(LocalDateTime.now().plus(inviteTtl));
+        invitee.setPasswordResetRequestedAt(LocalDateTime.now());
+        userRepository.save(invitee);
+        String link = resolveInviteBaseUrl(http) + "/auth/set-password?token=" + token;
+        mailService.sendHtml(invitee.getEmail(), "Your SECPhils Portal access is ready",
+                mailService.inviteEmail(invitee.getFirstName(), invitee.getFullName(), link,
+                        DisplayNamePolicy.nameFor(actorUser), company.getName()),
+                link);
+        auditService.audit(actor, auditAction, "User", invitee.getId(),
+                "Email: " + invitee.getEmail() + " -> " + company.getName(), http);
     }
 
     private Company ownCompany(AuthUser me) {
@@ -286,9 +331,17 @@ public class CompanyController {
         return sb.toString();
     }
 
-    private static String fullName(String name) {
+    /**
+     * Splits a free-form full name into first/last: the first token becomes the
+     * first name and everything after it the last name, so multi-word names are
+     * preserved by getFullName() instead of being truncated to the first word.
+     */
+    private static String[] splitName(String name) {
         String trimmed = name == null ? "" : name.trim();
         int space = trimmed.indexOf(' ');
-        return space > 0 ? trimmed.substring(0, space) : trimmed;
+        return new String[]{
+                space > 0 ? trimmed.substring(0, space) : trimmed,
+                space > 0 ? trimmed.substring(space + 1) : ""
+        };
     }
 }

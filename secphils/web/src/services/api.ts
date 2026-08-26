@@ -252,6 +252,22 @@ export async function useGetCompanyTeamFor(companyId: number) {
   return response.data as CompanyTeamMember[]
 }
 
+/**
+ * Staff/admin invites a NEW client (authorized representative) to a customer company
+ * from the project wizard. Creates an inactive CLIENT on that company, sends the invite
+ * email, and — when setAsRep — makes them the company's authorized representative.
+ */
+export async function useInviteCustomerRep(
+  companyId: number,
+  data: { name: string; email: string; setAsRep?: boolean }
+) {
+  const response = await api.post(`/companies/${companyId}/team/invite`, {
+    ...data,
+    setAsRep: data.setAsRep ?? false,
+  })
+  return response.data as CompanyTeamMember
+}
+
 export async function useCreateCompany(data: Record<string, unknown>) {
   const response = await api.post('/companies', data)
   return response.data
