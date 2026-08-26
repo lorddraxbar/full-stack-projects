@@ -34,8 +34,8 @@ const saveError = ref('')
 const tabs = computed(() => {
   const base = ['Overview', 'Documents', 'Messages']
   if (isClient.value) return [...base, 'Team']
-  if (isUser.value) return ['Overview', 'Client Company & Team', 'Documents', 'Messages']
-  if (isAdmin.value) return ['Overview', 'Client Company & Team', 'Documents', 'Messages', 'Admin Controls']
+  if (isUser.value) return ['Overview', 'Company', 'Documents', 'Messages']
+  if (isAdmin.value) return ['Overview', 'Company', 'Documents', 'Messages', 'Admin Controls']
   return base
 })
 const activeTab = ref('Overview')
@@ -356,49 +356,25 @@ async function saveAdminChanges() {
         </div>
       </div>
 
-      <!-- ================= CLIENT COMPANY & TEAM ================= -->
-      <div v-if="activeTab === 'Client Company & Team'" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Client Company</h2>
-          <div class="space-y-4">
-            <div>
-              <p class="text-sm text-gray-500">Company Name</p>
-              <p class="text-gray-900 font-medium">{{ company?.name || project.companyName || '—' }}</p>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500">Location</p>
-              <p class="text-gray-900">{{ company?.location || '—' }}</p>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500">Owner</p>
-              <p class="text-gray-900">{{ company?.owner || '—' }}</p>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500">Authorized Representative</p>
-              <p class="text-gray-900">{{ company?.authorizedRepName || '—' }}</p>
-            </div>
+      <!-- ================= COMPANY ================= -->
+      <div v-if="activeTab === 'Company'" class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Client Company</h2>
+        <div class="space-y-4">
+          <div>
+            <p class="text-sm text-gray-500">Company Name</p>
+            <p class="text-gray-900 font-medium">{{ company?.name || project.companyName || '—' }}</p>
           </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">
-            {{ isAdmin ? 'Assigned Consultant Team' : 'Assigned Team' }}
-          </h2>
-          <div v-if="team.length === 0" class="text-sm text-gray-500">No team members assigned yet.</div>
-          <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div
-              v-for="member in team"
-              :key="member.userId"
-              class="flex items-center gap-4 p-4 border border-gray-200 rounded-lg"
-            >
-              <div class="w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center text-white font-medium">
-                {{ initials(member.fullName) }}
-              </div>
-              <div>
-                <h3 class="font-medium text-gray-900">{{ member.fullName }}</h3>
-                <p class="text-sm text-gray-600">{{ member.role }}</p>
-              </div>
-            </div>
+          <div>
+            <p class="text-sm text-gray-500">Location</p>
+            <p class="text-gray-900">{{ company?.location || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500">Owner</p>
+            <p class="text-gray-900">{{ company?.owner || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500">Authorized Representative</p>
+            <p class="text-gray-900">{{ company?.authorizedRepName || '—' }}</p>
           </div>
         </div>
       </div>
