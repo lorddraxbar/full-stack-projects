@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Trash2 } from '@lucide/vue'
+import { Trash2, Check } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -286,6 +286,15 @@ const isScenarioNew = computed(() => scenario.value === 'new')
 const totalSteps = computed(() => (isScenarioNew.value ? 5 : 4))
 const isProductionStep = computed(() => currentStep.value === (isScenarioNew.value ? 4 : 3))
 
+// Human step names for the stepper. The scenario step (0) is shared; after
+// that the label depends on which scenario was chosen.
+const stepLabels = computed<string[]>(() =>
+  isScenarioNew.value
+    ? ['Scenario', 'Company', 'Representative', 'Project', 'Production']
+    : ['Scenario', 'Company & Rep', 'Project', 'Production'],
+)
+const stepIndex = computed(() => currentStep.value)
+
 // Actions
 const resetForm = () => {
   currentStep.value = 0
@@ -518,6 +527,58 @@ const handleClose = () => {
           Create a new project by following the steps below.
         </DialogDescription>
       </DialogHeader>
+
+      <!-- Stepper: compact "Step X of Y" + dots on mobile, full numbered
+           circles with labels on desktop. Shows how far along the user is. -->
+      <div class="px-6 pt-1" aria-label="Wizard progress">
+        <!-- Mobile: text + dot trail -->
+        <div class="flex items-center justify-between gap-3 sm:hidden">
+          <span class="text-sm font-medium">
+            Step {{ stepIndex + 1 }} of {{ totalSteps }}
+            <span class="text-muted-foreground">· {{ stepLabels[stepIndex] }}</span>
+          </span>
+          <div class="flex items-center gap-1.5">
+            <span
+              v-for="s in totalSteps"
+              :key="'m' + s"
+              class="h-1.5 rounded-full transition-all"
+              :class="s - 1 === stepIndex ? 'w-5 bg-primary' : s - 1 < stepIndex ? 'w-1.5 bg-primary/60' : 'w-1.5 bg-border'"
+            />
+          </div>
+        </div>
+        <!-- Desktop: numbered circles with labels beneath and connector
+             lines behind the circles. Labels wrap under each circle so long
+             names (e.g. "Company & Rep") never overflow the dialog width. -->
+        <ol class="hidden sm:flex sm:items-start">
+          <li
+            v-for="(label, i) in stepLabels"
+            :key="'d' + i"
+            class="relative flex flex-1 flex-col items-center"
+          >
+            <!-- connector from the previous circle (skipped on the first) -->
+            <span
+              v-if="i > 0"
+              class="absolute top-3.5 left-0 right-1/2 h-px"
+              :class="i <= stepIndex ? 'bg-primary/50' : 'bg-border'"
+            />
+            <span
+              class="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors"
+              :class="i === stepIndex
+                ? 'border-primary bg-primary text-primary-foreground'
+                : i < stepIndex
+                  ? 'border-primary/50 bg-primary/10 text-primary'
+                  : 'border-border bg-background text-muted-foreground'"
+            >
+              <Check v-if="i < stepIndex" class="h-4 w-4" />
+              <template v-else>{{ i + 1 }}</template>
+            </span>
+            <span
+              class="mt-1.5 px-1 text-center text-xs leading-tight"
+              :class="i === stepIndex ? 'font-semibold text-foreground' : 'text-muted-foreground'"
+            >{{ label }}</span>
+          </li>
+        </ol>
+      </div>
 
       <div v-if="loadError" class="mx-6 mt-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
         {{ loadError }}
@@ -949,20 +1010,44 @@ const handleClose = () => {
 
       <Separator />
 
-      <!-- Footer with navigation -->
-      <DialogFooter class="flex flex-col sm:flex-row gap-2 sm:justify-between">
-        <Button variant="outline" @click="handleClose">Cancel</Button>
+      <!-- Footer with navigation. At ALL sizes the buttons share a single
+           horizontal row; on mobile each is flex-1 so Cancel / Previous /
+           Next split the width evenly (1/3 each), and on desktop the group is
+           right-aligned with Cancel on the left. The nav group is
+           `display:contents` on mobile so its buttons join the footer's flex
+           row directly, while staying a flex group on desktop. -->
+      <DialogFooter class="flex flex-row gap-2 sm:justify-between">
+        <Button
+          variant="outline"
+          class="flex-1 sm:flex-none whitespace-normal"
+          @click="handleClose"
+        >
+          Cancel
+        </Button>
 
-        <div class="flex gap-2">
-          <Button v-if="currentStep > 0" variant="outline" @click="prevStep">
+        <div class="contents sm:flex sm:gap-2">
+          <Button
+            v-if="currentStep > 0"
+            variant="outline"
+            class="flex-1 sm:flex-none whitespace-normal"
+            @click="prevStep"
+          >
             Previous
           </Button>
 
-          <Button v-if="currentStep < totalSteps - 1" @click="nextStep">
+          <Button
+            v-if="currentStep < totalSteps - 1"
+            class="flex-1 sm:flex-none whitespace-normal"
+            @click="nextStep"
+          >
             Next
           </Button>
 
-          <Button v-if="currentStep === totalSteps - 1" @click="handleSubmit">
+          <Button
+            v-if="currentStep === totalSteps - 1"
+            class="flex-1 sm:flex-none whitespace-normal"
+            @click="handleSubmit"
+          >
             Submit Wizard
           </Button>
         </div>
