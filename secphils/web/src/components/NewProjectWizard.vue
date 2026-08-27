@@ -378,8 +378,9 @@ const prevStep = () => {
 
 const selectScenario = (value: string) => {
   loadError.value = ''
+  // Selection only — the user stays on the Scenario step until they press
+  // Next (the active ring shows which flow was picked).
   scenario.value = value === 'new' ? 'new' : 'existing'
-  currentStep.value = 1
 }
 
 async function addRep() {
@@ -589,25 +590,27 @@ const handleClose = () => {
 
       <div class="flex-1 overflow-y-auto">
         <!-- Scenario Selection (Step 0) -->
-        <div v-if="currentStep === 0" class="space-y-6">
+        <div v-if="currentStep === 0" class="space-y-2">
           <div class="text-center">
-            <h3 class="text-lg font-semibold mb-2">What type of project is this?</h3>
-            <p class="text-muted-foreground">Select whether this is for a new customer or an existing one.</p>
+            <h3 class="text-base font-semibold mb-1">What type of project is this?</h3>
+            <p class="text-sm text-muted-foreground">Select whether this is for a new customer or an existing one.</p>
           </div>
 
-          <div class="grid gap-4">
-            <Card class="cursor-pointer transition hover:ring-primary/40" :active="scenario === 'new'" @click="selectScenario('new')">
+          <!-- size="sm" + tight spacing keep both cards fully inside the
+               scroll area even on short phone viewports (no bottom clipping). -->
+          <div class="grid gap-2">
+            <Card size="sm" class="cursor-pointer transition hover:ring-primary/40" :active="scenario === 'new'" @click="selectScenario('new')">
               <CardHeader>
-                <CardTitle>New Customer</CardTitle>
+                <CardTitle class="text-sm">New Customer</CardTitle>
                 <CardDescription>
                   Create a new customer company and project from scratch.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            <Card class="cursor-pointer transition hover:ring-primary/40" :active="scenario === 'existing'" @click="selectScenario('existing')">
+            <Card size="sm" class="cursor-pointer transition hover:ring-primary/40" :active="scenario === 'existing'" @click="selectScenario('existing')">
               <CardHeader>
-                <CardTitle>Existing Customer</CardTitle>
+                <CardTitle class="text-sm">Existing Customer</CardTitle>
                 <CardDescription>
                   Add a new project for an existing customer company.
                 </CardDescription>
