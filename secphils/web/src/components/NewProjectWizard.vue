@@ -305,8 +305,8 @@ const isProductionStep = computed(() => currentStep.value === (isScenarioNew.val
 // that the label depends on which scenario was chosen.
 const stepLabels = computed<string[]>(() =>
   isScenarioNew.value
-    ? ['Scenario', 'Company', 'Representative', 'Project', 'Production']
-    : ['Scenario', 'Company & Rep', 'Project', 'Production'],
+    ? ['Type', 'Company', 'Representative', 'Project', 'Details']
+    : ['Type', 'Company & Rep', 'Project', 'Details'],
 )
 const stepIndex = computed(() => currentStep.value)
 
@@ -620,7 +620,7 @@ const handleClose = () => {
         <!-- Scenario Selection (Step 0) -->
         <div v-if="currentStep === 0" class="space-y-2">
           <div class="text-center">
-            <h3 class="text-base font-semibold mb-1">What type of project is this?</h3>
+            <h3 class="text-base font-semibold mb-1">What type of customer is this?</h3>
             <p class="text-sm text-muted-foreground">Select whether this is for a new customer or an existing one.</p>
           </div>
 
