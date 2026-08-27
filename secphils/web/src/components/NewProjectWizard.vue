@@ -608,7 +608,15 @@ const handleClose = () => {
         {{ loadError }}
       </div>
 
-      <div class="flex-1 overflow-y-auto">
+      <!-- p-1.5 clearance for Card rings: the active card's ring is a 2px
+           box-shadow offset 2px OUTSIDE the border (4px total beyond the
+           card edge), and this container's `overflow-y-auto` clips
+           box-shadows at its padding-box edge. With no padding, the ring
+           was drawn only inside the card — the bottom edge of the lower
+           card (and the top of the upper one) lost its whole green
+           outline ("trimming"). 6px > 4px on every side, so the full
+           ring renders. -->
+      <div class="flex-1 overflow-y-auto p-1.5">
         <!-- Scenario Selection (Step 0) -->
         <div v-if="currentStep === 0" class="space-y-2">
           <div class="text-center">
