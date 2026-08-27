@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import NewProjectWizard from '@/components/NewProjectWizard.vue'
 import type { WizardData } from '@/components/NewProjectWizard.vue'
 import { useRole } from '@/composables/useRole'
-import { useGetMe, useGetProjects, useCreateProject, useCreateCompany, useUpdateCompany } from '@/services/api'
+import { useGetMe, useGetProjects, useCreateProject, useUpdateProject, useCreateCompany, useUpdateCompany, useUploadDocument } from '@/services/api'
 import { projectStatusLabel, PROJECT_STATUS_COLORS } from '@/lib/labels'
 
 const { isClient } = useRole()
@@ -18,6 +18,7 @@ const selectedStatus = ref('ALL')
 const showWizard = ref(false)
 const loading = ref(false)
 const loadError = ref('')
+const notice = ref('')
 
 // Backend ProjectResponse -> display shape (only fields the API actually returns)
 interface ProjectRow {
@@ -128,6 +129,7 @@ const goToProject = (id: number) => {
 // - new customer      -> POST /companies (rep email becomes the company contact)
 //                        then POST /projects against the returned companyId
 const handleWizardSubmit = async (data: WizardData) => {
+  notice.value = ''
   try {
     let companyId = data.companyId
     if (data.scenario === 'new') {
@@ -146,12 +148,52 @@ const handleWizardSubmit = async (data: WizardData) => {
         authorizedRepId: data.rep.userId,
       })
     }
-    await useCreateProject({
+    const p = data.project
+    // The structured checklist rows are JSONB columns: serialize the arrays;
+    // free-text fields (waste management practices, manufacturing procedure)
+    // go straight through as plain text.
+    const productionPayload = {
       companyId,
-      serviceId: data.project.serviceId,
-      name: data.project.name,
-      notes: data.project.notes,
-    })
+      serviceId: p.serviceId,
+      name: p.name,
+      notes: p.notes,
+      totalCost: p.totalCost ?? null,
+      rawMaterials: p.rawMaterials ? JSON.stringify(p.rawMaterials) : null,
+      productionOutput: p.productionOutput ? JSON.stringify(p.productionOutput) : null,
+      wasteManagement: p.wasteManagement || null,
+      wasteMaterials: p.wasteMaterials ? JSON.stringify(p.wasteMaterials) : null,
+      manufacturingProcedure: p.manufacturingProcedure || null,
+    }
+    const project = await useCreateProject(productionPayload)
+    const projectId = (project as any).id as number
+    // Optional flowchart: best-effort. Object storage may not be configured
+    // yet — the project is already created, so a failed upload is reported
+    // as a notice (attach later from the Documents tab) instead of an error.
+    if (p.flowchart) {
+      try {
+        const doc = await useUploadDocument({
+          projectId,
+          title: 'Production flowchart',
+          description: 'Submitted with the new project wizard',
+          file: p.flowchart,
+        })
+        // PUT (not the create path): update() emits no notifications, so
+        // recording the URL on the project is quiet. Re-send the full
+        // payload — apply() overwrites every field.
+        await useUpdateProject(projectId, {
+          ...productionPayload,
+          productionFlowchartUrl: (doc as any).fileUrl,
+          progress: (project as any).progress ?? 0,
+        })
+        notice.value = `Project created. The production flowchart was saved in the project's Documents tab.`
+      } catch (e: any) {
+        notice.value = `Project created, but the flowchart could not be uploaded (${
+          e?.response?.data?.message || 'object storage not configured yet'
+        }). You can attach it later from the Documents tab.`
+      }
+    } else {
+      notice.value = 'Project created.'
+    }
     showWizard.value = false
     await loadProjects()
   } catch (e: any) {
@@ -181,6 +223,10 @@ onMounted(init)
 
     <div v-if="loadError" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
       {{ loadError }}
+    </div>
+
+    <div v-if="notice" class="mb-4 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-700">
+      <i class="fas fa-circle-check mr-1" />{{ notice }}
     </div>
 
     <!-- Filters -->

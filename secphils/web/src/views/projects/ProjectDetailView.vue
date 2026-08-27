@@ -33,13 +33,39 @@ const saveError = ref('')
 
 // ---------- Role-based tabs ----------
 const tabs = computed(() => {
-  const base = ['Overview', 'Documents', 'Messages']
+  const base = ['Overview', 'Production', 'Documents', 'Messages']
   if (isClient.value) return [...base, 'Team']
-  if (isUser.value) return ['Overview', 'Company', 'Documents', 'Messages']
-  if (isAdmin.value) return ['Overview', 'Company', 'Documents', 'Messages', 'Admin Controls']
+  if (isUser.value) return ['Overview', 'Company', 'Production', 'Documents', 'Messages']
+  if (isAdmin.value) return ['Overview', 'Company', 'Production', 'Documents', 'Messages', 'Admin Controls']
   return base
 })
 const activeTab = ref('Overview')
+
+// ---------- Production checklist (wizard step, JSONB columns) ----------
+function tryParseJson(raw: any): any[] | null {
+  if (!raw) return null
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : null
+  } catch {
+    return null
+  }
+}
+const rawMaterials = computed(() => tryParseJson(project.value?.rawMaterials))
+const productionOutput = computed(() => tryParseJson(project.value?.productionOutput))
+const wasteMaterials = computed(() => tryParseJson(project.value?.wasteMaterials))
+const hasProductionData = computed(() => {
+  const p = project.value
+  return !!p && (
+    p.totalCost != null ||
+    p.wasteManagement ||
+    p.manufacturingProcedure ||
+    p.productionFlowchartUrl ||
+    (rawMaterials.value && rawMaterials.value.length > 0) ||
+    (productionOutput.value && productionOutput.value.length > 0) ||
+    (wasteMaterials.value && wasteMaterials.value.length > 0)
+  )
+})
 
 function initials(name: string): string {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
@@ -349,6 +375,117 @@ async function saveAdminChanges() {
               <span class="absolute left-1.5 top-1 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-100" />
               <p class="text-xs text-gray-500">{{ formatDateTime(msg.createdAt) }} &middot; {{ msg.senderName || '—' }}</p>
               <p class="text-sm text-gray-700 mt-1">{{ msg.body }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= PRODUCTION (wizard checklist) ================= -->
+      <div v-if="activeTab === 'Production'" class="space-y-6">
+        <div v-if="!hasProductionData" class="bg-white rounded-lg shadow p-6">
+          <h2 class="text-lg font-semibold text-gray-900">Production Details</h2>
+          <p class="text-sm text-gray-500 mt-2">
+            No production details captured for this project yet — they can be completed later from this page.
+          </p>
+        </div>
+
+        <div v-else class="space-y-6">
+          <!-- Total project cost -->
+          <div v-if="!isClient && project.totalCost != null" class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-sm font-medium text-gray-500 uppercase mb-1">Total Project Cost</h2>
+            <p class="text-2xl font-bold text-gray-900">₱{{ Number(project.totalCost).toLocaleString() }}</p>
+          </div>
+
+          <!-- Raw materials -->
+          <div v-if="rawMaterials && rawMaterials.length" class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Raw Materials</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                  <tr v-for="(m, i) in rawMaterials" :key="'raw-' + i">
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ m.name }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ m.quantity ?? '—' }} tons</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ m.period === 'YEARLY' ? 'Per year' : 'Per month' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Production output -->
+          <div v-if="productionOutput && productionOutput.length" class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Production Output (tons)</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Per Month</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Per Year</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                  <tr v-for="(o, i) in productionOutput" :key="'out-' + i">
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ o.name }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.monthlyTons ?? '—' }} tons</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.annualTons ?? '—' }} tons</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Waste management -->
+          <div v-if="project.wasteManagement || (wasteMaterials && wasteMaterials.length)" class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Waste Management</h2>
+            <p v-if="project.wasteManagement" class="text-gray-700 whitespace-pre-line">{{ project.wasteManagement }}</p>
+            <div v-if="wasteMaterials && wasteMaterials.length" class="overflow-x-auto mt-4">
+              <table class="w-full">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Waste Type</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Monthly (tons)</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recyclable</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                  <tr v-for="(w, i) in wasteMaterials" :key="'waste-' + i">
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ w.type }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ w.monthlyTons ?? '—' }} tons</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">
+                      <span v-if="w.recyclable" class="text-emerald-600"><i class="fas fa-check mr-1" />Recyclable</span>
+                      <span v-else class="text-gray-500">Non-recyclable</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Manufacturing process -->
+          <div v-if="project.manufacturingProcedure || project.productionFlowchartUrl" class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Manufacturing Process</h2>
+            <div v-if="project.manufacturingProcedure" class="space-y-4">
+              <h3 class="text-sm font-medium text-gray-500 uppercase mb-1">Procedure</h3>
+              <p class="text-gray-700 whitespace-pre-line">{{ project.manufacturingProcedure }}</p>
+            </div>
+            <div v-if="project.productionFlowchartUrl" class="mt-4">
+              <h3 class="text-sm font-medium text-gray-500 uppercase mb-1">Production Flowchart</h3>
+              <a
+                :href="project.productionFlowchartUrl"
+                target="_blank"
+                rel="noopener"
+                class="inline-flex items-center gap-2 text-emerald-600 hover:underline"
+              >
+                <i class="fas fa-diagram-project" /> View production flowchart
+              </a>
             </div>
           </div>
         </div>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { Trash2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,6 +18,11 @@ import { useGetCompanies, useGetCompanyTeamFor, useGetServices, useInviteCustome
  *             then a Project against the returned companyId.
  * - existing: parent creates a Project against the selected companyId.
  * serviceId is a required real Service id from /services; notes is free text (optional).
+ * The Production Details step captures the project & production checklist:
+ * totalCost (required), raw materials / production output / waste materials
+ * (structured lists — ProjectsView serializes them to JSONB strings),
+ * waste-management and manufacturing-procedure free text, and an optional
+ * flowchart file the parent attaches as a project document after creation.
  */
 export interface WizardData {
   scenario: 'new' | 'existing'
@@ -36,6 +43,15 @@ export interface WizardData {
     name: string
     serviceId: number
     notes: string
+    /** Total project cost in PHP (estimated or actual) — required. */
+    totalCost: number | null
+    rawMaterials: { name: string; quantity: number | null; period: 'MONTHLY' | 'YEARLY' }[] | null
+    productionOutput: { name: string; monthlyTons: number | null; annualTons: number | null }[] | null
+    wasteManagement: string
+    wasteMaterials: { type: string; recyclable: boolean; monthlyTons: number | null }[] | null
+    manufacturingProcedure: string
+    /** Flowchart file (PDF/PNG/JPG/SVG) to attach as a project document; optional. */
+    flowchart: File | null
   }
 }
 
@@ -86,6 +102,49 @@ const projectForm = ref({
   serviceId: '' as string, // real Service id (string from Select)
   notes: '',
 })
+
+// Project & production details (production step). Total cost is the only
+// required field — the rest of the checklist can be left blank and completed
+// later from the project's detail page.
+const productionForm = ref({
+  totalCost: '',
+  rawMaterials: [] as { name: string; quantity: string; period: 'MONTHLY' | 'YEARLY' }[],
+  productionOutput: [] as { name: string; monthlyTons: string; annualTons: string }[],
+  wasteManagement: '',
+  wasteMaterials: [] as { type: string; recyclable: boolean; monthlyTons: string }[],
+  manufacturingProcedure: '',
+  flowchart: null as File | null,
+})
+
+function addRow(kind: 'rawMaterials' | 'productionOutput' | 'wasteMaterials') {
+  if (kind === 'rawMaterials') {
+    productionForm.value.rawMaterials.push({ name: '', quantity: '', period: 'MONTHLY' })
+  } else if (kind === 'productionOutput') {
+    productionForm.value.productionOutput.push({ name: '', monthlyTons: '', annualTons: '' })
+  } else {
+    productionForm.value.wasteMaterials.push({ type: '', recyclable: true, monthlyTons: '' })
+  }
+}
+
+function removeRow(kind: 'rawMaterials' | 'productionOutput' | 'wasteMaterials', i: number) {
+  productionForm.value[kind].splice(i, 1)
+}
+
+const onFlowchartFile = (e: Event) => {
+  productionForm.value.flowchart = (e.target as HTMLInputElement).files?.[0] ?? null
+}
+
+const countRows = (kind: 'rawMaterials' | 'productionOutput' | 'wasteMaterials') =>
+  productionForm.value[kind].filter(r => (kind === 'wasteMaterials' ? (r as any).type : (r as any).name).trim())
+
+// The structured rows' numeric fields are type="number" inputs bound with
+// v-model, so Vue coerces them to numbers (and '' when cleared). Map any
+// number-or-string to a number or null — never call .trim() on them.
+const numOrNull = (v: string | number | null | undefined): number | null => {
+  if (v == null || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
 
 // Real catalog lookups (backend /companies, /services)
 const existingCompanies = ref<{ id: number; name: string; location: string | null; owner: string | null; authorizedRepId: number | null; authorizedRepName: string | null }[]>([])
@@ -221,10 +280,11 @@ async function loadLookups() {
 }
 
 // Steps:
-//   new:      0 scenario -> 1 company details -> 2 representative -> 3 project
-//   existing: 0 scenario -> 1 company + representative -> 2 project
+//   new:      0 scenario -> 1 company details -> 2 representative -> 3 project -> 4 production details
+//   existing: 0 scenario -> 1 company + representative -> 2 project -> 3 production details
 const isScenarioNew = computed(() => scenario.value === 'new')
-const totalSteps = computed(() => (isScenarioNew.value ? 4 : 3))
+const totalSteps = computed(() => (isScenarioNew.value ? 5 : 4))
+const isProductionStep = computed(() => currentStep.value === (isScenarioNew.value ? 4 : 3))
 
 // Actions
 const resetForm = () => {
@@ -233,6 +293,15 @@ const resetForm = () => {
   companyForm.value = { name: '', location: '', owner: '', description: '' }
   repForm.value = { name: '', email: '' }
   projectForm.value = { name: '', serviceId: '', notes: '' }
+  productionForm.value = {
+    totalCost: '',
+    rawMaterials: [],
+    productionOutput: [],
+    wasteManagement: '',
+    wasteMaterials: [],
+    manufacturingProcedure: '',
+    flowchart: null,
+  }
   selectedCompanyId.value = null
   selectedRepId.value = null
   clientTeam.value = []
@@ -261,6 +330,27 @@ const nextStep = () => {
     }
     if (currentStep.value === 1 && !repResolved.value) {
       loadError.value = repRequiredMessage.value
+      return
+    }
+  }
+  // Leaving the project step requires the service (and project name). The
+  // project step is not the final step anymore (production is), so handleSubmit
+  // only re-checks production — this gate is what enforces 'Service required'.
+  const projectStep = isScenarioNew.value ? 3 : 2
+  if (currentStep.value === projectStep) {
+    const err = validateProject()
+    if (err) {
+      loadError.value = err
+      return
+    }
+  }
+  // The production-details step always gates on total cost (both scenarios —
+  // it is the only required field on that step; the rest can be completed
+  // later from the project's detail page).
+  if (isProductionStep.value) {
+    const err = validateProduction()
+    if (err) {
+      loadError.value = err
       return
     }
   }
@@ -326,8 +416,22 @@ function validateProject(): string | null {
   return null
 }
 
+// The production step is the wizard's last one — re-check it in handleSubmit
+// too, so a submit from any state can't bypass the total-cost gate.
+function validateProduction(): string | null {
+  // totalCost is bound with v-model on a type="number" input, so Vue coerces
+  // it to a number (and leaves '' when cleared) — never assume a string here.
+  const raw = productionForm.value.totalCost
+  const empty = raw == null || raw === ''
+  const cost = empty ? NaN : Number(raw)
+  if (empty || !isFinite(cost) || cost < 0) {
+    return 'Total project cost is required (PHP, estimated or actual).'
+  }
+  return null
+}
+
 const handleSubmit = () => {
-  const err = validateProject()
+  const err = isProductionStep.value ? validateProduction() : validateProject()
   if (err) {
     loadError.value = err
     return
@@ -362,6 +466,37 @@ const handleSubmit = () => {
       // validateProject() guarantees a service is selected before this runs.
       serviceId: Number(projectForm.value.serviceId),
       notes: projectForm.value.notes.trim(),
+      totalCost: Number(productionForm.value.totalCost),
+      rawMaterials: countRows('rawMaterials').length
+        ? productionForm.value.rawMaterials
+            .filter(r => r.name.trim())
+            .map(r => ({
+              name: r.name.trim(),
+              quantity: numOrNull(r.quantity),
+              period: r.period,
+            }))
+            : null,
+      productionOutput: countRows('productionOutput').length
+        ? productionForm.value.productionOutput
+            .filter(r => r.name.trim())
+            .map(r => ({
+              name: r.name.trim(),
+              monthlyTons: numOrNull(r.monthlyTons),
+              annualTons: numOrNull(r.annualTons),
+            }))
+        : null,
+      wasteManagement: productionForm.value.wasteManagement.trim(),
+      wasteMaterials: countRows('wasteMaterials').length
+        ? productionForm.value.wasteMaterials
+            .filter(r => r.type.trim())
+            .map(r => ({
+              type: r.type.trim(),
+              recyclable: r.recyclable,
+              monthlyTons: numOrNull(r.monthlyTons),
+            }))
+        : null,
+      manufacturingProcedure: productionForm.value.manufacturingProcedure.trim(),
+      flowchart: productionForm.value.flowchart,
     },
   }
   emit('submit', data)
@@ -659,6 +794,156 @@ const handleClose = () => {
               </p>
             </div>
           </div>
+        </div>
+
+        <!-- Production Details (wizard's last step for both scenarios) -->
+        <div v-if="isProductionStep" class="space-y-4">
+          <h3 class="text-lg font-semibold">Production Details</h3>
+          <p class="text-sm text-muted-foreground -mt-2">
+            Total project cost is required; the rest of the checklist is optional and can be
+            completed later from the project's detail page.
+          </p>
+
+          <!-- Project & production -->
+          <Card>
+            <CardHeader>
+              <CardTitle class="text-base">Project &amp; Production</CardTitle>
+              <CardDescription>Total project cost (estimated or actual investment)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div class="space-y-2">
+                <Label for="totalCost">Total Project Cost (₱) *</Label>
+                <Input id="totalCost" v-model="productionForm.totalCost" type="number" min="0" step="any" placeholder="e.g. 2500000" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <!-- Raw materials -->
+          <Card>
+            <CardHeader class="flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle class="text-base">Raw Materials</CardTitle>
+                <CardDescription>Each material with quantity used or purchased, in tons</CardDescription>
+              </div>
+              <Button type="button" variant="outline" size="sm" @click="addRow('rawMaterials')">+ Add material</Button>
+            </CardHeader>
+            <CardContent class="space-y-2">
+              <p v-if="productionForm.rawMaterials.length === 0" class="text-sm text-muted-foreground">No raw materials added yet.</p>
+              <div v-for="(row, i) in productionForm.rawMaterials" :key="'raw-' + i" class="flex flex-wrap items-end gap-2">
+                <div class="flex-1 min-w-40 space-y-1">
+                  <Label>Material name</Label>
+                  <Input v-model="row.name" placeholder="e.g. Virgin LDPE resin" />
+                </div>
+                <div class="w-32 space-y-1">
+                  <Label>Quantity (tons)</Label>
+                  <Input v-model="row.quantity" type="number" min="0" step="any" placeholder="0" />
+                </div>
+                <div class="w-28 space-y-1">
+                  <Label>Period</Label>
+                  <Select :model-value="row.period" @update:model-value="(v) => (row.period = v as 'MONTHLY' | 'YEARLY')">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MONTHLY">Per month</SelectItem>
+                      <SelectItem value="YEARLY">Per year</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="button" variant="ghost" size="icon" class="text-muted-foreground hover:text-red-600" @click="removeRow('rawMaterials', i)">
+                  <Trash2 class="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <!-- Production output -->
+          <Card>
+            <CardHeader class="flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle class="text-base">Production Output</CardTitle>
+                <CardDescription>Finished products with annual volume in tons</CardDescription>
+              </div>
+              <Button type="button" variant="outline" size="sm" @click="addRow('productionOutput')">+ Add product</Button>
+            </CardHeader>
+            <CardContent class="space-y-2">
+              <p v-if="productionForm.productionOutput.length === 0" class="text-sm text-muted-foreground">No products added yet.</p>
+              <div v-for="(row, i) in productionForm.productionOutput" :key="'out-' + i" class="flex flex-wrap items-end gap-2">
+                <div class="flex-1 min-w-40 space-y-1">
+                  <Label>Product name</Label>
+                  <Input v-model="row.name" placeholder="e.g. HDPE bags, 300mm" />
+                </div>
+                <div class="w-32 space-y-1">
+                  <Label>Monthly (tons)</Label>
+                  <Input v-model="row.monthlyTons" type="number" min="0" step="any" placeholder="0" />
+                </div>
+                <div class="w-32 space-y-1">
+                  <Label>Annual (tons)</Label>
+                  <Input v-model="row.annualTons" type="number" min="0" step="any" placeholder="0" />
+                </div>
+                <Button type="button" variant="ghost" size="icon" class="text-muted-foreground hover:text-red-600" @click="removeRow('productionOutput', i)">
+                  <Trash2 class="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <!-- Waste management -->
+          <Card>
+            <CardHeader class="flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle class="text-base">Waste Management</CardTitle>
+                <CardDescription>How wastes are managed and how much is generated per month</CardDescription>
+              </div>
+              <Button type="button" variant="outline" size="sm" @click="addRow('wasteMaterials')">+ Add waste type</Button>
+            </CardHeader>
+            <CardContent class="space-y-3">
+              <div class="space-y-2">
+                <Label for="wasteManagement">Waste management practices</Label>
+                <Textarea id="wasteManagement" v-model="productionForm.wasteManagement" rows="3" placeholder="Recyclable materials: describe processes and quantities. Non-recyclable: describe disposal methods and quantities..." />
+              </div>
+              <div class="space-y-2">
+                <Label>Waste materials per month (tons)</Label>
+                <p v-if="productionForm.wasteMaterials.length === 0" class="text-sm text-muted-foreground">No waste types added yet.</p>
+                <div v-for="(row, i) in productionForm.wasteMaterials" :key="'waste-' + i" class="flex flex-wrap items-end gap-2">
+                  <div class="flex-1 min-w-40 space-y-1">
+                    <Label>Type</Label>
+                    <Input v-model="row.type" placeholder="e.g. Non-recyclable film scraps" />
+                  </div>
+                  <div class="w-36 space-y-1">
+                    <Label>Monthly (tons)</Label>
+                    <Input v-model="row.monthlyTons" type="number" min="0" step="any" placeholder="0" />
+                  </div>
+                  <div class="flex items-center gap-2 pb-1.5">
+                    <Checkbox id="recyclable" :checked="row.recyclable" @update:checked="(v: boolean | 'indeterminate') => (row.recyclable = v === true)" />
+                    <Label for="recyclable" class="text-sm font-normal">Recyclable</Label>
+                  </div>
+                  <Button type="button" variant="ghost" size="icon" class="text-muted-foreground hover:text-red-600" @click="removeRow('wasteMaterials', i)">
+                    <Trash2 class="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <!-- Manufacturing process -->
+          <Card>
+            <CardHeader>
+              <CardTitle class="text-base">Manufacturing Process</CardTitle>
+              <CardDescription>Step-by-step procedure and a visual flowchart of the production process</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-3">
+              <div class="space-y-2">
+                <Label for="manufacturingProcedure">Manufacturing procedure</Label>
+                <Textarea id="manufacturingProcedure" v-model="productionForm.manufacturingProcedure" rows="4" placeholder="Describe each production stage — processing methods, equipment used, quality control measures..." />
+              </div>
+              <div class="space-y-2">
+                <Label>Production flowchart (PDF, PNG, JPG, SVG)</Label>
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml,application/pdf" @change="onFlowchartFile" class="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-sm file:font-medium" />
+                <p v-if="productionForm.flowchart" class="text-sm text-muted-foreground">
+                  Selected: <strong>{{ productionForm.flowchart.name }}</strong> — it will be attached as a project document after creation.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
