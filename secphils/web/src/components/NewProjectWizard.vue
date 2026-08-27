@@ -520,7 +520,7 @@ const handleClose = () => {
 
 <template>
   <Dialog v-model:open="dialogOpen">
-    <DialogContent class="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+    <DialogContent class="max-h-[90vh] overflow-hidden flex flex-col max-w-[min(896px,calc(100vw-2rem))] sm:max-w-[min(896px,calc(100vw-2rem))]">
       <DialogHeader>
         <DialogTitle class="text-2xl">New Project Creation Wizard</DialogTitle>
         <DialogDescription>
