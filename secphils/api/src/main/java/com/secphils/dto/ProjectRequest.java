@@ -12,6 +12,7 @@ public record ProjectRequest(
         String notes,
         String objectives,
         String deliverables,
+        String address,
         String status,
         BigDecimal totalCost,
         String rawMaterials,

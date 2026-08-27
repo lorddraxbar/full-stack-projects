@@ -161,6 +161,9 @@ const handleWizardSubmit = async (data: WizardData) => {
       serviceId: p.serviceId,
       name: p.name,
       notes: p.notes,
+      // Project address (full PH address where the project operates) — null
+      // when the project address equals the company address.
+      address: p.address || null,
       totalCost: p.totalCost ?? null,
       rawMaterials: p.rawMaterials ? JSON.stringify(p.rawMaterials) : null,
       productionOutput: p.productionOutput ? JSON.stringify(p.productionOutput) : null,

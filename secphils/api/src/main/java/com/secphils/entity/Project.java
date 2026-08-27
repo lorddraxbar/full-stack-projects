@@ -42,6 +42,9 @@ public class Project {
     @Column(columnDefinition = "TEXT")
     private String deliverables;
 
+    @Column(length = 500)
+    private String address;
+
     @Column(length = 30)
     private String status = "NOT_STARTED";
 

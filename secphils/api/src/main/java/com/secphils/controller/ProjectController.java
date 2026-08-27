@@ -200,6 +200,7 @@ public class ProjectController {
         project.setNotes(req.notes());
         project.setObjectives(req.objectives());
         project.setDeliverables(req.deliverables());
+        project.setAddress(req.address());
         if (req.status() != null && !req.status().isBlank()) project.setStatus(req.status());
         project.setTotalCost(req.totalCost());
         project.setRawMaterials(req.rawMaterials());

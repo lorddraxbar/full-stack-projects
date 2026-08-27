@@ -221,6 +221,8 @@ const adminForm = ref({
   status: '',
   notes: '',
   objectives: '',
+  address: '',
+  addressDiffers: false,
   progress: 0,
 })
 const adminReady = ref(false)
@@ -232,6 +234,8 @@ function initAdminForm() {
     status: project.value.status || 'NOT_STARTED',
     notes: project.value.notes || '',
     objectives: project.value.objectives || '',
+    address: project.value.address || '',
+    addressDiffers: !!project.value.address,
     progress: project.value.progress ?? 0,
   }
   adminReady.value = true
@@ -248,6 +252,10 @@ async function saveAdminChanges() {
       name: project.value.name,
       notes: adminForm.value.notes,
       objectives: adminForm.value.objectives,
+      // Project address: when the "different from company address" box is
+      // off we send null to clear any stored override (company address is
+      // used); when on we send the entered address.
+      address: adminForm.value.addressDiffers ? (adminForm.value.address || null) : null,
       deliverables: project.value.deliverables ?? null,
       status: adminForm.value.status,
       totalCost: project.value.totalCost ?? null,
@@ -287,6 +295,7 @@ async function markCompleted() {
       notes: project.value.notes ?? null,
       objectives: project.value.objectives ?? null,
       deliverables: project.value.deliverables ?? null,
+      address: project.value.address ?? null,
       status: 'COMPLETED',
       totalCost: project.value.totalCost ?? null,
       rawMaterials: project.value.rawMaterials ?? null,
@@ -560,8 +569,15 @@ async function markCompleted() {
             <p class="text-gray-900 font-medium">{{ company?.name || project.companyName || '—' }}</p>
           </div>
           <div>
-            <p class="text-sm text-gray-500">Location</p>
+            <p class="text-sm text-gray-500">Company Address</p>
             <p class="text-gray-900">{{ company?.location || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500">Project Address</p>
+            <p class="text-gray-900">
+              {{ project.address || company?.location || '—' }}
+              <span v-if="!project.address && company?.location" class="text-gray-400 text-xs">(company address)</span>
+            </p>
           </div>
           <div>
             <p class="text-sm text-gray-500">Owner</p>
@@ -753,6 +769,28 @@ async function markCompleted() {
               rows="3"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
+          </div>
+
+          <div class="lg:col-span-2 border-t border-gray-200 pt-4">
+            <label class="flex items-center gap-2 mb-1">
+              <input
+                type="checkbox"
+                v-model="adminForm.addressDiffers"
+                class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span class="text-sm font-medium text-gray-700">Project address is different from company address</span>
+            </label>
+            <p v-if="!adminForm.addressDiffers && company?.location" class="text-xs text-gray-500">
+              Company address: {{ company.location }}
+            </p>
+            <div v-if="adminForm.addressDiffers" class="mt-2">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Project Address</label>
+              <input
+                v-model="adminForm.address"
+                placeholder="Full address where the project operates (barangay, city, province, ZIP)"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+              />
+            </div>
           </div>
         </div>
 

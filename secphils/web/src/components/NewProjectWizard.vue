@@ -43,6 +43,11 @@ export interface WizardData {
     name: string
     serviceId: number
     notes: string
+    /** Where the business physically operates. When `addressDiffers` is
+     *  false this is null and the company address (above) is the address. */
+    address: string | null
+    /** Checked when the project operates somewhere other than the company address. */
+    addressDiffers: boolean
     /** Total project cost in PHP (estimated or actual) — required. */
     totalCost: number | null
     rawMaterials: { name: string; quantity: number | null; period: 'MONTHLY' | 'YEARLY' }[] | null
@@ -115,6 +120,8 @@ const projectForm = ref({
   name: '',
   serviceId: '' as string, // real Service id (string from Select)
   notes: '',
+  address: '',
+  addressDiffers: false,
 })
 
 // Project & production details (production step). Total cost is the only
@@ -316,7 +323,7 @@ const resetForm = () => {
   scenario.value = 'new'
   companyForm.value = { name: '', location: '', owner: '', description: '' }
   repForm.value = { name: '', email: '' }
-  projectForm.value = { name: '', serviceId: '', notes: '' }
+  projectForm.value = { name: '', serviceId: '', notes: '', address: '', addressDiffers: false }
   productionForm.value = {
     totalCost: '',
     rawMaterials: [],
@@ -438,6 +445,9 @@ async function addRep() {
 function validateProject(): string | null {
   if (!projectForm.value.name.trim()) return 'Project name is required.'
   if (!projectForm.value.serviceId) return 'Service type is required.'
+  if (projectForm.value.addressDiffers && !projectForm.value.address.trim()) {
+    return 'Enter the project address, or uncheck "Project address is different from company address".'
+  }
   return null
 }
 
@@ -491,6 +501,11 @@ const handleSubmit = () => {
       // validateProject() guarantees a service is selected before this runs.
       serviceId: Number(projectForm.value.serviceId),
       notes: projectForm.value.notes.trim(),
+      // When the project address differs from the company's, the checkbox is
+      // checked and this holds the full project address; otherwise null and
+      // the company address is used.
+      address: projectForm.value.addressDiffers ? projectForm.value.address.trim() : null,
+      addressDiffers: projectForm.value.addressDiffers,
       totalCost: Number(productionForm.value.totalCost),
       rawMaterials: countRows('rawMaterials').length
         ? productionForm.value.rawMaterials
@@ -675,7 +690,7 @@ const handleClose = () => {
             <div v-if="selectedCompany" class="mt-4 p-4 bg-muted rounded-lg">
               <h4 class="font-medium mb-2">{{ selectedCompany.name }}</h4>
               <div class="text-sm text-muted-foreground space-y-1">
-                <p v-if="selectedCompany.location">Location: {{ selectedCompany.location }}</p>
+                <p v-if="selectedCompany.location">Company Address: {{ selectedCompany.location }}</p>
                 <p v-if="selectedCompany.owner">Owner: {{ selectedCompany.owner }}</p>
                 <p v-if="selectedCompany.authorizedRepName">Current rep: {{ selectedCompany.authorizedRepName }}</p>
               </div>
@@ -782,8 +797,8 @@ const handleClose = () => {
           </div>
 
           <div class="space-y-2">
-            <Label for="location">Location</Label>
-            <Input id="location" v-model="companyForm.location" placeholder="City, Province" />
+            <Label for="location">Company Address</Label>
+            <Input id="location" v-model="companyForm.location" placeholder="Full address (barangay, city/municipality, province, ZIP)" />
           </div>
 
           <div class="space-y-2">
@@ -847,6 +862,22 @@ const handleClose = () => {
             <Textarea v-model="projectForm.notes" placeholder="Anything else the team should know (optional)..." rows="3" />
           </div>
 
+          <div class="space-y-2">
+            <div class="flex items-center gap-2">
+              <Checkbox id="addressDiffers" :model-value="projectForm.addressDiffers" @update:model-value="(v: unknown) => projectForm.addressDiffers = v === true" />
+              <Label for="addressDiffers" class="cursor-pointer">Project address is different from company address</Label>
+            </div>
+            <p class="text-sm text-muted-foreground">
+              Leave unchecked if the project operates at the company address
+              {{ isScenarioNew ? '(entered above' : '(on the company profile' }}).
+            </p>
+            <div v-if="projectForm.addressDiffers" class="space-y-2">
+              <Label for="projectAddress">Project Address *</Label>
+              <Textarea id="projectAddress" v-model="projectForm.address"
+                placeholder="Full address where this project operates (barangay, city/municipality, province, ZIP)" rows="2" />
+            </div>
+          </div>
+
           <!-- Review summary -->
           <div class="space-y-3 pt-2">
             <h4 class="text-sm font-semibold text-muted-foreground uppercase">Review</h4>
@@ -857,7 +888,7 @@ const handleClose = () => {
               <CardContent class="space-y-1 text-sm">
                 <p><strong>Name:</strong> {{ isScenarioNew ? companyForm.name : selectedCompany?.name }}</p>
                 <p v-if="(isScenarioNew ? companyForm.location : selectedCompany?.location)">
-                  <strong>Location:</strong> {{ isScenarioNew ? companyForm.location : selectedCompany?.location }}
+                  <strong>Company Address:</strong> {{ isScenarioNew ? companyForm.location : selectedCompany?.location }}
                 </p>
                 <p v-if="(isScenarioNew ? companyForm.owner : selectedCompany?.owner)">
                   <strong>Owner:</strong> {{ isScenarioNew ? companyForm.owner : selectedCompany?.owner }}
@@ -1008,7 +1039,7 @@ const handleClose = () => {
                     <Input v-model="row.monthlyTons" type="number" min="0" step="any" placeholder="0" />
                   </div>
                   <div class="flex items-center gap-2 pb-1.5">
-                    <Checkbox id="recyclable" :checked="row.recyclable" @update:checked="(v: boolean | 'indeterminate') => (row.recyclable = v === true)" />
+                    <Checkbox id="recyclable" :model-value="row.recyclable" @update:model-value="(v: unknown) => (row.recyclable = v === true)" />
                     <Label for="recyclable" class="text-sm font-normal">Recyclable</Label>
                   </div>
                   <Button type="button" variant="ghost" size="icon" class="text-muted-foreground hover:text-red-600" @click="removeRow('wasteMaterials', i)">
