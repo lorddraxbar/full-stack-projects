@@ -877,49 +877,6 @@ const handleClose = () => {
                 placeholder="Full address where this project operates (barangay, city/municipality, province, ZIP)" rows="2" />
             </div>
           </div>
-
-          <!-- Review summary -->
-          <div class="space-y-3 pt-2">
-            <h4 class="text-sm font-semibold text-muted-foreground uppercase">Review</h4>
-            <Card>
-              <CardHeader>
-                <CardTitle class="text-base">Customer Company</CardTitle>
-              </CardHeader>
-              <CardContent class="space-y-1 text-sm">
-                <p><strong>Name:</strong> {{ isScenarioNew ? companyForm.name : selectedCompany?.name }}</p>
-                <p v-if="(isScenarioNew ? companyForm.location : selectedCompany?.location)">
-                  <strong>Company Address:</strong> {{ isScenarioNew ? companyForm.location : selectedCompany?.location }}
-                </p>
-                <p v-if="(isScenarioNew ? companyForm.owner : selectedCompany?.owner)">
-                  <strong>Owner:</strong> {{ isScenarioNew ? companyForm.owner : selectedCompany?.owner }}
-                </p>
-              </CardContent>
-            </Card>
-            <Card v-if="(isScenarioNew && (repForm.name || repForm.email)) || (!isScenarioNew && resolvedRep)">
-              <CardHeader>
-                <CardTitle class="text-base">Authorized Representative</CardTitle>
-              </CardHeader>
-              <CardContent class="space-y-1 text-sm">
-                <p><strong>Name:</strong> {{ isScenarioNew ? (repForm.name || '—') : (resolvedRep?.name || '—') }}</p>
-                <p><strong>Email:</strong> {{ isScenarioNew ? (repForm.email || '—') : (resolvedRep?.email || '—') }}</p>
-              </CardContent>
-            </Card>
-            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
-              <p class="text-sm text-emerald-800" v-if="isScenarioNew">
-                <strong>Next steps:</strong> The contact email is saved on the customer's company
-                profile. Once the customer activates a portal account with that address, they become
-                the company's authorized representative and can see this project in their workspace.
-              </p>
-              <p class="text-sm text-emerald-800" v-else-if="selectedTeamMember && selectedRepId">
-                <strong>Next steps:</strong> {{ selectedTeamMember.name }} ({{ selectedTeamMember.email }})
-                becomes the company's authorized representative and will see this project in their workspace.
-              </p>
-              <p class="text-sm text-emerald-800" v-else>
-                <strong>Next steps:</strong> {{ (resolvedRep?.name || `The company's current representative`) }} will
-                review this customer's onboarding and see this project in their workspace.
-              </p>
-            </div>
-          </div>
         </div>
 
         <!-- Production Details (wizard's last step for both scenarios) -->
