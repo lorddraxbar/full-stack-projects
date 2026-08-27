@@ -242,9 +242,10 @@ async function loadTeam() {
     const currentRepId = selectedCompany.value?.authorizedRepId ?? null
     if (currentRepId != null && clientTeam.value.some(m => m.id === currentRepId)) {
       selectedRepId.value = String(currentRepId)
-    } else if (clientTeam.value.length === 1) {
-      // Exactly one client user: there is no choice to make — they are the rep.
-      // (Overridable via "add a new one".)
+    } else if (clientTeam.value.length > 0) {
+      // No rep on file yet: preselect the first client user as the default so
+      // there's always a highlighted choice. Still overridable via the picker
+      // (or "add a new one") — the rep is required, and a default satisfies it.
       selectedRepId.value = String(clientTeam.value[0].id)
     }
   }
@@ -555,10 +556,12 @@ const handleClose = () => {
             :key="'d' + i"
             class="relative flex flex-1 flex-col items-center"
           >
-            <!-- connector from the previous circle (skipped on the first) -->
+            <!-- connector from the previous circle to this one: spans the full
+                 gap between the two circle edges (1px overlap at each end,
+                 hidden under the z-10 circles) so the line is continuous -->
             <span
               v-if="i > 0"
-              class="absolute top-3.5 left-0 right-1/2 h-px"
+              class="absolute top-3.5 h-px left-[calc(-50%_+13px)] right-[calc(50%_+13px)]"
               :class="i <= stepIndex ? 'bg-primary/50' : 'bg-border'"
             />
             <span
@@ -593,7 +596,7 @@ const handleClose = () => {
           </div>
 
           <div class="grid gap-4">
-            <Card class="cursor-pointer hover:border-primary transition-colors" @click="selectScenario('new')">
+            <Card class="cursor-pointer transition hover:ring-primary/40" :active="scenario === 'new'" @click="selectScenario('new')">
               <CardHeader>
                 <CardTitle>New Customer</CardTitle>
                 <CardDescription>
@@ -602,7 +605,7 @@ const handleClose = () => {
               </CardHeader>
             </Card>
 
-            <Card class="cursor-pointer hover:border-primary transition-colors" @click="selectScenario('existing')">
+            <Card class="cursor-pointer transition hover:ring-primary/40" :active="scenario === 'existing'" @click="selectScenario('existing')">
               <CardHeader>
                 <CardTitle>Existing Customer</CardTitle>
                 <CardDescription>
