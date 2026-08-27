@@ -79,6 +79,20 @@ watch(dialogOpen, (val) => {
   emit('update:open', val)
 })
 
+// Visible-viewport max-height. On phones, CSS `vh` is the FULL layout
+// viewport including the region behind the browser address bar / home
+// indicator, so a `90vh` dialog is taller than what's actually visible and
+// its bottom edge gets clipped by the browser chrome (the "trimmed" look).
+// dvh tracks the real visible height; 90vh stays as the fallback for
+// browsers without dvh support. Set inline so the declaration wins the
+// cascade over any utility classes (tailwind-merge would otherwise drop
+// duplicate max-h utilities).
+const dialogMaxH = computed(() =>
+  typeof CSS !== 'undefined' && CSS.supports?.('max-height', '1dvh')
+    ? { maxHeight: '90dvh' }
+    : { maxHeight: '90vh' },
+)
+
 // Wizard state
 const currentStep = ref(0)
 const scenario = ref<'new' | 'existing'>('new')
@@ -522,10 +536,16 @@ const handleClose = () => {
 
 <template>
   <Dialog v-model:open="dialogOpen">
-    <DialogContent class="max-h-[90vh] overflow-hidden flex flex-col max-w-[min(896px,calc(100vw-2rem))] sm:max-w-[min(896px,calc(100vw-2rem))]">
-      <DialogHeader>
-        <DialogTitle class="text-2xl">New Project Creation Wizard</DialogTitle>
-        <DialogDescription>
+    <!-- max-height is set inline (dialogMaxH): on phones the CSS `vh` unit is
+         the FULL layout viewport including the area behind the browser address
+         bar, so a 90vh dialog is taller than the visible area and its bottom
+         edge gets clipped by the browser chrome (the "trimmed" look). dvh
+         tracks the visible height; 90vh remains the fallback for browsers
+         without dvh support. -->
+    <DialogContent :style="dialogMaxH" class="overflow-hidden flex flex-col max-w-[min(896px,calc(100vw-2rem))] sm:max-w-[min(896px,calc(100vw-2rem))] p-4 sm:p-6 gap-3 sm:gap-6">
+      <DialogHeader class="gap-1.5 sm:gap-2">
+        <DialogTitle class="text-lg sm:text-2xl">New Project Creation Wizard</DialogTitle>
+        <DialogDescription class="text-xs sm:text-sm">
           Create a new project by following the steps below.
         </DialogDescription>
       </DialogHeader>
