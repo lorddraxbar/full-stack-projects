@@ -67,15 +67,53 @@ public class CompanyController {
     public ResponseEntity<CompanyResponse> create(@Valid @RequestBody CompanyRequest req,
                                                   HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
+        User actorUser = userRepository.findById(actor.id())
+                .orElseThrow(() -> ApiException.notFound("User"));
         Company company = new Company();
         apply(company, req);
+        User rep = null;
         if (req.authorizedRepId() != null) {
-            User rep = userRepository.findById(req.authorizedRepId())
+            rep = userRepository.findById(req.authorizedRepId())
                     .orElseThrow(() -> ApiException.notFound("Authorized representative user"));
+        } else if (req.repName() != null && !req.repName().isBlank()
+                && req.email() != null && !req.email().isBlank()) {
+            // New-customer wizard: the rep doesn't exist yet — create their
+            // (inactive) CLIENT account, invite them, and make them the rep.
+            if (userRepository.findByEmail(req.email()).isPresent()) {
+                throw ApiException.conflict("A user with this email already exists");
+            }
+            rep = new User();
+            rep.setEmail(req.email());
+            String[] repName = splitName(req.repName());
+            rep.setFirstName(repName[0]);
+            rep.setLastName(repName[1]);
+            rep.setRole("CLIENT");
+            rep.setIsActive(false);
+            rep = userRepository.save(rep);
+        }
+        if (rep != null) {
+            // Link before the company is saved so the FK column is written on
+            // the company insert (the rep row already has its own id).
             company.setAuthorizedRep(rep);
         }
         company = companyRepository.save(company);
+        if (rep != null) {
+            // Now that the company has an id, back-link the rep row and keep
+            // it in sync with the FK on the companies table — but only if the
+            // rep isn't already a member of a different company (never yank
+            // an existing user off their company; the fresh-rep path above
+            // always has a null company and is the one the wizard uses).
+            if (rep.getCompanyId() == null) {
+                rep.setCompanyId(company.getId());
+                userRepository.save(rep);
+            }
+        }
         auditService.audit(actor, "COMPANY_CREATE", "Company", company.getId(), "Name: " + company.getName(), http);
+        if (rep != null && rep.getPasswordResetToken() == null && !rep.getIsActive()) {
+            // Brand-new rep account: mint the password-set token and send the
+            // onboarding invite (same flow as the existing-customer team invite).
+            sendInvite(actor, actorUser, rep, company, http, "COMPANY_CUSTOMER_REP_INVITE");
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(CompanyResponse.from(company));
     }
 

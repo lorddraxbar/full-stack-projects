@@ -8,12 +8,14 @@ import com.secphils.dto.ProjectResponse;
 import com.secphils.entity.Company;
 import com.secphils.entity.Project;
 import com.secphils.entity.Service;
+import com.secphils.entity.User;
 import com.secphils.repository.CompanyRepository;
 import com.secphils.repository.ProjectRepository;
 import com.secphils.repository.ServiceRepository;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
 import com.secphils.service.ProjectArchiveService;
+import com.secphils.service.ProjectNotificationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -34,15 +36,18 @@ public class ProjectController {
     private final ServiceRepository serviceRepository;
     private final AuditService auditService;
     private final ProjectArchiveService archiveService;
+    private final ProjectNotificationService notificationService;
 
     public ProjectController(ProjectRepository projectRepository, CompanyRepository companyRepository,
                              ServiceRepository serviceRepository, AuditService auditService,
-                             ProjectArchiveService archiveService) {
+                             ProjectArchiveService archiveService,
+                             ProjectNotificationService notificationService) {
         this.projectRepository = projectRepository;
         this.companyRepository = companyRepository;
         this.serviceRepository = serviceRepository;
         this.auditService = auditService;
         this.archiveService = archiveService;
+        this.notificationService = notificationService;
     }
 
     @GetMapping
@@ -98,8 +103,14 @@ public class ProjectController {
         }
         Project project = new Project();
         apply(project, req);
+        if (req.status() == null || req.status().isBlank()) {
+            // Entity default is NOT_STARTED, but a submitted project is actively
+            // waiting for the authorized rep's review/completion — "In Progress".
+            project.setStatus("IN_PROGRESS");
+        }
         project = projectRepository.save(project);
         auditService.audit(actor, "PROJECT_CREATE", "Project", project.getId(), "Name: " + project.getName(), http);
+        notificationService.onProjectCreated(project, actor.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(ProjectResponse.from(project));
     }
 
@@ -123,9 +134,13 @@ public class ProjectController {
         if (!actor.isAdmin() && (req.companyId() == null || !req.companyId().equals(actor.getCompanyId()))) {
             throw ApiException.forbidden("You can only update projects of your own company");
         }
+        String oldStatus = project.getStatus();
         apply(project, req);
         project = projectRepository.save(project);
         auditService.audit(actor, "PROJECT_UPDATE", "Project", project.getId(), "Name: " + project.getName(), http);
+        if (!java.util.Objects.equals(oldStatus, project.getStatus())) {
+            notificationService.onStatusChanged(project, oldStatus, project.getStatus(), actor.id());
+        }
         return ResponseEntity.ok(ProjectResponse.from(project));
     }
 
@@ -196,10 +211,16 @@ public class ProjectController {
         project.setProgress(req.progress() != null ? req.progress() : 0);
     }
 
-    /** Clients/staff may only touch projects of their own company; admin is unrestricted. */
+    /** Clients/staff may only touch projects of their own company; admin is
+     *  unrestricted. The customer company's authorized representative is an
+     *  exception: they must be able to open the project (review link) and
+     *  mark it complete — that's the whole point of the submission email. */
     private void requireVisibleTo(AuthUser actor, Long companyId) {
-        if (!actor.isAdmin() && !companyId.equals(actor.getCompanyId())) {
-            throw ApiException.notFound("Project"); // 404, not 403 — don't reveal other companies' data
-        }
+        if (actor.isAdmin()) return;
+        if (companyId.equals(actor.getCompanyId())) return;
+        Company company = companyRepository.findById(companyId).orElse(null);
+        User rep = company == null ? null : company.getAuthorizedRep();
+        if (rep != null && rep.getId().equals(actor.id())) return;
+        throw ApiException.notFound("Project"); // 404, not 403 — don't reveal other companies' data
     }
 }

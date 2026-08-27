@@ -21,5 +21,8 @@ public record CompanyRequest(
         String brandSecondary,
         String logoUrl,
         String contactDetails,
-        Long authorizedRepId
+        Long authorizedRepId,
+        /** New-customer wizard: full name of the authorized rep whose CLIENT
+         *  account is created and invited when no authorizedRepId is given. */
+        String repName
 ) {}

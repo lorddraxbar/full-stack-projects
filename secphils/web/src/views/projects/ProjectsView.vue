@@ -139,6 +139,10 @@ const handleWizardSubmit = async (data: WizardData) => {
         owner: data.company.owner || null,
         description: data.company.description || null,
         email: data.rep.email || null,
+        // New-customer flow: create + invite the authorized representative's
+        // CLIENT account (they become the company's authorizedRep). The
+        // backend only does this when no existing authorizedRepId is sent.
+        repName: data.rep.name || null,
       })
       companyId = (company as any).id
     } else if (companyId != null && data.rep.userId != null) {

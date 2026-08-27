@@ -264,6 +264,46 @@ async function saveAdminChanges() {
     saveError.value = err?.response?.data?.message || 'Failed to save project'
   }
 }
+
+// ---------- Authorized-rep review & completion ----------
+// The customer's authorized representative is the one who reviews a
+// submitted project and marks it complete. Identified by matching their
+// own user id against the company's authorizedRepId.
+const isAuthorizedRep = computed(() => {
+  return !!me.value?.id && !!company.value?.authorizedRepId &&
+    Number(company.value.authorizedRepId) === Number(me.value.id)
+})
+const completing = ref(false)
+async function markCompleted() {
+  if (!project.value) return
+  if (!confirm('Mark this project as completed? The SECPhils team will be notified and it will appear in the reviews list.')) return
+  completing.value = true
+  saveError.value = ''
+  try {
+    const updated = await useUpdateProject(projectId.value, {
+      companyId: project.value.companyId,
+      serviceId: project.value.serviceId ?? null,
+      name: project.value.name,
+      notes: project.value.notes ?? null,
+      objectives: project.value.objectives ?? null,
+      deliverables: project.value.deliverables ?? null,
+      status: 'COMPLETED',
+      totalCost: project.value.totalCost ?? null,
+      rawMaterials: project.value.rawMaterials ?? null,
+      productionOutput: project.value.productionOutput ?? null,
+      wasteManagement: project.value.wasteManagement ?? null,
+      wasteMaterials: project.value.wasteMaterials ?? null,
+      manufacturingProcedure: project.value.manufacturingProcedure ?? null,
+      productionFlowchartUrl: project.value.productionFlowchartUrl ?? null,
+      progress: project.value.progress ?? 0,
+    })
+    project.value = updated
+  } catch (err: any) {
+    saveError.value = err?.response?.data?.message || 'Failed to mark the project complete'
+  } finally {
+    completing.value = false
+  }
+}
 </script>
 
 <template>
@@ -336,6 +376,26 @@ async function saveAdminChanges() {
           <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4">Objectives</h2>
             <p class="text-gray-700">{{ project.objectives || '—' }}</p>
+          </div>
+        </div>
+
+        <!-- Authorized-rep review card: the customer's rep reviews a
+             submitted project and marks it complete (notifies the team). -->
+        <div v-if="isAuthorizedRep && project.status !== 'COMPLETED'" class="bg-emerald-50 border border-emerald-200 rounded-lg shadow p-6 mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-1">Review &amp; complete this project</h2>
+          <p class="text-sm text-gray-600 mb-4">
+            You're the authorized representative for {{ company?.name || 'this customer' }}. Check the project
+            details and production checklist, then mark it complete when everything looks right.
+          </p>
+          <div class="flex items-center gap-3">
+            <button
+              @click="markCompleted"
+              :disabled="completing"
+              class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
+            >
+              {{ completing ? 'Marking…' : 'Mark as completed' }}
+            </button>
+            <span v-if="saveError" class="text-sm text-red-600">{{ saveError }}</span>
           </div>
         </div>
 
