@@ -100,7 +100,7 @@ function onAvatarSelected(e: Event) {
 }
 
 // ---------- Client: Company Profile ----------
-const company = ref({ name: '', businessType: '', address: '', contactDetails: '' })
+const company = ref({ name: '', businessType: '', owner: '', ownerPhone: '', address: '', contactDetails: '' })
 
 async function loadCompany() {
   try {
@@ -108,6 +108,8 @@ async function loadCompany() {
     company.value = {
       name: c?.name ?? '',
       businessType: c?.industrySectors ?? '',
+      owner: c?.owner ?? '',
+      ownerPhone: c?.ownerPhone ?? '',
       address: c?.location ?? '',
       contactDetails: c?.contactDetails ?? '',
     }
@@ -121,6 +123,8 @@ async function saveCompany() {
     await useUpdateMyCompany({
       name: company.value.name,
       industrySectors: company.value.businessType,
+      owner: company.value.owner,
+      ownerPhone: company.value.ownerPhone,
       location: company.value.address,
       contactDetails: company.value.contactDetails,
     })
@@ -132,7 +136,7 @@ async function saveCompany() {
 
 // ---------- Client: Team & Invitations ----------
 const clientTeam = ref<CompanyTeamMember[]>([])
-const inviteForm = ref({ name: '', email: '', role: '' })
+const inviteForm = ref({ name: '', email: '', phone: '', role: '' })
 const inviting = ref(false)
 
 async function loadTeam() {
@@ -153,9 +157,10 @@ async function inviteMember() {
     await useInviteTeamMember({
       name: inviteForm.value.name.trim() || inviteForm.value.email.trim(),
       email: inviteForm.value.email.trim(),
+      phone: inviteForm.value.phone.trim() || undefined,
       role: inviteForm.value.role.trim() || 'Team Member',
     })
-    inviteForm.value = { name: '', email: '', role: '' }
+    inviteForm.value = { name: '', email: '', phone: '', role: '' }
     await loadTeam()
     flash('success', 'Invitation sent. The team member will receive an email with an account setup link.')
   } catch (e: any) {
@@ -527,6 +532,24 @@ onMounted(async () => {
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Company Owner</label>
+            <input
+              v-model="company.owner"
+              type="text"
+              placeholder="Owner's full name"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Owner Phone <span class="font-normal text-gray-400">(optional)</span></label>
+            <input
+              v-model="company.ownerPhone"
+              type="tel"
+              placeholder="0917 000 0000"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Company Address</label>
             <input
@@ -569,6 +592,7 @@ onMounted(async () => {
                 <tr>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 </tr>
@@ -577,6 +601,7 @@ onMounted(async () => {
                 <tr v-for="member in clientTeam" :key="member.id" class="hover:bg-gray-50">
                   <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ member.name }}</td>
                   <td class="px-6 py-4 text-sm text-gray-600">{{ member.email }}</td>
+                  <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ member.phone || '—' }}</td>
                   <td class="px-6 py-4 text-sm text-gray-600">{{ member.role }}</td>
                   <td class="px-6 py-4">
                     <span
@@ -594,7 +619,7 @@ onMounted(async () => {
                   </td>
                 </tr>
                 <tr v-if="clientTeam.length === 0">
-                  <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500">
+                  <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">
                     No team members yet.
                   </td>
                 </tr>
@@ -609,7 +634,7 @@ onMounted(async () => {
           <p class="text-sm text-gray-600 mb-4">
             Invited members receive an email with an account setup link and are added to your company.
           </p>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
               <input
@@ -625,6 +650,15 @@ onMounted(async () => {
                 v-model="inviteForm.email"
                 type="email"
                 placeholder="juan@company.com"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Phone <span class="font-normal text-gray-400">(optional)</span></label>
+              <input
+                v-model="inviteForm.phone"
+                type="tel"
+                placeholder="0917 000 0000"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>

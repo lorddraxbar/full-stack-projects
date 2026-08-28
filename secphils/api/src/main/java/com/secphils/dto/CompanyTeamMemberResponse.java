@@ -11,13 +11,14 @@ public record CompanyTeamMemberResponse(
         Long id,
         String name,
         String email,
+        String phone,
         String role,
         String status,
         java.time.LocalDateTime lastLogin
 ) {
     public static CompanyTeamMemberResponse from(User u) {
         return new CompanyTeamMemberResponse(u.getId(), DisplayNamePolicy.nameFor(u), u.getEmail(),
-                u.getRole(), statusFor(u), u.getLastLogin());
+                u.getPhone(), u.getRole(), statusFor(u), u.getLastLogin());
     }
 
     /**
@@ -29,7 +30,7 @@ public record CompanyTeamMemberResponse(
         String name = u.getFullName();
         if (name == null || name.isBlank()) name = u.getEmail();
         return new CompanyTeamMemberResponse(u.getId(), name, u.getEmail(),
-                u.getRole(), statusFor(u), u.getLastLogin());
+                u.getPhone(), u.getRole(), statusFor(u), u.getLastLogin());
     }
 
     private static String statusFor(User u) {

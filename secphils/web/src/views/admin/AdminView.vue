@@ -103,6 +103,7 @@ interface PortalUser {
   id: number
   email: string
   fullName: string
+  phone?: string | null
   role: string
   isActive: boolean
   deactivatedAt: string | null
@@ -1470,6 +1471,7 @@ const timeOfDay = (ts: string) => {
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -1479,13 +1481,13 @@ const timeOfDay = (ts: string) => {
             </thead>
             <tbody class="divide-y divide-gray-200">
               <tr v-if="usersLoading && clientUsers.length === 0">
-                <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">Loading users…</td>
+                <td colspan="8" class="px-6 py-8 text-center text-sm text-gray-500">Loading users…</td>
               </tr>
               <tr v-else-if="clientUsers.length === 0">
-                <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">No users found.</td>
+                <td colspan="8" class="px-6 py-8 text-center text-sm text-gray-500">No users found.</td>
               </tr>
               <tr v-else-if="filteredUsers.length === 0">
-                <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">No users match your filter.</td>
+                <td colspan="8" class="px-6 py-8 text-center text-sm text-gray-500">No users match your filter.</td>
               </tr>
               <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4">
@@ -1497,6 +1499,7 @@ const timeOfDay = (ts: string) => {
                   </div>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ user.email }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ user.phone || '—' }}</td>
                 <td class="px-6 py-4">
                   <span :class="[
                     'px-2 py-1 text-xs font-medium rounded',

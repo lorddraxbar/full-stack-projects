@@ -87,6 +87,7 @@ public class CompanyController {
             String[] repName = splitName(req.repName());
             rep.setFirstName(repName[0]);
             rep.setLastName(repName[1]);
+            if (req.repPhone() != null && !req.repPhone().isBlank()) rep.setPhone(req.repPhone());
             rep.setRole("CLIENT");
             rep.setIsActive(false);
             rep = userRepository.save(rep);
@@ -135,6 +136,13 @@ public class CompanyController {
         if (req.authorizedRepId() != null) {
             User rep = userRepository.findById(req.authorizedRepId())
                     .orElseThrow(() -> ApiException.notFound("Authorized representative user"));
+            // Fill in the rep's phone when the wizard provided one and the user
+            // row is blank — never clobber a phone the rep set for themselves.
+            if (req.repPhone() != null && !req.repPhone().isBlank()
+                    && (rep.getPhone() == null || rep.getPhone().isBlank())) {
+                rep.setPhone(req.repPhone());
+                userRepository.save(rep);
+            }
             company.setAuthorizedRep(rep);
         }
         company = companyRepository.save(company);
@@ -226,6 +234,7 @@ public class CompanyController {
         String[] inviteeName = splitName(req.name());
         invitee.setFirstName(inviteeName[0]);
         invitee.setLastName(inviteeName[1]);
+        if (req.phone() != null && !req.phone().isBlank()) invitee.setPhone(req.phone());
         invitee.setRole(req.role() != null && !req.role().isBlank() ? req.role() : "CLIENT");
         invitee.setCompanyId(company.getId());
         invitee.setIsActive(false);
@@ -261,6 +270,7 @@ public class CompanyController {
         String[] inviteeName = splitName(req.name());
         invitee.setFirstName(inviteeName[0]);
         invitee.setLastName(inviteeName[1]);
+        if (req.phone() != null && !req.phone().isBlank()) invitee.setPhone(req.phone());
         // The onboarding reviewer must be a client of this company — never a provider account.
         invitee.setRole("CLIENT");
         invitee.setCompanyId(company.getId());
@@ -304,10 +314,13 @@ public class CompanyController {
         return companyRepository.findById(companyId).orElseThrow(() -> ApiException.notFound("Company"));
     }
 
-    /** Fields the client-facing Company Profile may edit (name, business type, address, contact string). */
+    /** Fields the client-facing Company Profile may edit (name, business type,
+     *  owner + owner phone, address, contact string). */
     private void applyClientVisible(Company company, CompanyRequest req) {
         company.setName(req.name());
         company.setIndustrySectors(req.industrySectors());
+        company.setOwner(req.owner());
+        company.setOwnerPhone(req.ownerPhone());
         company.setLocation(req.location());
         company.setContactDetails(req.contactDetails());
     }
@@ -320,6 +333,7 @@ public class CompanyController {
         if (req.name() != null) company.setName(req.name());
         if (req.location() != null) company.setLocation(req.location());
         if (req.owner() != null) company.setOwner(req.owner());
+        if (req.ownerPhone() != null) company.setOwnerPhone(req.ownerPhone());
         if (req.description() != null) company.setDescription(req.description());
         if (req.tagline() != null) company.setTagline(req.tagline());
         if (req.industrySectors() != null) company.setIndustrySectors(req.industrySectors());

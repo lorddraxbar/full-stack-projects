@@ -8,5 +8,6 @@ import jakarta.validation.constraints.Size;
 public record TeamInviteRequest(
         @NotBlank(message = "Name is required") String name,
         @NotBlank(message = "Email is required") @Email String email,
+        @Size(max = 40) String phone,
         @Size(max = 40) String role
 ) {}

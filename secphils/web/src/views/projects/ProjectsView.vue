@@ -137,16 +137,22 @@ const handleWizardSubmit = async (data: WizardData) => {
         name: data.company.name,
         location: data.company.location || null,
         owner: data.company.owner || null,
+        ownerPhone: data.company.ownerPhone || null,
         description: data.company.description || null,
         email: data.rep.email || null,
         // New-customer flow: create + invite the authorized representative's
         // CLIENT account (they become the company's authorizedRep). The
         // backend only does this when no existing authorizedRepId is sent.
         repName: data.rep.name || null,
+        repPhone: data.rep.phone || null,
       })
       companyId = (company as any).id
     } else if (companyId != null && data.rep.userId != null) {
-      // Persist the client user picked in the wizard as the company's authorized rep.
+      // Existing customer: persist the picked client user as the company's
+      // authorized rep. Phone numbers for an existing rep / owner are their own
+      // data (set via the member's profile or Admin), so we don't round-trip
+      // them here — a new rep added in this flow already got its phone via the
+      // invite endpoint.
       await useUpdateCompany(companyId, {
         name: data.company.name,
         authorizedRepId: data.rep.userId,

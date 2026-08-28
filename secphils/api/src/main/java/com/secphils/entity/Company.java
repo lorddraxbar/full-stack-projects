@@ -25,6 +25,9 @@ public class Company {
     @Column(length = 255)
     private String owner;
 
+    @Column(name = "owner_phone", length = 30)
+    private String ownerPhone;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 

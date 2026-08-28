@@ -226,6 +226,7 @@ export interface CompanyTeamMember {
   id: number
   name: string
   email: string
+  phone?: string | null
   role: string
   status: string
   lastLogin?: string | null
@@ -236,7 +237,7 @@ export async function useGetCompanyTeam() {
   return response.data as CompanyTeamMember[]
 }
 
-export async function useInviteTeamMember(data: { name: string; email: string; role?: string }) {
+export async function useInviteTeamMember(data: { name: string; email: string; phone?: string; role?: string }) {
   const response = await api.post('/companies/me/team/invite', data)
   return response.data
 }
@@ -259,7 +260,7 @@ export async function useGetCompanyTeamFor(companyId: number) {
  */
 export async function useInviteCustomerRep(
   companyId: number,
-  data: { name: string; email: string; setAsRep?: boolean }
+  data: { name: string; email: string; phone?: string; setAsRep?: boolean }
 ) {
   const response = await api.post(`/companies/${companyId}/team/invite`, {
     ...data,

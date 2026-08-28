@@ -31,11 +31,13 @@ export interface WizardData {
     name: string
     location: string
     owner: string
+    ownerPhone: string
     description: string
   }
   rep: {
     name: string
     email: string
+    phone: string
     /** Portal user id picked from the customer's client team (existing scenario); null otherwise. */
     userId: number | null
   }
@@ -108,12 +110,14 @@ const companyForm = ref({
   name: '',
   location: '',
   owner: '',
+  ownerPhone: '',
   description: '',
 })
 
 const repForm = ref({
   name: '',
   email: '',
+  phone: '',
 })
 
 const projectForm = ref({
@@ -184,7 +188,7 @@ const selectedCompany = computed(() =>
 )
 
 // Client users of the selected customer company (existing scenario)
-const clientTeam = ref<{ id: number; name: string; email: string; role: string; status: string }[]>([])
+const clientTeam = ref<{ id: number; name: string; email: string; role: string; status: string; phone: string | null }[]>([])
 const teamLoading = ref(false)
 const teamError = ref('')
 const selectedRepId = ref<string | null>(null)
@@ -225,7 +229,7 @@ const repRequiredMessage = computed(() => {
 // Add-a-new-rep form (always available in the existing-customer flow).
 const addingRep = ref(false)
 const repError = ref('')
-const addRepForm = ref({ name: '', email: '' })
+const addRepForm = ref({ name: '', email: '', phone: '' })
 const addRepBusy = ref(false)
 const newRepFormValid = computed(() =>
   addRepForm.value.name.trim() !== '' && addRepForm.value.email.trim() !== ''
@@ -246,12 +250,12 @@ async function loadTeam() {
   teamLoading.value = true
   selectedRepId.value = null
   addingRep.value = false
-  addRepForm.value = { name: '', email: '' }
+  addRepForm.value = { name: '', email: '', phone: '' }
   repError.value = ''
   try {
     const team = await useGetCompanyTeamFor(selectedCompanyIdNum.value)
     clientTeam.value = (team as any[]).map(m => ({
-      id: m.id, name: m.name, email: m.email, role: m.role, status: m.status,
+      id: m.id, name: m.name, email: m.email, role: m.role, status: m.status, phone: m.phone ?? null,
     }))
   } catch (e: any) {
     teamError.value = e?.response?.data?.message || 'Failed to load the client users for this company'
@@ -288,8 +292,10 @@ async function loadLookups() {
         name: c.name,
         location: c.location ?? null,
         owner: c.owner ?? null,
+        ownerPhone: c.ownerPhone ?? null,
         authorizedRepId: c.authorizedRepId ?? null,
         authorizedRepName: c.authorizedRepName ?? null,
+        authorizedRepPhone: c.authorizedRepPhone ?? null,
       }))
     services.value = (svcs as any[])
       .filter(s => s != null && s.id != null && (s.isActive !== false))
@@ -321,8 +327,8 @@ const stepIndex = computed(() => currentStep.value)
 const resetForm = () => {
   currentStep.value = 0
   scenario.value = 'new'
-  companyForm.value = { name: '', location: '', owner: '', description: '' }
-  repForm.value = { name: '', email: '' }
+  companyForm.value = { name: '', location: '', owner: '', ownerPhone: '', description: '' }
+  repForm.value = { name: '', email: '', phone: '' }
   projectForm.value = { name: '', serviceId: '', notes: '', address: '', addressDiffers: false }
   productionForm.value = {
     totalCost: '',
@@ -338,7 +344,7 @@ const resetForm = () => {
   clientTeam.value = []
   teamError.value = ''
   addingRep.value = false
-  addRepForm.value = { name: '', email: '' }
+  addRepForm.value = { name: '', email: '', phone: '' }
   repError.value = ''
   loadError.value = ''
 }
@@ -420,9 +426,10 @@ async function addRep() {
     const created = (await useInviteCustomerRep(companyId, {
       name: addRepForm.value.name.trim(),
       email: addRepForm.value.email.trim(),
+      phone: addRepForm.value.phone.trim() || undefined,
       setAsRep: true,
     })) as any
-    addRepForm.value = { name: '', email: '' }
+    addRepForm.value = { name: '', email: '', phone: '' }
     addingRep.value = false
     // Refresh the team list, then pin the selection to the rep we just added:
     // loadTeam() re-preselects from the (stale) company cache, which still
@@ -477,19 +484,20 @@ const handleSubmit = () => {
           name: selectedCompany.value.name,
           location: selectedCompany.value.location || '',
           owner: selectedCompany.value.owner || '',
+          ownerPhone: (selectedCompany.value as any).ownerPhone || '',
           description: '',
         }
       : { ...companyForm.value }
   let rep: WizardData['rep']
   if (scenario.value === 'new') {
-    rep = { name: repForm.value.name.trim(), email: repForm.value.email.trim(), userId: null }
+    rep = { name: repForm.value.name.trim(), email: repForm.value.email.trim(), phone: repForm.value.phone.trim(), userId: null }
   } else if (selectedTeamMember.value) {
-    rep = { name: selectedTeamMember.value.name, email: selectedTeamMember.value.email, userId: selectedTeamMember.value.id }
+    rep = { name: selectedTeamMember.value.name, email: selectedTeamMember.value.email, phone: selectedTeamMember.value.phone || '', userId: selectedTeamMember.value.id }
   } else {
     // No one picked explicitly — keep the company's current rep. The step gate
     // guarantees repResolved here, so resolvedRep is non-null.
     const r = resolvedRep.value!
-    rep = { name: r.name, email: r.email, userId: r.id }
+    rep = { name: r.name, email: r.email, phone: r.phone || '', userId: r.id }
   }
   const data: WizardData = {
     scenario: scenario.value,
@@ -741,6 +749,7 @@ const handleClose = () => {
                   <span class="flex-1">
                     <span class="text-sm font-medium">{{ member.name }}</span>
                     <span class="text-xs text-muted-foreground"> · {{ member.email }}</span>
+                    <span v-if="member.phone" class="text-xs text-muted-foreground"> · {{ member.phone }}</span>
                   </span>
                   <span class="text-xs text-muted-foreground">{{ member.status }}</span>
                 </label>
@@ -749,6 +758,7 @@ const handleClose = () => {
               <div v-else-if="clientTeam.length === 1" class="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
                 <span class="font-medium">{{ clientTeam[0].name }}</span>
                 <span class="text-xs text-muted-foreground"> · {{ clientTeam[0].email }}</span>
+                <span v-if="clientTeam[0].phone" class="text-xs text-muted-foreground"> · {{ clientTeam[0].phone }}</span>
                 <span class="text-xs text-emerald-700 ml-2">selected</span>
               </div>
               <!-- zero client users: must add one -->
@@ -761,7 +771,7 @@ const handleClose = () => {
             </div>
             <!-- Add-a-new-rep form (always available in the existing-customer flow) -->
             <div v-if="addingRep" class="rounded-lg border p-4 space-y-3 bg-muted/30">
-              <div class="grid gap-3 sm:grid-cols-2">
+              <div class="grid gap-3 sm:grid-cols-3">
                 <div class="space-y-1">
                   <Label class="text-xs">Full Name *</Label>
                   <Input v-model="addRepForm.name" placeholder="Full name" />
@@ -769,6 +779,10 @@ const handleClose = () => {
                 <div class="space-y-1">
                   <Label class="text-xs">Email Address *</Label>
                   <Input v-model="addRepForm.email" type="email" placeholder="email@company.com" />
+                </div>
+                <div class="space-y-1">
+                  <Label class="text-xs">Phone</Label>
+                  <Input v-model="addRepForm.phone" placeholder="Phone (optional)" />
                 </div>
               </div>
               <div v-if="repError" class="text-sm text-red-600">{{ repError }}</div>
@@ -807,6 +821,11 @@ const handleClose = () => {
           </div>
 
           <div class="space-y-2">
+            <Label for="ownerPhone">Owner Phone</Label>
+            <Input id="ownerPhone" v-model="companyForm.ownerPhone" placeholder="Phone number (optional)" />
+          </div>
+
+          <div class="space-y-2">
             <Label for="companyDesc">Business Description</Label>
             <Textarea id="companyDesc" v-model="companyForm.description" placeholder="Describe the company's business" rows="3" />
           </div>
@@ -827,6 +846,11 @@ const handleClose = () => {
           <div class="space-y-2">
             <Label for="email">Email Address *</Label>
             <Input id="email" v-model="repForm.email" type="email" placeholder="email@company.com" />
+          </div>
+
+          <div class="space-y-2">
+            <Label for="repPhone">Phone</Label>
+            <Input id="repPhone" v-model="repForm.phone" placeholder="Phone number (optional)" />
           </div>
         </div>
 
