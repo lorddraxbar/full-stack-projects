@@ -207,7 +207,12 @@ const handleWizardSubmit = async (data: WizardData) => {
     } else {
       notice.value = 'Project created.'
     }
-    showWizard.value = false
+    // NOTE: do NOT set `showWizard = false` here. This is an async continuation
+    // (we awaited useCreateProject above) — by the time it runs, the user may
+    // have already opened a FRESH wizard, and this late write would dismiss the
+    // new dialog. The child wizard closes itself on submit (it sets its own
+    // open=false right after emitting), which v-model:open propagates here
+    // synchronously — so the parent never has to close it.
     await loadProjects()
   } catch (e: any) {
     const status = e?.response?.status
