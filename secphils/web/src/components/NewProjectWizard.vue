@@ -892,7 +892,7 @@ const handleClose = () => {
               <Label for="addressDiffers" class="cursor-pointer">Project address is different from company address</Label>
             </div>
             <p class="text-sm text-muted-foreground">
-              Leave unchecked if the project operates at the company address{{ isScenarioNew ? '' : ' (on the company profile)' }}.
+              Leave unchecked if the project operates at the company address.
             </p>
             <div v-if="projectForm.addressDiffers" class="space-y-2">
               <Label for="projectAddress">Project Address *</Label>
