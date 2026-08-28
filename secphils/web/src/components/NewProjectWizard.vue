@@ -726,7 +726,7 @@ const handleClose = () => {
               </button>
             </div>
             <p class="text-sm text-muted-foreground">
-              The authorized representative reviews this customer's onboarding, so one is required.
+              The authorized representative reviews and submits the customer's project information, so one is required.
               Pick a client user from {{ selectedCompany.name }}, or add a new one.
             </p>
             <div v-if="teamLoading" class="text-sm text-muted-foreground">Loading client users…</div>
@@ -821,7 +821,7 @@ const handleClose = () => {
           </div>
 
           <div class="space-y-2">
-            <Label for="ownerPhone">Owner Phone</Label>
+            <Label for="ownerPhone">Company Phone</Label>
             <Input id="ownerPhone" v-model="companyForm.ownerPhone" placeholder="Phone number (optional)" />
           </div>
 
@@ -892,8 +892,7 @@ const handleClose = () => {
               <Label for="addressDiffers" class="cursor-pointer">Project address is different from company address</Label>
             </div>
             <p class="text-sm text-muted-foreground">
-              Leave unchecked if the project operates at the company address
-              {{ isScenarioNew ? '(entered above' : '(on the company profile' }}).
+              Leave unchecked if the project operates at the company address{{ isScenarioNew ? '' : ' (on the company profile)' }}.
             </p>
             <div v-if="projectForm.addressDiffers" class="space-y-2">
               <Label for="projectAddress">Project Address *</Label>
