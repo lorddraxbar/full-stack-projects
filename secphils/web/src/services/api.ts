@@ -1,4 +1,5 @@
-import axios from 'axios'
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
+import { useRole } from '@/composables/useRole'
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -6,6 +7,51 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 })
+
+// ---------- Silent session renewal ----------
+// Access tokens are short-lived (15m); refresh tokens last 7d. When a
+// request 401s while a refresh token is still alive, we swap in a fresh
+// token pair and retry the request once. We only force a re-login when
+// the refresh token itself is dead (expired, user deactivated, etc.).
+// The refresh request uses plain axios (not `api`) so its own failure
+// can never re-enter this interceptor.
+
+let refreshInFlight: Promise<boolean> | null = null
+
+function tryRefresh(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const refreshToken = localStorage.getItem('refreshToken')
+        if (!refreshToken) return false
+        const { data } = await axios.post('/api/v1/auth/refresh', { refreshToken })
+        if (!data.accessToken || !data.refreshToken) return false
+        localStorage.setItem('accessToken', data.accessToken)
+        localStorage.setItem('refreshToken', data.refreshToken)
+        if (data.user?.role) useRole().setRole(data.user.role)
+        if (data.user?.fullName) localStorage.setItem('userName', data.user.fullName)
+        if (data.user?.id != null) localStorage.setItem('userId', String(data.user.id))
+        return true
+      } catch {
+        return false
+      } finally {
+        refreshInFlight = null
+      }
+    })()
+  }
+  return refreshInFlight
+}
+
+function clearSession() {
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('refreshToken')
+  localStorage.removeItem('userRole')
+  localStorage.removeItem('userName')
+  localStorage.removeItem('userId')
+  if (!window.location.pathname.startsWith('/auth/login')) {
+    window.location.href = '/auth/login'
+  }
+}
 
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('accessToken')
@@ -17,17 +63,26 @@ api.interceptors.request.use(config => {
 
 api.interceptors.response.use(
   response => response,
-  error => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      localStorage.removeItem('userRole')
-      localStorage.removeItem('userName')
-      localStorage.removeItem('userId')
-      if (!window.location.pathname.startsWith('/auth/login')) {
-        window.location.href = '/auth/login'
+  async (error: AxiosError) => {
+    const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined
+    const status = error.response?.status
+    const isAuthPath = (original?.url ?? '').startsWith('/auth/')
+
+    // 401 on a non-auth request: try one silent refresh, then retry.
+    if (status === 401 && original && !original._retried && !isAuthPath) {
+      const renewed = await tryRefresh()
+      if (renewed) {
+        original._retried = true
+        original.headers.Authorization = `Bearer ${localStorage.getItem('accessToken')}`
+        return api(original)
       }
     }
+
+    // Session is genuinely over (or the login itself failed): bounce to login.
+    if (status === 401 && !isAuthPath) {
+      clearSession()
+    }
+
     return Promise.reject(error)
   }
 )
