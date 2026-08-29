@@ -80,7 +80,6 @@ public class DocumentController {
     @Transactional(readOnly = true)
     public ResponseEntity<List<DocumentResponse>> list(
             @RequestParam(required = false) Long projectId,
-            @RequestParam(required = false) String category,
             @RequestParam(required = false) Long companyId) {
         AuthUser actor = CurrentUser.require();
         Set<Long> projectIds = null;
@@ -103,9 +102,7 @@ public class DocumentController {
         }
 
         List<Document> docs;
-        if (projectId != null && category != null) {
-            docs = documentRepository.findByProjectIdAndCategory(projectId, category);
-        } else if (projectId != null) {
+        if (projectId != null) {
             docs = documentRepository.findByProjectId(projectId);
         } else if (projectIds != null && !projectIds.isEmpty()) {
             docs = documentRepository.findByProjectIdIn(projectIds);
@@ -189,7 +186,6 @@ public class DocumentController {
     public ResponseEntity<DocumentResponse> upload(
             @RequestParam("project") Long projectId,
             @RequestParam("title") String title,
-            @RequestParam(required = false) String category,
             @RequestParam(required = false) String description,
             @RequestParam("file") MultipartFile file,
             HttpServletRequest http) throws IOException {
@@ -216,7 +212,6 @@ public class DocumentController {
             doc.setProject(project);
             doc.setTitle(title.trim());
             doc.setDescription(description == null ? null : description.trim());
-            if (category != null && !category.isBlank()) doc.setCategory(category.trim());
             doc.setFileUrl(s3Uri);
             doc.setFileSize((long) bytes.length);
             doc.setUploader(userRepository.findById(actor.id())
@@ -339,7 +334,6 @@ public class DocumentController {
         doc.setProject(project);
         doc.setTitle(req.title());
         doc.setDescription(req.description());
-        if (req.category() != null && !req.category().isBlank()) doc.setCategory(req.category());
         doc.setFileUrl(req.fileUrl());
         doc.setFileSize(req.fileSize());
     }

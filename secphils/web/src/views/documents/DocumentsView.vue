@@ -5,7 +5,7 @@ import {
   useGetDocuments, useDeleteDocument, useUploadDocument, useDownloadDocument, useGetProjects,
 } from '@/services/api'
 import {
-  documentCategoryLabel, DOCUMENT_CATEGORY_LABELS, DOCUMENT_CATEGORY_COLORS,
+  fileTypeLabel, FILE_TYPE_LABELS, FILE_TYPE_COLORS,
   formatDate, formatFileSize,
 } from '@/lib/labels'
 
@@ -17,8 +17,8 @@ interface DocRow {
   description: string
   projectId: number
   project: string
-  category: string
-  categoryLabel: string
+  fileType: string
+  fileTypeLabel: string
   fileUrl: string
   fileSize: number | null
   version: number | null
@@ -32,7 +32,7 @@ const loading = ref(false)
 const loadError = ref('')
 const searchQuery = ref('')
 const selectedProject = ref('ALL')
-const selectedCategory = ref('ALL')
+const selectedType = ref('ALL')
 
 const showUploadModal = ref(false)
 const uploading = ref(false)
@@ -40,7 +40,6 @@ const uploadError = ref('')
 const uploadForm = ref({
   title: '',
   projectId: null as number | null,
-  category: 'DELIVERABLE',
   description: '',
   file: null as File | null,
 })
@@ -73,8 +72,8 @@ const filteredDocuments = computed(() => {
   if (selectedProject.value !== 'ALL') {
     result = result.filter(d => d.projectId === Number(selectedProject.value))
   }
-  if (selectedCategory.value !== 'ALL') {
-    result = result.filter(d => d.category === selectedCategory.value)
+  if (selectedType.value !== 'ALL') {
+    result = result.filter(d => d.fileType === selectedType.value)
   }
   return result
 })
@@ -86,8 +85,8 @@ function mapDoc(d: any): DocRow {
     description: d.description || '',
     projectId: d.projectId,
     project: projectById.value[d.projectId] || `Project #${d.projectId}`,
-    category: d.category || '',
-    categoryLabel: documentCategoryLabel(d.category),
+    fileType: d.fileType || 'OTHER',
+    fileTypeLabel: fileTypeLabel(d.fileType),
     fileUrl: d.fileUrl || '',
     fileSize: d.fileSize ?? null,
     version: d.version ?? null,
@@ -129,12 +128,11 @@ async function submitUpload() {
     await useUploadDocument({
       projectId: uploadForm.value.projectId,
       title: uploadForm.value.title.trim(),
-      category: uploadForm.value.category,
       description: uploadForm.value.description.trim() || undefined,
       file: uploadForm.value.file,
     })
     showUploadModal.value = false
-    uploadForm.value = { title: '', projectId: null, category: 'DELIVERABLE', description: '', file: null }
+    uploadForm.value = { title: '', projectId: null, description: '', file: null }
     if (fileInput.value) fileInput.value.value = ''
     await loadDocuments()
   } catch (e: any) {
@@ -210,11 +208,11 @@ onMounted(async () => {
           <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
         </select>
         <select
-          v-model="selectedCategory"
+          v-model="selectedType"
           class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
         >
-          <option value="ALL">All Categories</option>
-          <option v-for="(label, code) in DOCUMENT_CATEGORY_LABELS" :key="code" :value="code">{{ label }}</option>
+          <option value="ALL">All Types</option>
+          <option v-for="(label, code) in FILE_TYPE_LABELS" :key="code" :value="code">{{ label }}</option>
         </select>
       </div>
     </div>
@@ -252,8 +250,8 @@ onMounted(async () => {
 
           <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
             <div class="flex flex-wrap items-center gap-3">
-              <span :class="['px-2 py-0.5 text-xs font-medium rounded-full', DOCUMENT_CATEGORY_COLORS[doc.categoryLabel] || 'bg-gray-100 text-gray-700']">
-                {{ doc.categoryLabel }}
+              <span :class="['px-2 py-0.5 text-xs font-medium rounded-full', FILE_TYPE_COLORS[doc.fileTypeLabel] || 'bg-gray-100 text-gray-700']">
+                {{ doc.fileTypeLabel }}
               </span>
               <span class="text-gray-600">By: {{ doc.uploaderName }}</span>
               <span v-if="doc.version" class="text-gray-600">v{{ doc.version }}</span>
@@ -309,15 +307,6 @@ onMounted(async () => {
             >
               <option :value="null" disabled>Select a project...</option>
               <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <select
-              v-model="uploadForm.category"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option v-for="(label, code) in DOCUMENT_CATEGORY_LABELS" :key="code" :value="code">{{ label }}</option>
             </select>
           </div>
           <div>

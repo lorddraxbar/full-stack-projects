@@ -11,8 +11,8 @@ import {
   useArchiveProject, useRestoreProject, useHardDeleteProject,
 } from '@/services/api'
 import {
-  projectStatusLabel, documentCategoryLabel,
-  PROJECT_STATUS_COLORS, DOCUMENT_CATEGORY_COLORS,
+  projectStatusLabel, fileTypeLabel,
+  PROJECT_STATUS_COLORS, FILE_TYPE_COLORS,
   formatDate, formatDateTime,
 } from '@/lib/labels'
 
@@ -178,11 +178,10 @@ async function sendMessage() {
 // ---------- Documents (add / delete) ----------
 const docDialogOpen = ref(false)
 const docSaving = ref(false)
-const docForm = ref({ title: '', category: 'DELIVERABLE', description: '', fileUrl: '' })
-const docCategories = ['CLIENT_SUBMITTED', 'REQUESTED', 'DELIVERABLE']
+const docForm = ref({ title: '', description: '', fileUrl: '' })
 
 function openDocDialog() {
-  docForm.value = { title: '', category: 'DELIVERABLE', description: '', fileUrl: '' }
+  docForm.value = { title: '', description: '', fileUrl: '' }
   docDialogOpen.value = true
 }
 
@@ -193,7 +192,6 @@ async function submitDocument() {
     await useCreateDocument({
       projectId: projectId.value,
       title: docForm.value.title.trim(),
-      category: docForm.value.category,
       description: docForm.value.description.trim() || null,
       fileUrl: docForm.value.fileUrl.trim() || null,
     })
@@ -631,7 +629,7 @@ async function markCompleted() {
             <thead class="bg-gray-50">
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Document Name</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Version</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded By</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
@@ -650,8 +648,8 @@ async function markCompleted() {
                   </div>
                 </td>
                 <td class="px-6 py-4">
-                  <span :class="['px-2 py-1 text-xs font-medium rounded-full', DOCUMENT_CATEGORY_COLORS[documentCategoryLabel(doc.category)]]">
-                    {{ documentCategoryLabel(doc.category) }}
+                  <span :class="['px-2 py-1 text-xs font-medium rounded-full', FILE_TYPE_COLORS[fileTypeLabel(doc.fileType)] || 'bg-gray-100 text-gray-700']">
+                    {{ fileTypeLabel(doc.fileType) }}
                   </span>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600">v{{ doc.version ?? 1 }}</td>
@@ -873,15 +871,6 @@ async function markCompleted() {
               placeholder="e.g. Bottleneck Analysis — Line 3"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <select
-              v-model="docForm.category"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-            >
-              <option v-for="c in docCategories" :key="c" :value="c">{{ documentCategoryLabel(c) }}</option>
-            </select>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">File URL (optional)</label>

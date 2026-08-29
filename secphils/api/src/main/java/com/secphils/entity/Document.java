@@ -7,12 +7,17 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Entity
 @Table(name = "documents")
 @Getter
 @Setter
 public class Document {
+
+    private static final List<String> IMAGE_EXTS = List.of("png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "tiff");
+    private static final List<String> SPREADSHEET_EXTS = List.of("xls", "xlsx", "csv", "ods");
+    private static final List<String> ARCHIVE_EXTS = List.of("zip", "tar", "gz", "tgz", "7z", "rar");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -31,9 +36,6 @@ public class Document {
 
     @Column(columnDefinition = "TEXT")
     private String description;
-
-    @Column(length = 50)
-    private String category = "OTHER";
 
     @Column(name = "file_url", nullable = false, length = 1000)
     private String fileUrl;
@@ -55,6 +57,36 @@ public class Document {
 
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<DocumentComment> comments = new ArrayList<>();
+
+    /**
+     * File format, derived from the stored file name (the s3:// object key keeps the
+     * original name, e.g. {@code .../{uuid}__report.pdf}). One of IMAGE, PDF, WORD,
+     * SPREADSHEET, PRESENTATION, ARCHIVE, OTHER. Metadata-only documents (no file yet)
+     * are OTHER.
+     */
+    public String fileType() {
+        String name = fileName();
+        int dot = name.lastIndexOf('.');
+        if (dot < 0 || dot == name.length() - 1) return "OTHER";
+        String ext = name.substring(dot + 1).toLowerCase(Locale.ROOT);
+        if (IMAGE_EXTS.contains(ext)) return "IMAGE";
+        if (ext.equals("pdf")) return "PDF";
+        if (ext.equals("doc") || ext.equals("docx") || ext.equals("odt") || ext.equals("rtf")) return "WORD";
+        if (SPREADSHEET_EXTS.contains(ext)) return "SPREADSHEET";
+        if (ext.equals("ppt") || ext.equals("pptx") || ext.equals("odp")) return "PRESENTATION";
+        if (ARCHIVE_EXTS.contains(ext)) return "ARCHIVE";
+        return "OTHER";
+    }
+
+    /** Last path segment of the file reference (works for both s3:// and http(s) URLs). */
+    public String fileName() {
+        if (fileUrl == null || fileUrl.isBlank()) return "";
+        String s = fileUrl;
+        int q = s.indexOf('?');
+        if (q >= 0) s = s.substring(0, q);
+        int slash = s.lastIndexOf('/');
+        return slash >= 0 ? s.substring(slash + 1) : s;
+    }
 
     @PrePersist
     void onCreate() {

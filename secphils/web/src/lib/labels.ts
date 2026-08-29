@@ -41,16 +41,29 @@ export const TASK_STATUS_COLORS: Record<string, string> = {
   'Done': 'bg-green-100 text-green-800',
 }
 
-export const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
-  CLIENT_SUBMITTED: 'Client-Submitted',
-  REQUESTED: 'Requested',
-  DELIVERABLE: 'Deliverable',
+export const FILE_TYPE_LABELS: Record<string, string> = {
+  IMAGE: 'Image',
+  PDF: 'PDF',
+  WORD: 'Word',
+  SPREADSHEET: 'Spreadsheet',
+  PRESENTATION: 'Presentation',
+  ARCHIVE: 'Archive',
+  OTHER: 'Other',
 }
 
-export const DOCUMENT_CATEGORY_COLORS: Record<string, string> = {
-  'Client-Submitted': 'bg-green-100 text-green-800',
-  'Requested': 'bg-yellow-100 text-yellow-800',
-  'Deliverable': 'bg-teal-100 text-teal-800',
+export const FILE_TYPE_COLORS: Record<string, string> = {
+  Image: 'bg-teal-100 text-teal-800',
+  PDF: 'bg-red-100 text-red-800',
+  Word: 'bg-blue-100 text-blue-800',
+  Spreadsheet: 'bg-green-100 text-green-800',
+  Presentation: 'bg-orange-100 text-orange-800',
+  Archive: 'bg-purple-100 text-purple-800',
+  Other: 'bg-gray-100 text-gray-700',
+}
+
+export function fileTypeLabel(code: string | null | undefined): string {
+  if (!code) return 'Other'
+  return FILE_TYPE_LABELS[code] || code
 }
 
 export const ANNOUNCEMENT_CATEGORY_LABELS: Record<string, string> = {
@@ -85,11 +98,6 @@ export const REVIEW_STATUS_COLORS: Record<string, string> = {
   'Pending': 'bg-yellow-100 text-yellow-800',
   'Approved': 'bg-green-100 text-green-800',
   'Rejected': 'bg-red-100 text-red-800',
-}
-
-export function documentCategoryLabel(code: string | null | undefined): string {
-  if (!code) return 'Uncategorized'
-  return DOCUMENT_CATEGORY_LABELS[code] || code
 }
 
 export function announcementCategoryLabel(code: string | null | undefined): string {

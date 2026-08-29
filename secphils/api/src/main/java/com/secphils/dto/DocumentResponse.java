@@ -12,7 +12,8 @@ public record DocumentResponse(
         String uploaderName,
         String title,
         String description,
-        String category,
+        String fileType,
+        String fileName,
         String fileUrl,
         Long fileSize,
         Integer version,
@@ -24,7 +25,7 @@ public record DocumentResponse(
                 d.getProject() != null ? d.getProject().getId() : null,
                 d.getUploader() != null ? d.getUploader().getId() : null,
                 DisplayNamePolicy.nameFor(d.getUploader()),
-                d.getTitle(), d.getDescription(), d.getCategory(), d.getFileUrl(),
+                d.getTitle(), d.getDescription(), d.fileType(), d.fileName(), d.getFileUrl(),
                 d.getFileSize(), d.getVersion(), d.getIsLatest(), d.getUploadedAt());
     }
 }
