@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAdminStats, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
+import { formatPhpCompact } from '../../lib/labels'
 
 const authStore = useAuthStore()
 const currentUserId = computed(() => {
@@ -1372,7 +1373,7 @@ const timeOfDay = (ts: string) => {
         </div>
         <div class="bg-white rounded-lg shadow p-6">
           <p class="text-sm text-gray-600">Total Revenue</p>
-          <p class="text-3xl font-bold text-gray-900 mt-2">${{ (dashboardStats.totalRevenue / 1000000).toFixed(1) }}M</p>
+          <p class="text-3xl font-bold text-gray-900 mt-2">{{ formatPhpCompact(dashboardStats.totalRevenue) }}</p>
         </div>
         <div class="bg-white rounded-lg shadow p-6">
           <p class="text-sm text-gray-600">Pending Reviews</p>

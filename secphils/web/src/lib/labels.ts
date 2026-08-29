@@ -122,6 +122,29 @@ export function formatFileSize(bytes: number | null | undefined): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+/**
+ * Format a Philippine Peso (PHP) amount for display, e.g. 2500000 → "₱2,500,000".
+ * en-PH locale keeps digit grouping consistent with PH convention; whole-peso
+ * amounts only (decimals are rounded), which matches project-level contract
+ * values in this portal.
+ */
+export function formatPhp(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return '—'
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency', currency: 'PHP',
+    minimumFractionDigits: 0, maximumFractionDigits: 0,
+  }).format(value)
+}
+
+/** Compact peso for stat cards, e.g. 2500000 → "₱2.5M", 500000 → "₱500.0K". */
+export function formatPhpCompact(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return '—'
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency', currency: 'PHP',
+    notation: 'compact', maximumFractionDigits: 1,
+  }).format(value)
+}
+
 export function projectStatusLabel(code: string | null | undefined): string {
   if (!code) return 'Unknown'
   return PROJECT_STATUS_LABELS[code] || code

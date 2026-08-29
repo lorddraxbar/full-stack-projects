@@ -9,7 +9,7 @@ import {
 import {
   projectStatusLabel, taskStatusLabel, priorityLabel,
   PROJECT_STATUS_COLORS, PRIORITY_COLORS, TASK_STATUS_COLORS,
-  formatDate, formatDateTime,
+  formatDate, formatDateTime, formatPhpCompact,
 } from '@/lib/labels'
 
 const { isClient, isAdmin } = useRole()
@@ -522,7 +522,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm text-gray-600">Contract Value</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">${{ (adminStats.totalRevenue / 1000000).toFixed(1) }}M</p>
+              <p class="text-2xl font-bold text-gray-900 mt-1">{{ formatPhpCompact(adminStats.totalRevenue) }}</p>
             </div>
             <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
               <i class="fas fa-coins text-yellow-600 text-xl"></i>

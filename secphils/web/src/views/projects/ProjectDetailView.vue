@@ -13,7 +13,7 @@ import {
 import {
   projectStatusLabel, fileTypeLabel,
   PROJECT_STATUS_COLORS, FILE_TYPE_COLORS,
-  formatDate, formatDateTime,
+  formatDate, formatDateTime, formatPhp,
 } from '@/lib/labels'
 
 const { isClient, isAdmin } = useRole()
@@ -345,7 +345,7 @@ async function markCompleted() {
         </div>
 
         <div class="flex items-center gap-6 text-sm text-gray-600" v-if="!isClient && project.totalCost != null">
-          <i class="fas fa-coins mr-1"></i>Contract: ${{ Number(project.totalCost).toLocaleString() }}
+          <i class="fas fa-coins mr-1"></i>Contract: {{ formatPhp(project.totalCost) }}
         </div>
 
         <div class="mt-4 w-full bg-gray-200 rounded-full h-2">
@@ -460,7 +460,7 @@ async function markCompleted() {
           <!-- Total project cost -->
           <div v-if="!isClient && project.totalCost != null" class="bg-white rounded-lg shadow p-6">
             <h2 class="text-sm font-medium text-gray-500 uppercase mb-1">Total Project Cost</h2>
-            <p class="text-2xl font-bold text-gray-900">₱{{ Number(project.totalCost).toLocaleString() }}</p>
+            <p class="text-2xl font-bold text-gray-900">{{ formatPhp(project.totalCost) }}</p>
           </div>
 
           <!-- Raw materials -->
