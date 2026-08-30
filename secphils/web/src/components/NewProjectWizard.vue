@@ -55,7 +55,7 @@ export interface WizardData {
     rawMaterials: { name: string; quantity: number | null; unit: string | null; period: 'MONTHLY' | 'YEARLY' }[] | null
     productionOutput: { name: string; quantity: number | null; unit: string | null; period: 'MONTHLY' | 'YEARLY'; pricePerUnit: number | null }[] | null
     wasteManagement: string
-    wasteMaterials: { type: string; recyclable: boolean; monthlyTons: number | null }[] | null
+    wasteMaterials: { type: string; quantity: number | null; unit: string | null; period: 'MONTHLY' | 'YEARLY'; recyclable: boolean }[] | null
     manufacturingProcedure: string
     /** Flowchart file (PDF/PNG/JPG/SVG) to attach as a project document; optional. */
     flowchart: File | null
@@ -136,7 +136,7 @@ const productionForm = ref({
   rawMaterials: [] as { name: string; quantity: string; unit: string; period: 'MONTHLY' | 'YEARLY' }[],
   productionOutput: [] as { name: string; quantity: string; unit: string; period: 'MONTHLY' | 'YEARLY'; pricePerUnit: string }[],
   wasteManagement: '',
-  wasteMaterials: [] as { type: string; recyclable: boolean; monthlyTons: string }[],
+  wasteMaterials: [] as { type: string; quantity: string; unit: string; period: 'MONTHLY' | 'YEARLY'; recyclable: boolean }[],
   manufacturingProcedure: '',
   flowchart: null as File | null,
 })
@@ -147,7 +147,7 @@ function addRow(kind: 'rawMaterials' | 'productionOutput' | 'wasteMaterials') {
   } else if (kind === 'productionOutput') {
     productionForm.value.productionOutput.push({ name: '', quantity: '', unit: '', period: 'MONTHLY', pricePerUnit: '' })
   } else {
-    productionForm.value.wasteMaterials.push({ type: '', recyclable: true, monthlyTons: '' })
+    productionForm.value.wasteMaterials.push({ type: '', quantity: '', unit: '', period: 'MONTHLY', recyclable: true })
   }
 }
 
@@ -542,8 +542,10 @@ const handleSubmit = () => {
             .filter(r => r.type.trim())
             .map(r => ({
               type: r.type.trim(),
+              quantity: numOrNull(r.quantity),
+              unit: r.unit.trim() || null,
+              period: r.period,
               recyclable: r.recyclable,
-              monthlyTons: numOrNull(r.monthlyTons),
             }))
         : null,
       manufacturingProcedure: productionForm.value.manufacturingProcedure.trim(),
@@ -1015,33 +1017,44 @@ const handleClose = () => {
 
           <!-- Waste management -->
           <Card>
-            <CardHeader class="flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle class="text-base">Waste Management</CardTitle>
-                <CardDescription>How wastes are managed and how much is generated per month</CardDescription>
-              </div>
-              <Button type="button" variant="outline" size="sm" @click="addRow('wasteMaterials')">+ Add waste type</Button>
+            <CardHeader>
+              <CardTitle class="text-base">Waste Management</CardTitle>
             </CardHeader>
             <CardContent class="space-y-3">
               <div class="space-y-2">
                 <Label for="wasteManagement">Waste management practices</Label>
-                <Textarea id="wasteManagement" v-model="productionForm.wasteManagement" rows="3" placeholder="Recyclable materials: describe processes and quantities. Non-recyclable: describe disposal methods and quantities..." />
+                <Textarea id="wasteManagement" v-model="productionForm.wasteManagement" rows="3" placeholder="How do you manage your wastes (recyclable and non-recyclable)?" />
               </div>
               <div class="space-y-2">
-                <Label>Waste materials per month (tons)</Label>
+                <Label>Waste Types</Label>
+                <Button type="button" variant="outline" size="sm" @click="addRow('wasteMaterials')">+ Add waste type</Button>
                 <p v-if="productionForm.wasteMaterials.length === 0" class="text-sm text-muted-foreground">No waste types added yet.</p>
                 <div v-for="(row, i) in productionForm.wasteMaterials" :key="'waste-' + i" class="flex flex-wrap items-end gap-2">
                   <div class="flex-1 min-w-40 space-y-1">
                     <Label>Type</Label>
                     <Input v-model="row.type" placeholder="e.g. Non-recyclable film scraps" />
                   </div>
-                  <div class="w-36 space-y-1">
-                    <Label>Monthly (tons)</Label>
-                    <Input v-model="row.monthlyTons" type="number" min="0" step="any" placeholder="0" />
+                  <div class="w-28 space-y-1">
+                    <Label>Quantity</Label>
+                    <Input v-model="row.quantity" type="number" min="0" step="any" placeholder="0" />
+                  </div>
+                  <div class="w-28 space-y-1">
+                    <Label>Unit</Label>
+                    <Input v-model="row.unit" placeholder="e.g. Tons, kg" />
+                  </div>
+                  <div class="w-28 space-y-1">
+                    <Label>Period</Label>
+                    <Select :model-value="row.period" @update:model-value="(v) => (row.period = v as 'MONTHLY' | 'YEARLY')">
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MONTHLY">Per month</SelectItem>
+                        <SelectItem value="YEARLY">Per year</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div class="flex items-center gap-2 pb-1.5">
-                    <Checkbox id="recyclable" :model-value="row.recyclable" @update:model-value="(v: unknown) => (row.recyclable = v === true)" />
-                    <Label for="recyclable" class="text-sm font-normal">Recyclable</Label>
+                    <Checkbox :id="'recyclable-' + i" :model-value="row.recyclable" @update:model-value="(v: unknown) => (row.recyclable = v === true)" />
+                    <Label :for="'recyclable-' + i" class="text-sm font-normal">Recyclable</Label>
                   </div>
                   <Button type="button" variant="ghost" size="icon" class="text-muted-foreground hover:text-red-600" @click="removeRow('wasteMaterials', i)">
                     <Trash2 class="h-4 w-4" />

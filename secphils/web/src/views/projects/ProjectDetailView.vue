@@ -524,14 +524,18 @@ async function markCompleted() {
                 <thead class="bg-gray-50">
                   <tr>
                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Waste Type</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Monthly (tons)</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recyclable</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                   <tr v-for="(w, i) in wasteMaterials" :key="'waste-' + i">
                     <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ w.type }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ w.monthlyTons ?? '—' }} tons</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ w.quantity ?? '—' }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ w.unit || '—' }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ w.period === 'YEARLY' ? 'Per year' : 'Per month' }}</td>
                     <td class="px-4 py-3 text-sm text-gray-700">
                       <span v-if="w.recyclable" class="text-emerald-600"><i class="fas fa-check mr-1" />Recyclable</span>
                       <span v-else class="text-gray-500">Non-recyclable</span>
