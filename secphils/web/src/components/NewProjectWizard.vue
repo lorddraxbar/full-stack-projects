@@ -472,8 +472,11 @@ function validateProduction(): string | null {
   return null
 }
 
-const handleSubmit = () => {
-  const err = isProductionStep.value ? validateProduction() : validateProject()
+const handleSubmit = (skipCost = false) => {
+  // A normal submit still requires the total cost; the "Skip and Submit Wizard"
+  // button (skipCost=true) bypasses that gate so the project can be created
+  // without one (it is stored as null).
+  const err = isProductionStep.value ? (skipCost ? null : validateProduction()) : validateProject()
   if (err) {
     loadError.value = err
     return
@@ -514,7 +517,10 @@ const handleSubmit = () => {
       // the company address is used.
       address: projectForm.value.addressDiffers ? projectForm.value.address.trim() : null,
       addressDiffers: projectForm.value.addressDiffers,
-      totalCost: Number(productionForm.value.totalCost),
+      // Total project cost (₱). Optional: "Skip and Submit Wizard" stores null;
+      // a normal submit only reaches here after validateProduction() confirms a
+      // non-empty value, so Number() is safe on that path.
+      totalCost: skipCost ? null : Number(productionForm.value.totalCost),
       rawMaterials: countRows('rawMaterials').length
         ? productionForm.value.rawMaterials
             .filter(r => r.name.trim())
@@ -923,7 +929,7 @@ const handleClose = () => {
             </CardHeader>
             <CardContent>
               <div class="space-y-2">
-                <Label for="totalCost">Total Project Cost (₱) *</Label>
+                <Label for="totalCost">Total Project Cost (₱)</Label>
                 <Input id="totalCost" v-model="productionForm.totalCost" type="number" min="0" step="any" placeholder="e.g. 2500000" />
               </div>
             </CardContent>
@@ -1073,10 +1079,10 @@ const handleClose = () => {
             <CardContent class="space-y-3">
               <div class="space-y-2">
                 <Label for="manufacturingProcedure">Manufacturing procedure</Label>
-                <Textarea id="manufacturingProcedure" v-model="productionForm.manufacturingProcedure" rows="4" placeholder="Describe each production stage — processing methods, equipment used, quality control measures..." />
+                <Textarea id="manufacturingProcedure" v-model="productionForm.manufacturingProcedure" rows="4" placeholder="How do you manufacture your products/output?" />
               </div>
               <div class="space-y-2">
-                <Label>Production flowchart (PDF, PNG, JPG, SVG)</Label>
+                <Label>or Production flowchart (PDF, PNG, JPG, SVG)</Label>
                 <input type="file" accept=".pdf,.png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml,application/pdf" @change="onFlowchartFile" class="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-sm file:font-medium" />
                 <p v-if="productionForm.flowchart" class="text-sm text-muted-foreground">
                   Selected: <strong>{{ productionForm.flowchart.name }}</strong> — it will be attached as a project document after creation.
@@ -1091,10 +1097,11 @@ const handleClose = () => {
 
       <!-- Footer with navigation. At ALL sizes the buttons share a single
            horizontal row; on mobile each is flex-1 so Cancel / Previous /
-           Next split the width evenly (1/3 each), and on desktop the group is
-           right-aligned with Cancel on the left. The nav group is
-           `display:contents` on mobile so its buttons join the footer's flex
-           row directly, while staying a flex group on desktop. -->
+           (Next | Skip-and-Submit + Submit) split the width evenly, and on
+           desktop the group is right-aligned with Cancel on the left. The nav
+           group is `display:contents` on mobile so its buttons join the
+           footer's flex row directly, while staying a flex group on desktop.
+           On the final step the group is Previous / Skip-and-Submit / Submit. -->
       <DialogFooter class="flex flex-row gap-2 sm:justify-between">
         <Button
           variant="outline"
@@ -1124,8 +1131,17 @@ const handleClose = () => {
 
           <Button
             v-if="currentStep === totalSteps - 1"
+            variant="outline"
             class="flex-1 sm:flex-none whitespace-normal"
-            @click="handleSubmit"
+            @click="handleSubmit(true)"
+          >
+            Skip and Submit Wizard
+          </Button>
+
+          <Button
+            v-if="currentStep === totalSteps - 1"
+            class="flex-1 sm:flex-none whitespace-normal"
+            @click="handleSubmit(false)"
           >
             Submit Wizard
           </Button>
