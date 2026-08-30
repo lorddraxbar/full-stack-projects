@@ -53,7 +53,7 @@ export interface WizardData {
     /** Total project cost in PHP (estimated or actual) — required. */
     totalCost: number | null
     rawMaterials: { name: string; quantity: number | null; unit: string | null; period: 'MONTHLY' | 'YEARLY' }[] | null
-    productionOutput: { name: string; monthlyTons: number | null; annualTons: number | null }[] | null
+    productionOutput: { name: string; monthlyTons: number | null; annualTons: number | null; unit: string | null }[] | null
     wasteManagement: string
     wasteMaterials: { type: string; recyclable: boolean; monthlyTons: number | null }[] | null
     manufacturingProcedure: string
@@ -134,7 +134,7 @@ const projectForm = ref({
 const productionForm = ref({
   totalCost: '',
   rawMaterials: [] as { name: string; quantity: string; unit: string; period: 'MONTHLY' | 'YEARLY' }[],
-  productionOutput: [] as { name: string; monthlyTons: string; annualTons: string }[],
+  productionOutput: [] as { name: string; monthlyTons: string; annualTons: string; unit: string }[],
   wasteManagement: '',
   wasteMaterials: [] as { type: string; recyclable: boolean; monthlyTons: string }[],
   manufacturingProcedure: '',
@@ -145,7 +145,7 @@ function addRow(kind: 'rawMaterials' | 'productionOutput' | 'wasteMaterials') {
   if (kind === 'rawMaterials') {
     productionForm.value.rawMaterials.push({ name: '', quantity: '', unit: '', period: 'MONTHLY' })
   } else if (kind === 'productionOutput') {
-    productionForm.value.productionOutput.push({ name: '', monthlyTons: '', annualTons: '' })
+    productionForm.value.productionOutput.push({ name: '', monthlyTons: '', annualTons: '', unit: '' })
   } else {
     productionForm.value.wasteMaterials.push({ type: '', recyclable: true, monthlyTons: '' })
   }
@@ -532,6 +532,7 @@ const handleSubmit = () => {
               name: r.name.trim(),
               monthlyTons: numOrNull(r.monthlyTons),
               annualTons: numOrNull(r.annualTons),
+              unit: r.unit.trim() || null,
             }))
         : null,
       wasteManagement: productionForm.value.wasteManagement.trim(),
@@ -971,7 +972,7 @@ const handleClose = () => {
             <CardHeader class="flex-row items-center justify-between space-y-0">
               <div>
                 <CardTitle class="text-base">Production Output</CardTitle>
-                <CardDescription>Finished products with annual volume in tons</CardDescription>
+                <CardDescription>Finished products with monthly and annual volume</CardDescription>
               </div>
               <Button type="button" variant="outline" size="sm" @click="addRow('productionOutput')">+ Add product</Button>
             </CardHeader>
@@ -983,12 +984,16 @@ const handleClose = () => {
                   <Input v-model="row.name" placeholder="e.g. HDPE bags, 300mm" />
                 </div>
                 <div class="w-32 space-y-1">
-                  <Label>Monthly (tons)</Label>
+                  <Label>Monthly</Label>
                   <Input v-model="row.monthlyTons" type="number" min="0" step="any" placeholder="0" />
                 </div>
                 <div class="w-32 space-y-1">
-                  <Label>Annual (tons)</Label>
+                  <Label>Annual</Label>
                   <Input v-model="row.annualTons" type="number" min="0" step="any" placeholder="0" />
+                </div>
+                <div class="w-28 space-y-1">
+                  <Label>Unit</Label>
+                  <Input v-model="row.unit" placeholder="e.g. Tons, Rolls" />
                 </div>
                 <Button type="button" variant="ghost" size="icon" class="text-muted-foreground hover:text-red-600" @click="removeRow('productionOutput', i)">
                   <Trash2 class="h-4 w-4" />

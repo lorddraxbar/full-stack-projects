@@ -490,7 +490,7 @@ async function markCompleted() {
 
           <!-- Production output -->
           <div v-if="productionOutput && productionOutput.length" class="bg-white rounded-lg shadow p-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Production Output (tons)</h2>
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Production Output</h2>
             <div class="overflow-x-auto">
               <table class="w-full">
                 <thead class="bg-gray-50">
@@ -498,13 +498,15 @@ async function markCompleted() {
                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Per Month</th>
                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Per Year</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                   <tr v-for="(o, i) in productionOutput" :key="'out-' + i">
                     <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ o.name }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.monthlyTons ?? '—' }} tons</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.annualTons ?? '—' }} tons</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.monthlyTons ?? '—' }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.annualTons ?? '—' }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.unit || 'tons' }}</td>
                   </tr>
                 </tbody>
               </table>
