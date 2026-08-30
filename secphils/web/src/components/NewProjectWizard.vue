@@ -473,7 +473,7 @@ function validateProduction(): string | null {
 }
 
 const handleSubmit = (skipCost = false) => {
-  // A normal submit still requires the total cost; the "Skip and Submit Wizard"
+  // A normal submit still requires the total cost; the "Skip and Submit"
   // button (skipCost=true) bypasses that gate so the project can be created
   // without one (it is stored as null).
   const err = isProductionStep.value ? (skipCost ? null : validateProduction()) : validateProject()
@@ -916,10 +916,6 @@ const handleClose = () => {
         <!-- Production Details (wizard's last step for both scenarios) -->
         <div v-if="isProductionStep" class="space-y-4">
           <h3 class="text-lg font-semibold">Production Details</h3>
-          <p class="text-sm text-muted-foreground -mt-2">
-            Total project cost is required; the rest of the checklist is optional and can be
-            completed later from the project's detail page.
-          </p>
 
           <!-- Project & production -->
           <Card>
@@ -1135,7 +1131,7 @@ const handleClose = () => {
             class="flex-1 sm:flex-none whitespace-normal"
             @click="handleSubmit(true)"
           >
-            Skip and Submit Wizard
+            Skip and Submit
           </Button>
 
           <Button
@@ -1143,7 +1139,7 @@ const handleClose = () => {
             class="flex-1 sm:flex-none whitespace-normal"
             @click="handleSubmit(false)"
           >
-            Submit Wizard
+            Submit
           </Button>
         </div>
       </DialogFooter>

@@ -100,6 +100,13 @@ async function load() {
     if (project.value?.companyId) {
       company.value = await useGetCompany(project.value.companyId).catch(() => null)
     }
+
+    // Deep-link: /projects/{id}?edit=1 opens the Production tab in edit mode
+    // straight away (used by the "edit these details" affordances).
+    if (route.query.edit) {
+      activeTab.value = 'Production'
+      startProductionEdit()
+    }
   } catch (err: any) {
     loadError.value = err?.response?.data?.message || err?.message || 'Failed to load project'
   } finally {
@@ -311,6 +318,110 @@ async function markCompleted() {
     completing.value = false
   }
 }
+
+// ---------- Production details editor ----------
+// The Production tab is read-only by default. Provider staff (admin/user) can
+// flip into edit mode to update the checklist the wizard captured: total cost,
+// waste management + waste types, raw materials, production output, and the
+// manufacturing procedure. One useUpdateProject PUT saves it all — the backend
+// ProjectController.apply() applies these fields unconditionally (null clears a
+// field), so clearing works too. The flowchart is a project Document, not part
+// of this payload, so it is left untouched.
+const editingProduction = ref(false)
+const producingEdit = ref(false)
+const productionError = ref('')
+const productionEdit = ref({
+  totalCost: '' as string,
+  wasteManagement: '',
+  rawMaterials: [] as { name: string; quantity: string; unit: string; period: 'MONTHLY' | 'YEARLY' }[],
+  productionOutput: [] as { name: string; quantity: string; unit: string; period: 'MONTHLY' | 'YEARLY'; pricePerUnit: string }[],
+  wasteMaterials: [] as { type: string; quantity: string; unit: string; period: 'MONTHLY' | 'YEARLY'; recyclable: boolean }[],
+  manufacturingProcedure: '',
+})
+
+// '' for null/0-free numbers; never .trim() a number input (Vue stores a
+// number with .number, but the editor inputs are plain v-model strings).
+function toStr(n: number | null | undefined): string {
+  return n == null ? '' : String(n)
+}
+function numOrNull(s: string): number | null {
+  if (s == null || s === '') return null
+  const n = Number(s)
+  return Number.isFinite(n) ? n : null
+}
+
+function initProductionEdit() {
+  const p = project.value
+  if (!p) return
+  productionEdit.value = {
+    totalCost: toStr(p.totalCost),
+    wasteManagement: p.wasteManagement || '',
+    rawMaterials: (rawMaterials.value || []).map(m => ({
+      name: m.name ?? '', quantity: toStr(m.quantity), unit: m.unit ?? '', period: (m.period as 'MONTHLY' | 'YEARLY') || 'MONTHLY',
+    })),
+    productionOutput: (productionOutput.value || []).map(o => ({
+      name: o.name ?? '', quantity: toStr(o.quantity), unit: o.unit ?? '', period: (o.period as 'MONTHLY' | 'YEARLY') || 'MONTHLY', pricePerUnit: toStr(o.pricePerUnit),
+    })),
+    wasteMaterials: (wasteMaterials.value || []).map(w => ({
+      type: w.type ?? '', quantity: toStr(w.quantity), unit: w.unit ?? '', period: (w.period as 'MONTHLY' | 'YEARLY') || 'MONTHLY', recyclable: !!w.recyclable,
+    })),
+    manufacturingProcedure: p.manufacturingProcedure || '',
+  }
+}
+
+function startProductionEdit() {
+  initProductionEdit()
+  productionError.value = ''
+  editingProduction.value = true
+}
+function cancelProductionEdit() {
+  editingProduction.value = false
+}
+
+function addEditRow(kind: 'rawMaterials' | 'productionOutput' | 'wasteMaterials') {
+  if (kind === 'rawMaterials') productionEdit.value.rawMaterials.push({ name: '', quantity: '', unit: '', period: 'MONTHLY' })
+  else if (kind === 'productionOutput') productionEdit.value.productionOutput.push({ name: '', quantity: '', unit: '', period: 'MONTHLY', pricePerUnit: '' })
+  else productionEdit.value.wasteMaterials.push({ type: '', quantity: '', unit: '', period: 'MONTHLY', recyclable: true })
+}
+function removeEditRow(kind: 'rawMaterials' | 'productionOutput' | 'wasteMaterials', i: number) {
+  productionEdit.value[kind].splice(i, 1)
+}
+
+async function saveProductionEdit() {
+  if (!project.value) return
+  producingEdit.value = true
+  productionError.value = ''
+  const e = productionEdit.value
+  const json = (a: any[]) => (a.length ? JSON.stringify(a) : null)
+  try {
+    const updated = await useUpdateProject(projectId.value, {
+      // Non-production fields pass through unchanged.
+      companyId: project.value.companyId,
+      serviceId: project.value.serviceId ?? null,
+      name: project.value.name,
+      notes: project.value.notes ?? null,
+      objectives: project.value.objectives ?? null,
+      deliverables: project.value.deliverables ?? null,
+      address: project.value.address ?? null,
+      status: project.value.status,
+      // Production checklist fields (edit mode) — blank clears the field.
+      totalCost: e.totalCost === '' ? null : Number(e.totalCost),
+      rawMaterials: json(e.rawMaterials.filter(r => r.name.trim()).map(r => ({ name: r.name.trim(), quantity: numOrNull(r.quantity), unit: r.unit.trim() || null, period: r.period }))),
+      productionOutput: json(e.productionOutput.filter(r => r.name.trim()).map(r => ({ name: r.name.trim(), quantity: numOrNull(r.quantity), unit: r.unit.trim() || null, period: r.period, pricePerUnit: numOrNull(r.pricePerUnit) }))),
+      wasteManagement: e.wasteManagement.trim() || null,
+      wasteMaterials: json(e.wasteMaterials.filter(r => r.type.trim()).map(r => ({ type: r.type.trim(), quantity: numOrNull(r.quantity), unit: r.unit.trim() || null, period: r.period, recyclable: r.recyclable }))),
+      manufacturingProcedure: e.manufacturingProcedure.trim() || null,
+      productionFlowchartUrl: project.value.productionFlowchartUrl ?? null,
+      progress: project.value.progress ?? 0,
+    })
+    project.value = updated
+    editingProduction.value = false
+  } catch (err: any) {
+    productionError.value = err?.response?.data?.message || 'Failed to save production details'
+  } finally {
+    producingEdit.value = false
+  }
+}
 </script>
 
 <template>
@@ -449,121 +560,243 @@ async function markCompleted() {
 
       <!-- ================= PRODUCTION (wizard checklist) ================= -->
       <div v-if="activeTab === 'Production'" class="space-y-6">
-        <div v-if="!hasProductionData" class="bg-white rounded-lg shadow p-6">
+        <!-- Header + Edit toggle (staff only; clients are read-only) -->
+        <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold text-gray-900">Production Details</h2>
-          <p class="text-sm text-gray-500 mt-2">
-            No production details captured for this project yet — they can be completed later from this page.
-          </p>
+          <button
+            v-if="!isClient && !editingProduction"
+            @click="startProductionEdit"
+            class="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <i class="fas fa-pencil" /> Edit
+          </button>
         </div>
 
+        <!-- READ-ONLY mode -->
+        <div v-if="!editingProduction">
+          <div v-if="!hasProductionData" class="bg-white rounded-lg shadow p-6">
+            <p class="text-sm text-gray-500">
+              No production details captured for this project yet — they can be completed later from this page.
+            </p>
+            <p v-if="!isClient" class="text-sm text-gray-500 mt-2">
+              <i class="fas fa-lightbulb mr-1" />Use the Edit button to fill them in.
+            </p>
+          </div>
+
+          <div v-else class="space-y-6">
+            <!-- Total project cost -->
+            <div v-if="!isClient && project.totalCost != null" class="bg-white rounded-lg shadow p-6">
+              <h2 class="text-sm font-medium text-gray-500 uppercase mb-1">Total Project Cost</h2>
+              <p class="text-2xl font-bold text-gray-900">{{ formatPhp(project.totalCost) }}</p>
+            </div>
+
+            <!-- Raw materials -->
+            <div v-if="rawMaterials && rawMaterials.length" class="bg-white rounded-lg shadow p-6">
+              <h2 class="text-lg font-semibold text-gray-900 mb-4">Raw Materials</h2>
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-200">
+                    <tr v-for="(m, i) in rawMaterials" :key="'raw-' + i">
+                      <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ m.name }}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700">{{ m.quantity ?? '—' }}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700">{{ m.unit || 'tons' }}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700">{{ m.period === 'YEARLY' ? 'Per year' : 'Per month' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Production output -->
+            <div v-if="productionOutput && productionOutput.length" class="bg-white rounded-lg shadow p-6">
+              <h2 class="text-lg font-semibold text-gray-900 mb-4">Production Output</h2>
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Price / Unit</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-200">
+                    <tr v-for="(o, i) in productionOutput" :key="'out-' + i">
+                      <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ o.name }}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700">{{ o.quantity ?? '—' }}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700">{{ o.unit || '—' }}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700">{{ o.period === 'YEARLY' ? 'Per year' : 'Per month' }}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700">{{ formatPhp(o.pricePerUnit) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Waste management -->
+            <div v-if="project.wasteManagement || (wasteMaterials && wasteMaterials.length)" class="bg-white rounded-lg shadow p-6">
+              <h2 class="text-lg font-semibold text-gray-900 mb-4">Waste Management</h2>
+              <p v-if="project.wasteManagement" class="text-gray-700 whitespace-pre-line">{{ project.wasteManagement }}</p>
+              <div v-if="wasteMaterials && wasteMaterials.length" class="overflow-x-auto mt-4">
+                <table class="w-full">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Waste Type</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recyclable</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-200">
+                    <tr v-for="(w, i) in wasteMaterials" :key="'waste-' + i">
+                      <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ w.type }}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700">{{ w.quantity ?? '—' }}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700">{{ w.unit || '—' }}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700">{{ w.period === 'YEARLY' ? 'Per year' : 'Per month' }}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700">
+                        <span v-if="w.recyclable" class="text-emerald-600"><i class="fas fa-check mr-1" />Recyclable</span>
+                        <span v-else class="text-gray-500">Non-recyclable</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Manufacturing process -->
+            <div v-if="project.manufacturingProcedure || project.productionFlowchartUrl" class="bg-white rounded-lg shadow p-6">
+              <h2 class="text-lg font-semibold text-gray-900 mb-4">Manufacturing Process</h2>
+              <div v-if="project.manufacturingProcedure" class="space-y-4">
+                <h3 class="text-sm font-medium text-gray-500 uppercase mb-1">Procedure</h3>
+                <p class="text-gray-700 whitespace-pre-line">{{ project.manufacturingProcedure }}</p>
+              </div>
+              <div v-if="project.productionFlowchartUrl" class="mt-4">
+                <h3 class="text-sm font-medium text-gray-500 uppercase mb-1">Production Flowchart</h3>
+                <a
+                  :href="project.productionFlowchartUrl"
+                  target="_blank"
+                  rel="noopener"
+                  class="inline-flex items-center gap-2 text-emerald-600 hover:underline"
+                >
+                  <i class="fas fa-diagram-project" /> View production flowchart
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EDIT mode -->
         <div v-else class="space-y-6">
+          <p v-if="productionError" class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{{ productionError }}</p>
+
           <!-- Total project cost -->
-          <div v-if="!isClient && project.totalCost != null" class="bg-white rounded-lg shadow p-6">
-            <h2 class="text-sm font-medium text-gray-500 uppercase mb-1">Total Project Cost</h2>
-            <p class="text-2xl font-bold text-gray-900">{{ formatPhp(project.totalCost) }}</p>
+          <div class="bg-white rounded-lg shadow p-6">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Total Project Cost (₱)</label>
+            <input
+              v-model="productionEdit.totalCost"
+              type="number" min="0" step="any"
+              placeholder="Optional — leave blank if not known yet"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            />
           </div>
 
           <!-- Raw materials -->
-          <div v-if="rawMaterials && rawMaterials.length" class="bg-white rounded-lg shadow p-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Raw Materials</h2>
-            <div class="overflow-x-auto">
-              <table class="w-full">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                  <tr v-for="(m, i) in rawMaterials" :key="'raw-' + i">
-                    <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ m.name }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ m.quantity ?? '—' }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ m.unit || 'tons' }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ m.period === 'YEARLY' ? 'Per year' : 'Per month' }}</td>
-                  </tr>
-                </tbody>
-              </table>
+          <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-lg font-semibold text-gray-900">Raw Materials</h2>
+              <button @click="addEditRow('rawMaterials')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add material</button>
+            </div>
+            <p v-if="!productionEdit.rawMaterials.length" class="text-sm text-gray-500">No raw materials — add one above.</p>
+            <div v-for="(m, i) in productionEdit.rawMaterials" :key="'eraw-' + i" class="grid grid-cols-12 gap-2 mb-2">
+              <input v-model="m.name" placeholder="Material" class="col-span-5 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+              <input v-model="m.quantity" type="number" min="0" step="any" placeholder="Qty" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+              <input v-model="m.unit" placeholder="Unit" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+              <select v-model="m.period" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                <option value="MONTHLY">Per month</option><option value="YEARLY">Per year</option>
+              </select>
+              <button @click="removeEditRow('rawMaterials', i)" class="col-span-1 justify-self-end text-red-500 hover:text-red-700" title="Remove"><i class="fas fa-trash" /></button>
             </div>
           </div>
 
           <!-- Production output -->
-          <div v-if="productionOutput && productionOutput.length" class="bg-white rounded-lg shadow p-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Production Output</h2>
-            <div class="overflow-x-auto">
-              <table class="w-full">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Price / Unit</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                  <tr v-for="(o, i) in productionOutput" :key="'out-' + i">
-                    <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ o.name }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.quantity ?? '—' }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.unit || '—' }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.period === 'YEARLY' ? 'Per year' : 'Per month' }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ formatPhp(o.pricePerUnit) }}</td>
-                  </tr>
-                </tbody>
-              </table>
+          <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-lg font-semibold text-gray-900">Production Output</h2>
+              <button @click="addEditRow('productionOutput')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add product</button>
+            </div>
+            <p v-if="!productionEdit.productionOutput.length" class="text-sm text-gray-500">No products — add one above.</p>
+            <div v-for="(o, i) in productionEdit.productionOutput" :key="'eout-' + i" class="grid grid-cols-12 gap-2 mb-2">
+              <input v-model="o.name" placeholder="Product" class="col-span-3 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+              <input v-model="o.quantity" type="number" min="0" step="any" placeholder="Qty" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+              <input v-model="o.unit" placeholder="Unit" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+              <select v-model="o.period" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                <option value="MONTHLY">Per month</option><option value="YEARLY">Per year</option>
+              </select>
+              <input v-model="o.pricePerUnit" type="number" min="0" step="any" placeholder="Price/Unit (₱)" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+              <button @click="removeEditRow('productionOutput', i)" class="col-span-1 justify-self-end text-red-500 hover:text-red-700" title="Remove"><i class="fas fa-trash" /></button>
             </div>
           </div>
 
           <!-- Waste management -->
-          <div v-if="project.wasteManagement || (wasteMaterials && wasteMaterials.length)" class="bg-white rounded-lg shadow p-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Waste Management</h2>
-            <p v-if="project.wasteManagement" class="text-gray-700 whitespace-pre-line">{{ project.wasteManagement }}</p>
-            <div v-if="wasteMaterials && wasteMaterials.length" class="overflow-x-auto mt-4">
-              <table class="w-full">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Waste Type</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recyclable</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                  <tr v-for="(w, i) in wasteMaterials" :key="'waste-' + i">
-                    <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ w.type }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ w.quantity ?? '—' }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ w.unit || '—' }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ w.period === 'YEARLY' ? 'Per year' : 'Per month' }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">
-                      <span v-if="w.recyclable" class="text-emerald-600"><i class="fas fa-check mr-1" />Recyclable</span>
-                      <span v-else class="text-gray-500">Non-recyclable</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+          <div class="bg-white rounded-lg shadow p-6 space-y-5">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Waste Management Practices</label>
+              <textarea
+                v-model="productionEdit.wasteManagement"
+                rows="3"
+                placeholder="How do you manage your wastes (recyclable and non-recyclable)?"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+              ></textarea>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-medium text-gray-700">Waste Types</h3>
+                <button @click="addEditRow('wasteMaterials')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add waste type</button>
+              </div>
+              <p v-if="!productionEdit.wasteMaterials.length" class="text-sm text-gray-500">No waste types — add one above.</p>
+              <div v-for="(w, i) in productionEdit.wasteMaterials" :key="'ewaste-' + i" class="grid grid-cols-12 gap-2 mb-2 items-center">
+                <input v-model="w.type" placeholder="Waste type" class="col-span-4 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                <input v-model="w.quantity" type="number" min="0" step="any" placeholder="Qty" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                <input v-model="w.unit" placeholder="Unit" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                <select v-model="w.period" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                  <option value="MONTHLY">Per month</option><option value="YEARLY">Per year</option>
+                </select>
+                <div class="col-span-2 flex items-center justify-between">
+                  <label class="flex items-center gap-1 text-sm text-gray-700"><input type="checkbox" v-model="w.recyclable" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Recyclable</label>
+                  <button @click="removeEditRow('wasteMaterials', i)" class="text-red-500 hover:text-red-700" title="Remove"><i class="fas fa-trash" /></button>
+                </div>
+              </div>
             </div>
           </div>
 
           <!-- Manufacturing process -->
-          <div v-if="project.manufacturingProcedure || project.productionFlowchartUrl" class="bg-white rounded-lg shadow p-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Manufacturing Process</h2>
-            <div v-if="project.manufacturingProcedure" class="space-y-4">
-              <h3 class="text-sm font-medium text-gray-500 uppercase mb-1">Procedure</h3>
-              <p class="text-gray-700 whitespace-pre-line">{{ project.manufacturingProcedure }}</p>
-            </div>
-            <div v-if="project.productionFlowchartUrl" class="mt-4">
-              <h3 class="text-sm font-medium text-gray-500 uppercase mb-1">Production Flowchart</h3>
-              <a
-                :href="project.productionFlowchartUrl"
-                target="_blank"
-                rel="noopener"
-                class="inline-flex items-center gap-2 text-emerald-600 hover:underline"
-              >
-                <i class="fas fa-diagram-project" /> View production flowchart
-              </a>
-            </div>
+          <div class="bg-white rounded-lg shadow p-6">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Manufacturing Procedure</label>
+            <textarea
+              v-model="productionEdit.manufacturingProcedure"
+              rows="4"
+              placeholder="How do you manufacture your products/output?"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            ></textarea>
+            <p class="text-xs text-gray-500 mt-2">The production flowchart is a project document — add or replace it from the Documents tab.</p>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex justify-end gap-3">
+            <button @click="cancelProductionEdit" class="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">Cancel</button>
+            <button @click="saveProductionEdit" :disabled="producingEdit" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50">
+              {{ producingEdit ? 'Saving…' : 'Save Production Details' }}
+            </button>
           </div>
         </div>
       </div>
