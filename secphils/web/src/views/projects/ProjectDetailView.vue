@@ -496,17 +496,19 @@ async function markCompleted() {
                 <thead class="bg-gray-50">
                   <tr>
                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Per Month</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Per Year</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Price / Unit</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                   <tr v-for="(o, i) in productionOutput" :key="'out-' + i">
                     <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ o.name }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.monthlyTons ?? '—' }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.annualTons ?? '—' }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.unit || 'tons' }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.quantity ?? '—' }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.unit || '—' }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ o.period === 'YEARLY' ? 'Per year' : 'Per month' }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ formatPhp(o.pricePerUnit) }}</td>
                   </tr>
                 </tbody>
               </table>

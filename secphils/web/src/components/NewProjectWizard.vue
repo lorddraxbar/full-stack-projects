@@ -53,7 +53,7 @@ export interface WizardData {
     /** Total project cost in PHP (estimated or actual) — required. */
     totalCost: number | null
     rawMaterials: { name: string; quantity: number | null; unit: string | null; period: 'MONTHLY' | 'YEARLY' }[] | null
-    productionOutput: { name: string; monthlyTons: number | null; annualTons: number | null; unit: string | null }[] | null
+    productionOutput: { name: string; quantity: number | null; unit: string | null; period: 'MONTHLY' | 'YEARLY'; pricePerUnit: number | null }[] | null
     wasteManagement: string
     wasteMaterials: { type: string; recyclable: boolean; monthlyTons: number | null }[] | null
     manufacturingProcedure: string
@@ -134,7 +134,7 @@ const projectForm = ref({
 const productionForm = ref({
   totalCost: '',
   rawMaterials: [] as { name: string; quantity: string; unit: string; period: 'MONTHLY' | 'YEARLY' }[],
-  productionOutput: [] as { name: string; monthlyTons: string; annualTons: string; unit: string }[],
+  productionOutput: [] as { name: string; quantity: string; unit: string; period: 'MONTHLY' | 'YEARLY'; pricePerUnit: string }[],
   wasteManagement: '',
   wasteMaterials: [] as { type: string; recyclable: boolean; monthlyTons: string }[],
   manufacturingProcedure: '',
@@ -145,7 +145,7 @@ function addRow(kind: 'rawMaterials' | 'productionOutput' | 'wasteMaterials') {
   if (kind === 'rawMaterials') {
     productionForm.value.rawMaterials.push({ name: '', quantity: '', unit: '', period: 'MONTHLY' })
   } else if (kind === 'productionOutput') {
-    productionForm.value.productionOutput.push({ name: '', monthlyTons: '', annualTons: '', unit: '' })
+    productionForm.value.productionOutput.push({ name: '', quantity: '', unit: '', period: 'MONTHLY', pricePerUnit: '' })
   } else {
     productionForm.value.wasteMaterials.push({ type: '', recyclable: true, monthlyTons: '' })
   }
@@ -530,9 +530,10 @@ const handleSubmit = () => {
             .filter(r => r.name.trim())
             .map(r => ({
               name: r.name.trim(),
-              monthlyTons: numOrNull(r.monthlyTons),
-              annualTons: numOrNull(r.annualTons),
+              quantity: numOrNull(r.quantity),
               unit: r.unit.trim() || null,
+              period: r.period,
+              pricePerUnit: numOrNull(r.pricePerUnit),
             }))
         : null,
       wasteManagement: productionForm.value.wasteManagement.trim(),
@@ -972,7 +973,7 @@ const handleClose = () => {
             <CardHeader class="flex-row items-center justify-between space-y-0">
               <div>
                 <CardTitle class="text-base">Production Output</CardTitle>
-                <CardDescription>Finished products with monthly and annual volume</CardDescription>
+                <CardDescription>Finished products with quantity, unit, period, and price per unit</CardDescription>
               </div>
               <Button type="button" variant="outline" size="sm" @click="addRow('productionOutput')">+ Add product</Button>
             </CardHeader>
@@ -983,17 +984,27 @@ const handleClose = () => {
                   <Label>Product name</Label>
                   <Input v-model="row.name" placeholder="e.g. HDPE bags, 300mm" />
                 </div>
-                <div class="w-32 space-y-1">
-                  <Label>Monthly</Label>
-                  <Input v-model="row.monthlyTons" type="number" min="0" step="any" placeholder="0" />
-                </div>
-                <div class="w-32 space-y-1">
-                  <Label>Annual</Label>
-                  <Input v-model="row.annualTons" type="number" min="0" step="any" placeholder="0" />
+                <div class="w-28 space-y-1">
+                  <Label>Quantity</Label>
+                  <Input v-model="row.quantity" type="number" min="0" step="any" placeholder="0" />
                 </div>
                 <div class="w-28 space-y-1">
                   <Label>Unit</Label>
-                  <Input v-model="row.unit" placeholder="e.g. Tons, Rolls" />
+                  <Input v-model="row.unit" placeholder="e.g. Sets, Tons" />
+                </div>
+                <div class="w-28 space-y-1">
+                  <Label>Period</Label>
+                  <Select :model-value="row.period" @update:model-value="(v) => (row.period = v as 'MONTHLY' | 'YEARLY')">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MONTHLY">Per month</SelectItem>
+                      <SelectItem value="YEARLY">Per year</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div class="w-32 space-y-1">
+                  <Label>Price / Unit (₱)</Label>
+                  <Input v-model="row.pricePerUnit" type="number" min="0" step="any" placeholder="0" />
                 </div>
                 <Button type="button" variant="ghost" size="icon" class="text-muted-foreground hover:text-red-600" @click="removeRow('productionOutput', i)">
                   <Trash2 class="h-4 w-4" />
