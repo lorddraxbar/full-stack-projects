@@ -472,13 +472,15 @@ async function markCompleted() {
                   <tr>
                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                   <tr v-for="(m, i) in rawMaterials" :key="'raw-' + i">
                     <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ m.name }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">{{ m.quantity ?? '—' }} tons</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ m.quantity ?? '—' }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ m.unit || 'tons' }}</td>
                     <td class="px-4 py-3 text-sm text-gray-700">{{ m.period === 'YEARLY' ? 'Per year' : 'Per month' }}</td>
                   </tr>
                 </tbody>

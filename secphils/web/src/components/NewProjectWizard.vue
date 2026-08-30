@@ -52,7 +52,7 @@ export interface WizardData {
     addressDiffers: boolean
     /** Total project cost in PHP (estimated or actual) — required. */
     totalCost: number | null
-    rawMaterials: { name: string; quantity: number | null; period: 'MONTHLY' | 'YEARLY' }[] | null
+    rawMaterials: { name: string; quantity: number | null; unit: string | null; period: 'MONTHLY' | 'YEARLY' }[] | null
     productionOutput: { name: string; monthlyTons: number | null; annualTons: number | null }[] | null
     wasteManagement: string
     wasteMaterials: { type: string; recyclable: boolean; monthlyTons: number | null }[] | null
@@ -133,7 +133,7 @@ const projectForm = ref({
 // later from the project's detail page.
 const productionForm = ref({
   totalCost: '',
-  rawMaterials: [] as { name: string; quantity: string; period: 'MONTHLY' | 'YEARLY' }[],
+  rawMaterials: [] as { name: string; quantity: string; unit: string; period: 'MONTHLY' | 'YEARLY' }[],
   productionOutput: [] as { name: string; monthlyTons: string; annualTons: string }[],
   wasteManagement: '',
   wasteMaterials: [] as { type: string; recyclable: boolean; monthlyTons: string }[],
@@ -143,7 +143,7 @@ const productionForm = ref({
 
 function addRow(kind: 'rawMaterials' | 'productionOutput' | 'wasteMaterials') {
   if (kind === 'rawMaterials') {
-    productionForm.value.rawMaterials.push({ name: '', quantity: '', period: 'MONTHLY' })
+    productionForm.value.rawMaterials.push({ name: '', quantity: '', unit: '', period: 'MONTHLY' })
   } else if (kind === 'productionOutput') {
     productionForm.value.productionOutput.push({ name: '', monthlyTons: '', annualTons: '' })
   } else {
@@ -521,6 +521,7 @@ const handleSubmit = () => {
             .map(r => ({
               name: r.name.trim(),
               quantity: numOrNull(r.quantity),
+              unit: r.unit.trim() || null,
               period: r.period,
             }))
             : null,
@@ -929,7 +930,7 @@ const handleClose = () => {
             <CardHeader class="flex-row items-center justify-between space-y-0">
               <div>
                 <CardTitle class="text-base">Raw Materials</CardTitle>
-                <CardDescription>Each material with quantity used or purchased, in tons</CardDescription>
+                <CardDescription>Each material with quantity, unit, and period used or purchased</CardDescription>
               </div>
               <Button type="button" variant="outline" size="sm" @click="addRow('rawMaterials')">+ Add material</Button>
             </CardHeader>
@@ -941,8 +942,12 @@ const handleClose = () => {
                   <Input v-model="row.name" placeholder="e.g. Virgin LDPE resin" />
                 </div>
                 <div class="w-32 space-y-1">
-                  <Label>Quantity (tons)</Label>
+                  <Label>Quantity</Label>
                   <Input v-model="row.quantity" type="number" min="0" step="any" placeholder="0" />
+                </div>
+                <div class="w-28 space-y-1">
+                  <Label>Unit</Label>
+                  <Input v-model="row.unit" placeholder="e.g. Tons, Rolls" />
                 </div>
                 <div class="w-28 space-y-1">
                   <Label>Period</Label>
