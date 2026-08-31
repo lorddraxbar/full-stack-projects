@@ -311,9 +311,6 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
               <div class="flex items-center justify-between text-sm text-gray-600">
                 <span>{{ project.serviceName || '—' }}</span>
               </div>
-              <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
-                <div class="bg-emerald-600 h-2 rounded-full transition-all" :style="{ width: project.progress + '%' }" />
-              </div>
             </div>
           </div>
         </div>
@@ -454,9 +451,6 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
               </div>
               <div class="flex items-center justify-between text-sm text-gray-600">
                 <span>{{ project.companyName || '—' }}</span>
-              </div>
-              <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
-                <div class="bg-emerald-600 h-2 rounded-full transition-all" :style="{ width: project.progress + '%' }" />
               </div>
             </div>
           </div>

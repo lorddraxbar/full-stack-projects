@@ -308,16 +308,7 @@ onMounted(init)
                 <i class="fas fa-tag text-xs mr-1 text-gray-400" />{{ project.serviceType }}
               </span>
             </div>
-            <div class="flex items-center gap-3 text-sm">
-              <span class="text-gray-600 w-24 shrink-0">{{ project.progress }}% complete</span>
-              <div class="flex-1 bg-gray-200 rounded-full h-2">
-                <div
-                  class="bg-emerald-600 h-2 rounded-full transition-all"
-                  :style="{ width: project.progress + '%' }"
-                />
-              </div>
             </div>
-          </div>
         </div>
       </CardContent>
     </Card>

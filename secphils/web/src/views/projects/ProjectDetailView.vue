@@ -271,7 +271,10 @@ async function saveAdminChanges() {
       wasteMaterials: project.value.wasteMaterials ?? null,
       manufacturingProcedure: project.value.manufacturingProcedure ?? null,
       productionFlowchartUrl: project.value.productionFlowchartUrl ?? null,
-      progress: adminForm.value.progress,
+      // No longer editable from the UI (the progress slider was removed),
+      // but apply() overwrites every field — echo the stored value back so a
+      // status/notes save doesn't reset progress to 0.
+      progress: project.value.progress ?? 0,
     })
     project.value = updated
   } catch (err: any) {
@@ -545,10 +548,6 @@ async function saveProductionEdit() {
           <i class="fas fa-coins mr-1"></i>Contract: {{ formatPhp(project.totalCost) }}
         </div>
 
-        <div class="mt-4 w-full bg-gray-200 rounded-full h-2">
-          <div class="bg-emerald-600 h-2 rounded-full transition-all" :style="{ width: (project.progress ?? 0) + '%' }" />
-        </div>
-        <p class="text-sm text-gray-600 mt-1">{{ project.progress ?? 0 }}% complete</p>
       </div>
 
       <!-- Tabs -->
@@ -1179,18 +1178,6 @@ async function saveProductionEdit() {
             >
               <option v-for="s in projectStatusCodes" :key="s" :value="s">{{ projectStatusLabel(s) }}</option>
             </select>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Progress ({{ adminForm.progress }}%)</label>
-            <input
-              v-model.number="adminForm.progress"
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              class="w-full accent-emerald-600"
-            />
           </div>
 
           <div class="lg:col-span-2">
