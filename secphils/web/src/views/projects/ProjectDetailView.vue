@@ -36,8 +36,10 @@ const saveError = ref('')
 const tabs = computed(() => {
   const base = ['Overview', 'Production', 'Documents', 'Messages']
   if (isClient.value) return [...base, 'Team']
-  if (isUser.value) return ['Overview', 'Production', 'Documents', 'Messages', 'Company']
-  if (isAdmin.value) return ['Overview', 'Production', 'Documents', 'Messages', 'Company', 'Admin Controls']
+  // Provider side (admin or staff user) both get the Administration tab.
+  if (isUser.value || isAdmin.value) {
+    return ['Overview', 'Production', 'Documents', 'Messages', 'Company', 'Administration']
+  }
   return base
 })
 const activeTab = ref('Overview')
@@ -222,7 +224,11 @@ async function deleteDocument(id: number) {
   }
 }
 
-// ---------- Admin controls ----------
+// ---------- Administration tab ----------
+// Available to both provider admins and non-admin staff (USER); clients
+// never see it. Holds the project notes (internal), the status
+// configuration, and the project lifecycle (archive/restore for staff;
+// hard delete stays admin-only).
 const adminForm = ref({
   status: '',
   notes: '',
@@ -240,9 +246,28 @@ function initAdminForm() {
 }
 // (adminForm is initialized inside load() once the project is available)
 
+// Notes card: read-only by default; staff flips it into edit mode
+// (same pattern as the Project & Representative card on the Overview).
+const editingNotes = ref(false)
+const notesSaving = ref(false)
+const notesError = ref('')
+
+function startNotesEdit() {
+  adminForm.value.notes = project.value?.notes || ''
+  notesError.value = ''
+  editingNotes.value = true
+}
+function cancelNotesEdit() {
+  // Revert the draft to the stored value.
+  adminForm.value.notes = project.value?.notes || ''
+  editingNotes.value = false
+}
+
 async function saveAdminChanges() {
   if (!project.value) return
   saveError.value = ''
+  notesError.value = ''
+  notesSaving.value = true
   try {
     const updated = await useUpdateProject(projectId.value, {
       companyId: project.value.companyId,
@@ -269,8 +294,15 @@ async function saveAdminChanges() {
       progress: project.value.progress ?? 0,
     })
     project.value = updated
+    adminForm.value.notes = project.value.notes || ''
+    editingNotes.value = false
   } catch (err: any) {
-    saveError.value = err?.response?.data?.message || 'Failed to save project'
+    // Surface the failure in both cards that share this save.
+    const msg = err?.response?.data?.message || 'Failed to save project'
+    saveError.value = msg
+    notesError.value = msg
+  } finally {
+    notesSaving.value = false
   }
 }
 
@@ -441,6 +473,15 @@ const overviewForm = ref<{
 const editingOverview = ref(false)
 const overviewSaving = ref(false)
 const overviewError = ref('')
+
+// The company's canonical address. New customer companies store it in
+// `location` (the wizard's "Company Address" field); the provider's own
+// profile stores it in `headquarters` (Admin → Company settings). Check
+// both so a project without its own address still shows the address.
+const companyAddress = computed(() => {
+  const c = company.value as any
+  return c?.location || c?.headquarters || ''
+})
 
 function startOverviewEdit() {
   const p = project.value
@@ -618,12 +659,8 @@ async function saveProductionEdit() {
 
       <!-- ================= OVERVIEW ================= -->
       <div v-if="activeTab === 'Overview'">
-        <div class="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Notes</h2>
-          <p class="text-gray-700">{{ project.notes || '—' }}</p>
-        </div>
-
-        <!-- Project address + authorized-rep contact (staff/admin editable) -->
+        <!-- Project address + authorized-rep contact (staff/admin editable).
+             Leads the Overview; the Notes card now sits below it. -->
         <div class="bg-white rounded-lg shadow p-6 mb-6">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-gray-900">Project &amp; Representative</h2>
@@ -650,8 +687,8 @@ async function saveProductionEdit() {
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
             <p v-else class="text-gray-900 mt-1">
-              {{ project.address || company?.location || '—' }}
-              <span v-if="!project.address && company?.location" class="text-gray-400 text-xs"> (company address)</span>
+              {{ project.address || companyAddress || '—' }}
+              <span v-if="!project.address && companyAddress" class="text-gray-400 text-xs"> (company address)</span>
               <span v-if="editingOverview && !overviewForm.addressDiffers" class="text-gray-400 text-xs"> — uses the company address; check the box to override</span>
             </p>
           </div>
@@ -697,6 +734,14 @@ async function saveProductionEdit() {
               {{ overviewSaving ? 'Saving…' : 'Save' }}
             </button>
           </div>
+        </div>
+
+        <!-- Notes (moved down so Project & Representative leads the page;
+             it's no longer visible at the top where clients would see it.
+             Editing it lives on the Administration tab.) -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Notes</h2>
+          <p class="text-gray-700">{{ project.notes || '—' }}</p>
         </div>
 
         <!-- Authorized-rep review card: the customer's rep reviews a
@@ -1042,7 +1087,7 @@ async function saveProductionEdit() {
                     class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
                     placeholder="Street, city, region"
                   />
-                  <p v-else class="text-gray-900">{{ company?.location || '—' }}</p>
+                  <p v-else class="text-gray-900">{{ companyAddress || '—' }}</p>
                 </div>
                 <div>
                   <p class="text-sm text-gray-500">Company Phone</p>
@@ -1223,12 +1268,41 @@ async function saveProductionEdit() {
         </div>
       </div>
 
-      <!-- ================= ADMIN CONTROLS ================= -->
-      <div v-if="activeTab === 'Admin Controls'" class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-6">Project Configuration</h2>
-        <p v-if="saveError" class="mb-4 text-sm text-red-600">{{ saveError }}</p>
+      <!-- ================= ADMINISTRATION (admin + staff user) ================= -->
+      <div v-if="activeTab === 'Administration'">
+        <!-- Notes: internal to the project — hidden from the client view. -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Notes</h2>
+            <button
+              v-if="!editingNotes"
+              @click="startNotesEdit"
+              class="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <i class="fas fa-pencil" /> Edit
+            </button>
+          </div>
+          <p v-if="notesError" class="mb-4 text-sm text-red-600">{{ notesError }}</p>
+          <textarea
+            v-if="editingNotes"
+            v-model="adminForm.notes"
+            rows="4"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+          ></textarea>
+          <p v-else class="text-gray-700">{{ adminForm.notes || '—' }}</p>
+          <div v-if="editingNotes" class="mt-6 pt-4 border-t border-gray-200 flex justify-end gap-3">
+            <button @click="cancelNotesEdit" class="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">Cancel</button>
+            <button @click="saveAdminChanges" :disabled="notesSaving" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50">
+              {{ notesSaving ? 'Saving…' : 'Save' }}
+            </button>
+          </div>
+        </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Project Configuration (notes moved to their own card above). -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Project Configuration</h2>
+          <p v-if="saveError" class="mb-4 text-sm text-red-600">{{ saveError }}</p>
+          <div class="max-w-md">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
@@ -1238,29 +1312,20 @@ async function saveProductionEdit() {
               <option v-for="s in projectStatusCodes" :key="s" :value="s">{{ projectStatusLabel(s) }}</option>
             </select>
           </div>
-
-          <div class="lg:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-            <textarea
-              v-model="adminForm.notes"
-              rows="4"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-            />
           </div>
 
-        </div>
-
-        <div class="mt-6 flex justify-end">
-          <button
-            @click="saveAdminChanges"
-            class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-          >
-            Save Changes
-          </button>
+          <div class="mt-6 flex justify-end">
+            <button
+              @click="saveAdminChanges"
+              class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+            >
+              Save Changes
+            </button>
+          </div>
         </div>
 
         <!-- Lifecycle: archive / restore / hard delete -->
-        <div class="mt-8 border-t border-gray-200 pt-6">
+        <div class="bg-white rounded-lg shadow p-6">
           <h3 class="text-base font-semibold text-gray-900">Lifecycle</h3>
           <p class="mt-1 text-sm text-gray-600">
             Archiving hides the project from the list and moves its files into the archive.
@@ -1296,6 +1361,7 @@ async function saveProductionEdit() {
               {{ lifecycleBusy ? 'Working…' : 'Restore Project' }}
             </button>
             <button
+              v-if="isAdmin"
               @click="hardDeleteProject"
               :disabled="lifecycleBusy"
               class="px-4 py-2 border border-red-300 text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium disabled:opacity-50"
