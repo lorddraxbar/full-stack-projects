@@ -9,6 +9,7 @@ import {
   useGetDocuments, useCreateDocument, useDeleteDocument,
   useGetMessages, useSendMessage, useUpdateProject,
   useArchiveProject, useRestoreProject, useHardDeleteProject,
+  useUpdateCompany, useUpdateUser,
 } from '@/services/api'
 import {
   projectStatusLabel, fileTypeLabel,
@@ -376,6 +377,91 @@ function startProductionEdit() {
 }
 function cancelProductionEdit() {
   editingProduction.value = false
+}
+
+// ---------- Company details editor ----------
+// The Company tab is read-only by default. Staff/admin (isUser || isAdmin) can
+// edit the client company's core details plus the authorized-rep contact.
+// Company fields go through the null-safe company PUT (edits values; the
+// null-safe apply can't clear a field, which is fine — we only set). The
+// rep's name/email/phone live on the rep's User row and go through the user PUT.
+const companyForm = ref<{ name: string; location: string; phone: string; owner: string; description: string }>({
+  name: '', location: '', phone: '', owner: '', description: '',
+})
+const repForm = ref<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' })
+const editingCompany = ref(false)
+const companySaving = ref(false)
+const companySaveError = ref('')
+
+function startCompanyEdit() {
+  const c = company.value as any
+  companyForm.value = {
+    name: c?.name || '',
+    location: c?.location || '',
+    phone: c?.phone || '',
+    owner: c?.owner || '',
+    description: c?.description || '',
+  }
+  repForm.value = {
+    name: c?.authorizedRepName || '',
+    email: c?.authorizedRepEmail || '',
+    phone: c?.authorizedRepPhone || '',
+  }
+  companySaveError.value = ''
+  editingCompany.value = true
+}
+
+function cancelCompanyEdit() {
+  editingCompany.value = false
+  companyForm.value = { name: '', location: '', phone: '', owner: '', description: '' }
+  repForm.value = { name: '', email: '', phone: '' }
+}
+
+async function saveCompanyEdit() {
+  if (!company.value) return
+  companySaving.value = true
+  companySaveError.value = ''
+  try {
+    // 1. Company's own fields (name is required + non-blank; null-safe apply).
+    const name = companyForm.value.name.trim()
+    if (!name) throw new Error('Company name is required.')
+    const updatedCompany = await useUpdateCompany(company.value.id, {
+      name,
+      location: companyForm.value.location.trim() || null,
+      phone: companyForm.value.phone.trim() || null,
+      owner: companyForm.value.owner.trim() || null,
+      description: companyForm.value.description.trim() || null,
+    })
+    company.value = updatedCompany
+
+    // 2. The authorized rep's name/email/phone live on the rep's User row.
+    //    Email can't be cleared (unique, non-blank only); name change is
+    //    best-effort — we don't block the save if the rep row is missing.
+    const repId = (company.value as any).authorizedRepId
+    if (repId) {
+      try {
+        const email = repForm.value.email.trim()
+        const repName = repForm.value.name.trim()
+        const repPhone = repForm.value.phone.trim()
+        const nameParts = repName ? repName.split(/\s+/) : []
+        await useUpdateUser(repId, {
+          email: email || undefined,
+          firstName: nameParts[0] || undefined,
+          lastName: nameParts.slice(1).join(' ') || undefined,
+          phone: repPhone || undefined,
+        })
+      } catch (repErr: any) {
+        // Rep contact is non-fatal to the company save — surface it but keep
+        // the company changes (which already committed).
+        companySaveError.value = `Company saved. Could not update the authorized rep's contact: ${repErr?.response?.data?.message || repErr?.message || repErr}`
+      }
+    }
+    editingCompany.value = false
+  } catch (err: any) {
+    companySaveError.value = err?.response?.data?.message || err?.message || 'Failed to save company details.'
+  } finally {
+    companySaving.value = false
+  }
 }
 
 function addEditRow(kind: 'rawMaterials' | 'productionOutput' | 'wasteMaterials') {
@@ -802,31 +888,144 @@ async function saveProductionEdit() {
       </div>
 
       <!-- ================= COMPANY ================= -->
-      <div v-if="activeTab === 'Company'" class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Client Company</h2>
-        <div class="space-y-4">
-          <div>
-            <p class="text-sm text-gray-500">Company Name</p>
-            <p class="text-gray-900 font-medium">{{ company?.name || project.companyName || '—' }}</p>
+      <div v-if="activeTab === 'Company'">
+        <div class="bg-white rounded-lg shadow p-6">
+          <!-- Header + Edit toggle (staff only; clients are read-only) -->
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Client Company</h2>
+            <div class="flex items-center gap-2">
+              <button
+                v-if="!isClient && !editingCompany"
+                @click="startCompanyEdit"
+                class="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <i class="fas fa-pencil" /> Edit
+              </button>
+              <template v-if="!isClient && editingCompany">
+                <button
+                  @click="saveCompanyEdit"
+                  :disabled="companySaving"
+                  class="inline-flex items-center gap-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <i class="fas fa-check" /> {{ companySaving ? 'Saving…' : 'Save Company Details' }}
+                </button>
+                <button
+                  @click="cancelCompanyEdit"
+                  class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 bg-white hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </template>
+            </div>
           </div>
+          <p v-if="companySaveError" class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">{{ companySaveError }}</p>
+
+          <!-- COMPANY -->
           <div>
-            <p class="text-sm text-gray-500">Company Address</p>
-            <p class="text-gray-900">{{ company?.location || '—' }}</p>
+            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Company</h3>
+            <div class="space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p class="text-sm text-gray-500">Company Name</p>
+                  <input
+                    v-if="editingCompany"
+                    v-model="companyForm.name"
+                    class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                    placeholder="Company name"
+                  />
+                  <p v-else class="text-gray-900 font-medium">{{ company?.name || project.companyName || '—' }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Company Address</p>
+                  <input
+                    v-if="editingCompany"
+                    v-model="companyForm.location"
+                    class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                    placeholder="Street, city, region"
+                  />
+                  <p v-else class="text-gray-900">{{ company?.location || '—' }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Company Phone</p>
+                  <input
+                    v-if="editingCompany"
+                    v-model="companyForm.phone"
+                    class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                    placeholder="+63 000 000 0000"
+                  />
+                  <p v-else class="text-gray-900">{{ company?.phone || '—' }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Company Owner</p>
+                  <input
+                    v-if="editingCompany"
+                    v-model="companyForm.owner"
+                    class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                    placeholder="Owner name"
+                  />
+                  <p v-else class="text-gray-900">{{ company?.owner || '—' }}</p>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-gray-500">Business Description</p>
+                <textarea
+                  v-if="editingCompany"
+                  v-model="companyForm.description"
+                  rows="3"
+                  class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  placeholder="What the company does"
+                ></textarea>
+                <p v-else class="text-gray-900">{{ company?.description || '—' }}</p>
+              </div>
+            </div>
           </div>
-          <div>
-            <p class="text-sm text-gray-500">Project Address</p>
-            <p class="text-gray-900">
-              {{ project.address || company?.location || '—' }}
-              <span v-if="!project.address && company?.location" class="text-gray-400 text-xs">(company address)</span>
-            </p>
+
+          <!-- AUTHORIZED REPRESENTATIVE -->
+          <div class="mt-6 border-t border-gray-200 pt-6">
+            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Authorized Representative</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <p class="text-sm text-gray-500">Name</p>
+                <input
+                  v-if="editingCompany"
+                  v-model="repForm.name"
+                  class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  placeholder="Full name"
+                />
+                <p v-else class="text-gray-900">{{ company?.authorizedRepName || '—' }}</p>
+              </div>
+              <div>
+                <p class="text-sm text-gray-500">Email Address</p>
+                <input
+                  v-if="editingCompany"
+                  v-model="repForm.email"
+                  type="email"
+                  class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  placeholder="name@example.com"
+                />
+                <p v-else class="text-gray-900">{{ company?.authorizedRepEmail || '—' }}</p>
+              </div>
+              <div>
+                <p class="text-sm text-gray-500">Phone</p>
+                <input
+                  v-if="editingCompany"
+                  v-model="repForm.phone"
+                  class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  placeholder="+63 000 000 0000"
+                />
+                <p v-else class="text-gray-900">{{ company?.authorizedRepPhone || '—' }}</p>
+              </div>
+            </div>
           </div>
-          <div>
-            <p class="text-sm text-gray-500">Owner</p>
-            <p class="text-gray-900">{{ company?.owner || '—' }}</p>
-          </div>
-          <div>
-            <p class="text-sm text-gray-500">Authorized Representative</p>
-            <p class="text-gray-900">{{ company?.authorizedRepName || '—' }}</p>
+
+          <div class="mt-6 border-t border-gray-200 pt-4">
+            <div>
+              <p class="text-sm text-gray-500">Project Address</p>
+              <p class="text-gray-900">
+                {{ project.address || company?.location || '—' }}
+                <span v-if="!project.address && company?.location" class="text-gray-400 text-xs">(company address)</span>
+              </p>
+            </div>
           </div>
         </div>
       </div>

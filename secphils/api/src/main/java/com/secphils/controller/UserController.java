@@ -320,6 +320,9 @@ public class UserController {
         if (req.lastName() != null && !req.lastName().isBlank()) user.setLastName(req.lastName());
         if (req.role() != null && !req.role().isBlank()) user.setRole(req.role());
         if (req.isActive() != null) user.setIsActive(req.isActive());
+        // Phone is applied on non-null so a blank value clears it (the null-safe
+        // name/email fields above only apply when non-blank).
+        if (req.phone() != null) user.setPhone(req.phone());
         if (req.companyId() != null) {
             if (companyRepository.findById(req.companyId()).isEmpty()) {
                 throw ApiException.badRequest("Selected company does not exist");

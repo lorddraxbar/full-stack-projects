@@ -30,6 +30,7 @@ public record CompanyResponse(
         Long authorizedRepId,
         String authorizedRepName,
         String authorizedRepPhone,
+        String authorizedRepEmail,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -43,6 +44,7 @@ public record CompanyResponse(
                 rep != null ? rep.getId() : null,
                 DisplayNamePolicy.nameFor(rep),
                 rep != null ? rep.getPhone() : null,
+                rep != null ? rep.getEmail() : null,
                 c.getCreatedAt(), c.getUpdatedAt());
     }
 }
