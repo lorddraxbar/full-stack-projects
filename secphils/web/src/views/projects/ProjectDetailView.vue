@@ -36,8 +36,8 @@ const saveError = ref('')
 const tabs = computed(() => {
   const base = ['Overview', 'Production', 'Documents', 'Messages']
   if (isClient.value) return [...base, 'Team']
-  if (isUser.value) return ['Overview', 'Company', 'Production', 'Documents', 'Messages']
-  if (isAdmin.value) return ['Overview', 'Company', 'Production', 'Documents', 'Messages', 'Admin Controls']
+  if (isUser.value) return ['Overview', 'Production', 'Documents', 'Messages', 'Company']
+  if (isAdmin.value) return ['Overview', 'Production', 'Documents', 'Messages', 'Company', 'Admin Controls']
   return base
 })
 const activeTab = ref('Overview')
@@ -226,10 +226,6 @@ async function deleteDocument(id: number) {
 const adminForm = ref({
   status: '',
   notes: '',
-  objectives: '',
-  address: '',
-  addressDiffers: false,
-  progress: 0,
 })
 const adminReady = ref(false)
 const projectStatusCodes = ['NOT_STARTED', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'ARCHIVED']
@@ -239,10 +235,6 @@ function initAdminForm() {
   adminForm.value = {
     status: project.value.status || 'NOT_STARTED',
     notes: project.value.notes || '',
-    objectives: project.value.objectives || '',
-    address: project.value.address || '',
-    addressDiffers: !!project.value.address,
-    progress: project.value.progress ?? 0,
   }
   adminReady.value = true
 }
@@ -257,11 +249,11 @@ async function saveAdminChanges() {
       serviceId: project.value.serviceId ?? null,
       name: project.value.name,
       notes: adminForm.value.notes,
-      objectives: adminForm.value.objectives,
-      // Project address: when the "different from company address" box is
-      // off we send null to clear any stored override (company address is
-      // used); when on we send the entered address.
-      address: adminForm.value.addressDiffers ? (adminForm.value.address || null) : null,
+      // Project address + authorized-rep contact are edited from the
+      // Overview tab now — pass through whatever is stored so this
+      // status/notes save doesn't clear them (apply() overwrites every
+      // field).
+      address: project.value.address ?? null,
       deliverables: project.value.deliverables ?? null,
       status: adminForm.value.status,
       totalCost: project.value.totalCost ?? null,
@@ -383,15 +375,14 @@ function cancelProductionEdit() {
 }
 
 // ---------- Company details editor ----------
-// The Company tab is read-only by default. Staff/admin (isUser || isAdmin) can
-// edit the client company's core details plus the authorized-rep contact.
-// Company fields go through the null-safe company PUT (edits values; the
-// null-safe apply can't clear a field, which is fine — we only set). The
-// rep's name/email/phone live on the rep's User row and go through the user PUT.
+// The Company tab is read-only by default. Staff/admin (isUser || isAdmin)
+// can edit the client company's core details. Company fields go through
+// the null-safe company PUT (edits values; the null-safe apply can't clear
+// a field, which is fine — we only set). The authorized-rep contact now
+// lives in the Overview tab (see the overview editor below).
 const companyForm = ref<{ name: string; location: string; phone: string; owner: string; description: string }>({
   name: '', location: '', phone: '', owner: '', description: '',
 })
-const repForm = ref<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' })
 const editingCompany = ref(false)
 const companySaving = ref(false)
 const companySaveError = ref('')
@@ -405,11 +396,6 @@ function startCompanyEdit() {
     owner: c?.owner || '',
     description: c?.description || '',
   }
-  repForm.value = {
-    name: c?.authorizedRepName || '',
-    email: c?.authorizedRepEmail || '',
-    phone: c?.authorizedRepPhone || '',
-  }
   companySaveError.value = ''
   editingCompany.value = true
 }
@@ -417,7 +403,6 @@ function startCompanyEdit() {
 function cancelCompanyEdit() {
   editingCompany.value = false
   companyForm.value = { name: '', location: '', phone: '', owner: '', description: '' }
-  repForm.value = { name: '', email: '', phone: '' }
 }
 
 async function saveCompanyEdit() {
@@ -425,7 +410,6 @@ async function saveCompanyEdit() {
   companySaving.value = true
   companySaveError.value = ''
   try {
-    // 1. Company's own fields (name is required + non-blank; null-safe apply).
     const name = companyForm.value.name.trim()
     if (!name) throw new Error('Company name is required.')
     const updatedCompany = await useUpdateCompany(company.value.id, {
@@ -436,34 +420,100 @@ async function saveCompanyEdit() {
       description: companyForm.value.description.trim() || null,
     })
     company.value = updatedCompany
-
-    // 2. The authorized rep's name/email/phone live on the rep's User row.
-    //    Email can't be cleared (unique, non-blank only); name change is
-    //    best-effort — we don't block the save if the rep row is missing.
-    const repId = (company.value as any).authorizedRepId
-    if (repId) {
-      try {
-        const email = repForm.value.email.trim()
-        const repName = repForm.value.name.trim()
-        const repPhone = repForm.value.phone.trim()
-        const nameParts = repName ? repName.split(/\s+/) : []
-        await useUpdateUser(repId, {
-          email: email || undefined,
-          firstName: nameParts[0] || undefined,
-          lastName: nameParts.slice(1).join(' ') || undefined,
-          phone: repPhone || undefined,
-        })
-      } catch (repErr: any) {
-        // Rep contact is non-fatal to the company save — surface it but keep
-        // the company changes (which already committed).
-        companySaveError.value = `Company saved. Could not update the authorized rep's contact: ${repErr?.response?.data?.message || repErr?.message || repErr}`
-      }
-    }
     editingCompany.value = false
   } catch (err: any) {
     companySaveError.value = err?.response?.data?.message || err?.message || 'Failed to save company details.'
   } finally {
     companySaving.value = false
+  }
+}
+
+// ---------- Overview editor: project address + authorized rep ----------
+// These two were split across the Company tab / Admin Controls. They now live
+// together in the Overview tab. The project address is a project field (PUT
+// project); the rep's name/email/phone live on the rep's User row (PUT user).
+// After the rep update we re-fetch the company so its derived rep fields
+// (authorizedRepName/Email/Phone) re-render from the fresh user row.
+const overviewForm = ref<{
+  address: string; addressDiffers: boolean;
+  repName: string; repEmail: string; repPhone: string;
+}>({ address: '', addressDiffers: false, repName: '', repEmail: '', repPhone: '' })
+const editingOverview = ref(false)
+const overviewSaving = ref(false)
+const overviewError = ref('')
+
+function startOverviewEdit() {
+  const p = project.value
+  const c = company.value as any
+  overviewForm.value = {
+    address: p?.address || '',
+    addressDiffers: !!p?.address,
+    repName: c?.authorizedRepName || '',
+    repEmail: c?.authorizedRepEmail || '',
+    repPhone: c?.authorizedRepPhone || '',
+  }
+  overviewError.value = ''
+  editingOverview.value = true
+}
+
+function cancelOverviewEdit() {
+  editingOverview.value = false
+  overviewForm.value = { address: '', addressDiffers: false, repName: '', repEmail: '', repPhone: '' }
+}
+
+async function saveOverviewEdit() {
+  const p = project.value
+  if (!p) return
+  overviewSaving.value = true
+  overviewError.value = ''
+  const f = overviewForm.value
+  try {
+    // 1. Project address. A plain address override, or null to fall back to
+    //    the company address. Everything else passes through unchanged
+    //    (apply() overwrites every field).
+    const address = f.addressDiffers ? (f.address.trim() || null) : null
+    const updated = await useUpdateProject(projectId.value, {
+      companyId: p.companyId,
+      serviceId: p.serviceId ?? null,
+      name: p.name,
+      notes: p.notes ?? null,
+      objectives: p.objectives ?? null,
+      deliverables: p.deliverables ?? null,
+      address,
+      status: p.status,
+      totalCost: p.totalCost ?? null,
+      rawMaterials: p.rawMaterials ?? null,
+      productionOutput: p.productionOutput ?? null,
+      wasteManagement: p.wasteManagement ?? null,
+      wasteMaterials: p.wasteMaterials ?? null,
+      manufacturingProcedure: p.manufacturingProcedure ?? null,
+      productionFlowchartUrl: p.productionFlowchartUrl ?? null,
+      progress: p.progress ?? 0,
+    })
+    project.value = updated
+
+    // 2. The authorized rep's name/email/phone live on the rep's User row.
+    //    Email can't be cleared (unique, non-blank only); a blank name just
+    //    skips the first/last-name split. Re-fetch the company afterwards so
+    //    the derived rep fields reflect the new user row.
+    const repId = (company.value as any)?.authorizedRepId
+    if (repId) {
+      const email = f.repEmail.trim()
+      const repName = f.repName.trim()
+      const nameParts = repName ? repName.split(/\s+/) : []
+      await useUpdateUser(repId, {
+        email: email || undefined,
+        firstName: nameParts[0] || undefined,
+        lastName: nameParts.slice(1).join(' ') || undefined,
+        phone: f.repPhone.trim() || undefined,
+      })
+      company.value = await useGetCompany(p.companyId)
+    }
+    editingOverview.value = false
+  } catch (err: any) {
+    overviewError.value = err?.response?.data?.message || err?.message || 'Failed to save.'
+  } finally {
+    overviewSaving.value = false
   }
 }
 
@@ -488,10 +538,11 @@ async function saveProductionEdit() {
       companyId: project.value.companyId,
       serviceId: project.value.serviceId ?? null,
       name: project.value.name,
-      notes: project.value.notes ?? null,
+      address: project.value.address ?? null,
+      // Objectives were removed from the UI — pass through whatever is
+      // stored so an edit elsewhere can't clear it.
       objectives: project.value.objectives ?? null,
       deliverables: project.value.deliverables ?? null,
-      address: project.value.address ?? null,
       status: project.value.status,
       // Production checklist fields (edit mode) — blank clears the field.
       totalCost: e.totalCost === '' ? null : Number(e.totalCost),
@@ -544,10 +595,6 @@ async function saveProductionEdit() {
           </span>
         </div>
 
-        <div class="flex items-center gap-6 text-sm text-gray-600" v-if="!isClient && project.totalCost != null">
-          <i class="fas fa-coins mr-1"></i>Contract: {{ formatPhp(project.totalCost) }}
-        </div>
-
       </div>
 
       <!-- Tabs -->
@@ -571,14 +618,84 @@ async function saveProductionEdit() {
 
       <!-- ================= OVERVIEW ================= -->
       <div v-if="activeTab === 'Overview'">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div class="bg-white rounded-lg shadow p-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Notes</h2>
-            <p class="text-gray-700">{{ project.notes || '—' }}</p>
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Notes</h2>
+          <p class="text-gray-700">{{ project.notes || '—' }}</p>
+        </div>
+
+        <!-- Project address + authorized-rep contact (staff/admin editable) -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Project &amp; Representative</h2>
+            <button
+              v-if="!isClient && !editingOverview"
+              @click="startOverviewEdit"
+              class="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <i class="fas fa-pencil" /> Edit
+            </button>
           </div>
-          <div class="bg-white rounded-lg shadow p-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Objectives</h2>
-            <p class="text-gray-700">{{ project.objectives || '—' }}</p>
+          <p v-if="overviewError" class="mb-4 text-sm text-red-600">{{ overviewError }}</p>
+
+          <div class="mb-4">
+            <p class="text-sm text-gray-500">Project Address</p>
+            <label v-if="editingOverview" class="flex items-center gap-2 mt-1 mb-2">
+              <input type="checkbox" v-model="overviewForm.addressDiffers" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+              <span class="text-sm text-gray-700">Different from company address</span>
+            </label>
+            <input
+              v-if="editingOverview && overviewForm.addressDiffers"
+              v-model="overviewForm.address"
+              placeholder="Full address where the project operates (barangay, city, province, ZIP)"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            />
+            <p v-else class="text-gray-900 mt-1">
+              {{ project.address || company?.location || '—' }}
+              <span v-if="!project.address && company?.location" class="text-gray-400 text-xs"> (company address)</span>
+              <span v-if="editingOverview && !overviewForm.addressDiffers" class="text-gray-400 text-xs"> — uses the company address; check the box to override</span>
+            </p>
+          </div>
+
+          <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Authorized Representative</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <p class="text-sm text-gray-500">Name</p>
+              <input
+                v-if="editingOverview"
+                v-model="overviewForm.repName"
+                class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                placeholder="Full name"
+              />
+              <p v-else class="text-gray-900 mt-1">{{ company?.authorizedRepName || '—' }}</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Email Address</p>
+              <input
+                v-if="editingOverview"
+                v-model="overviewForm.repEmail"
+                type="email"
+                class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                placeholder="name@example.com"
+              />
+              <p v-else class="text-gray-900 mt-1">{{ company?.authorizedRepEmail || '—' }}</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Phone</p>
+              <input
+                v-if="editingOverview"
+                v-model="overviewForm.repPhone"
+                class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                placeholder="+63 000 000 0000"
+              />
+              <p v-else class="text-gray-900 mt-1">{{ company?.authorizedRepPhone || '—' }}</p>
+            </div>
+          </div>
+
+          <div v-if="editingOverview" class="mt-6 pt-4 border-t border-gray-200 flex justify-end gap-3">
+            <button @click="cancelOverviewEdit" class="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">Cancel</button>
+            <button @click="saveOverviewEdit" :disabled="overviewSaving" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50">
+              {{ overviewSaving ? 'Saving…' : 'Save' }}
+            </button>
           </div>
         </div>
 
@@ -880,7 +997,7 @@ async function saveProductionEdit() {
           <div class="flex justify-end gap-3">
             <button @click="cancelProductionEdit" class="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">Cancel</button>
             <button @click="saveProductionEdit" :disabled="producingEdit" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50">
-              {{ producingEdit ? 'Saving…' : 'Save Production Details' }}
+              {{ producingEdit ? 'Saving…' : 'Save' }}
             </button>
           </div>
         </div>
@@ -892,30 +1009,13 @@ async function saveProductionEdit() {
           <!-- Header + Edit toggle (staff only; clients are read-only) -->
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-gray-900">Client Company</h2>
-            <div class="flex items-center gap-2">
-              <button
-                v-if="!isClient && !editingCompany"
-                @click="startCompanyEdit"
-                class="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                <i class="fas fa-pencil" /> Edit
-              </button>
-              <template v-if="!isClient && editingCompany">
-                <button
-                  @click="saveCompanyEdit"
-                  :disabled="companySaving"
-                  class="inline-flex items-center gap-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <i class="fas fa-check" /> {{ companySaving ? 'Saving…' : 'Save Company Details' }}
-                </button>
-                <button
-                  @click="cancelCompanyEdit"
-                  class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 bg-white hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-              </template>
-            </div>
+            <button
+              v-if="!isClient && !editingCompany"
+              @click="startCompanyEdit"
+              class="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <i class="fas fa-pencil" /> Edit
+            </button>
           </div>
           <p v-if="companySaveError" class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">{{ companySaveError }}</p>
 
@@ -979,52 +1079,11 @@ async function saveProductionEdit() {
             </div>
           </div>
 
-          <!-- AUTHORIZED REPRESENTATIVE -->
-          <div class="mt-6 border-t border-gray-200 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Authorized Representative</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <p class="text-sm text-gray-500">Name</p>
-                <input
-                  v-if="editingCompany"
-                  v-model="repForm.name"
-                  class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                  placeholder="Full name"
-                />
-                <p v-else class="text-gray-900">{{ company?.authorizedRepName || '—' }}</p>
-              </div>
-              <div>
-                <p class="text-sm text-gray-500">Email Address</p>
-                <input
-                  v-if="editingCompany"
-                  v-model="repForm.email"
-                  type="email"
-                  class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                  placeholder="name@example.com"
-                />
-                <p v-else class="text-gray-900">{{ company?.authorizedRepEmail || '—' }}</p>
-              </div>
-              <div>
-                <p class="text-sm text-gray-500">Phone</p>
-                <input
-                  v-if="editingCompany"
-                  v-model="repForm.phone"
-                  class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                  placeholder="+63 000 000 0000"
-                />
-                <p v-else class="text-gray-900">{{ company?.authorizedRepPhone || '—' }}</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-6 border-t border-gray-200 pt-4">
-            <div>
-              <p class="text-sm text-gray-500">Project Address</p>
-              <p class="text-gray-900">
-                {{ project.address || company?.location || '—' }}
-                <span v-if="!project.address && company?.location" class="text-gray-400 text-xs">(company address)</span>
-              </p>
-            </div>
+          <div v-if="!isClient && editingCompany" class="mt-6 pt-4 border-t border-gray-200 flex justify-end gap-3">
+            <button @click="cancelCompanyEdit" class="border border-gray-300 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">Cancel</button>
+            <button @click="saveCompanyEdit" :disabled="companySaving" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50">
+              {{ companySaving ? 'Saving…' : 'Save' }}
+            </button>
           </div>
         </div>
       </div>
@@ -1189,36 +1248,6 @@ async function saveProductionEdit() {
             />
           </div>
 
-          <div class="lg:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Objectives</label>
-            <textarea
-              v-model="adminForm.objectives"
-              rows="3"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-            />
-          </div>
-
-          <div class="lg:col-span-2 border-t border-gray-200 pt-4">
-            <label class="flex items-center gap-2 mb-1">
-              <input
-                type="checkbox"
-                v-model="adminForm.addressDiffers"
-                class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span class="text-sm font-medium text-gray-700">Project address is different from company address</span>
-            </label>
-            <p v-if="!adminForm.addressDiffers && company?.location" class="text-xs text-gray-500">
-              Company address: {{ company.location }}
-            </p>
-            <div v-if="adminForm.addressDiffers" class="mt-2">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Project Address</label>
-              <input
-                v-model="adminForm.address"
-                placeholder="Full address where the project operates (barangay, city, province, ZIP)"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-              />
-            </div>
-          </div>
         </div>
 
         <div class="mt-6 flex justify-end">
