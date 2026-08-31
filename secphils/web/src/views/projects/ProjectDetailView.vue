@@ -660,7 +660,8 @@ async function saveProductionEdit() {
       <!-- ================= OVERVIEW ================= -->
       <div v-if="activeTab === 'Overview'">
         <!-- Project address + authorized-rep contact (staff/admin editable).
-             Leads the Overview; the Notes card now sits below it. -->
+             Leads the Overview. Notes are provider-internal (Administration
+             tab) and are not shown to clients here. -->
         <div class="bg-white rounded-lg shadow p-6 mb-6">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-gray-900">Project &amp; Representative</h2>
@@ -736,13 +737,8 @@ async function saveProductionEdit() {
           </div>
         </div>
 
-        <!-- Notes (moved down so Project & Representative leads the page;
-             it's no longer visible at the top where clients would see it.
-             Editing it lives on the Administration tab.) -->
-        <div class="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Notes</h2>
-          <p class="text-gray-700">{{ project.notes || '—' }}</p>
-        </div>
+        <!-- Notes are provider-internal: hidden from the client Overview entirely.
+             The card + editing both live on the Administration tab. -->
 
         <!-- Authorized-rep review card: the customer's rep reviews a
              submitted project and marks it complete (notifies the team). -->
