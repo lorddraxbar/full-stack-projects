@@ -335,6 +335,7 @@ public class CompanyController {
         if (req.owner() != null) company.setOwner(req.owner());
         if (req.ownerPhone() != null) company.setOwnerPhone(req.ownerPhone());
         if (req.description() != null) company.setDescription(req.description());
+        if (req.about() != null) company.setAbout(req.about());
         if (req.tagline() != null) company.setTagline(req.tagline());
         if (req.industrySectors() != null) company.setIndustrySectors(req.industrySectors());
         if (req.headquarters() != null) company.setHeadquarters(req.headquarters());

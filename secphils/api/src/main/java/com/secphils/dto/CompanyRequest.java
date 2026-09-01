@@ -8,6 +8,7 @@ public record CompanyRequest(
         String owner,
         String ownerPhone,
         String description,
+        String about,
         String tagline,
         String industrySectors,
         String headquarters,

@@ -625,6 +625,7 @@ export interface LandingCompany {
   location?: string
   owner?: string
   description?: string
+  about?: string
   tagline?: string
   industrySectors?: string
   headquarters?: string

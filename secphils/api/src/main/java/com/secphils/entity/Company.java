@@ -31,6 +31,9 @@ public class Company {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(columnDefinition = "TEXT")
+    private String about;
+
     @Column(length = 255)
     private String tagline;
 

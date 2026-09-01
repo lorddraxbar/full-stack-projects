@@ -360,6 +360,7 @@ const companyProfile = ref({
   name: '',
   tagline: '',
   description: '',
+  about: '',
   industrySectors: '',
   headquarters: '',
   phone: '',
@@ -404,6 +405,7 @@ const loadProviderCompanyProfile = async () => {
         name: c.name ?? '',
         tagline: c.tagline ?? '',
         description: c.description ?? '',
+        about: c.about ?? '',
         industrySectors: c.industrySectors ?? '',
         headquarters: c.headquarters ?? '',
         phone: c.phone ?? '',
@@ -439,6 +441,10 @@ const saveCompanyProfile = async () => {
       location: null,
       owner: null,
       description: companyProfile.value.description || null,
+      // Company PUT is null-safe (null never clears a field), so a cleared
+      // About is sent as "" — applied on save and lets the marketing page
+      // fall back to the business description.
+      about: companyProfile.value.about || '',
       tagline: companyProfile.value.tagline || null,
       industrySectors: companyProfile.value.industrySectors || null,
       headquarters: companyProfile.value.headquarters || null,
@@ -1551,6 +1557,11 @@ const timeOfDay = (ts: string) => {
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Business Description</label>
             <textarea v-model="companyProfile.description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">About</label>
+            <textarea v-model="companyProfile.about" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+            <p class="mt-1 text-xs text-gray-400">Shown in the About section of the marketing page. Leave blank to use the business description.</p>
           </div>
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Headquarters Address</label>

@@ -140,9 +140,14 @@ const socialLinks = computed<SocialLink[]>(() => {
   })
 })
 
+// The About section reads the dedicated "About" field from Company Settings
+// (falls back to the business description, then the static copy, if unset).
 const c = computed(() => ({
   name: company.value?.name?.trim() || fallback.name,
-  description: company.value?.description?.trim() || fallback.description,
+  description:
+    company.value?.about?.trim() ||
+    company.value?.description?.trim() ||
+    fallback.description,
 }))
 
 // ---------- Brand color scheme (Admin Panel > Company Settings > Company Profile) ----------
