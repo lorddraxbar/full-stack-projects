@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRole } from '@/composables/useRole'
 import {
-  useGetMe, useGetProjects, useGetTasks, useGetMessages, useGetNotifications,
+  useGetMe, useGetProjects, useGetTasks, useGetMessages,
   useGetAuditLogs, useGetCompanies, useGetUsers,
 } from '@/services/api'
 import {
@@ -54,7 +54,6 @@ const me = ref<{ id: number; fullName: string; role: string } | null>(null)
 const projects = ref<ProjectRow[]>([])
 const tasks = ref<TaskRow[]>([])
 const messages = ref<MessageRow[]>([])
-const notifications = ref<{ id: number; isRead: boolean }[]>([])
 const companies = ref<{ id: number; name: string }[]>([])
 const auditLogs = ref<{ id: number; userId: number | string; action: string; entityType: string; details: string; createdAt: string }[]>([])
 const users = ref<Record<number, string>>({})
@@ -124,17 +123,16 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const [meRes, projRes, taskRes, notifRes] = await Promise.all([
+    const [meRes, projRes, taskRes] = await Promise.all([
       useGetMe(), useGetProjects(),
       // Admins keep the pre-scoping behaviour (all tasks); everyone else now
       // only sees their own tasks on the dashboard.
-      useGetTasks(isAdmin.value ? { scope: 'ALL' } : undefined), useGetNotifications(),
+      useGetTasks(isAdmin.value ? { scope: 'ALL' } : undefined),
     ])
     me.value = meRes.user ?? null
     const projContent = Array.isArray(projRes) ? projRes : projRes?.content ?? []
     projects.value = projContent.map(mapProject)
     tasks.value = (Array.isArray(taskRes) ? taskRes : []).map(mapTask)
-    notifications.value = Array.isArray(notifRes) ? notifRes : []
 
     // Messages live per project — fetch for each project in parallel.
     const msgResults = await Promise.all(
@@ -169,8 +167,6 @@ onMounted(load)
 const clientStats = computed(() => ({
   assignedProjects: projects.value.length,
   inProgress: projects.value.filter(p => p.status === 'IN_PROGRESS').length,
-  pendingDocuments: 0, // documents endpoint has no client scoping; shown in Documents view
-  unreadMessages: notifications.value.filter(n => !n.isRead).length,
 }))
 const clientProjects = computed(() =>
   [...projects.value].sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0)).slice(0, 5)
@@ -178,19 +174,13 @@ const clientProjects = computed(() =>
 const latestUpdates = computed(() => messages.value.slice(0, 3))
 
 // ---------- user ----------
-const userStats = computed(() => {
-  const weekFromNow = Date.now() + 7 * 86400000
-  return {
-    activeProjects: projects.value.filter(p => p.status === 'IN_PROGRESS').length,
-    myTasks: me.value ? tasks.value.filter(t => t.assigneeId === me.value!.id).length : 0,
-    pendingMessages: notifications.value.filter(n => !n.isRead).length,
-    dueThisWeek: tasks.value.filter(t => t.dueDate && t.status !== 'DONE' && new Date(t.dueDate).getTime() <= weekFromNow).length,
-  }
-})
+const userStats = computed(() => ({
+  activeProjects: projects.value.filter(p => p.status === 'IN_PROGRESS').length,
+}))
 const recentTasks = computed(() =>
   [...tasks.value].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5)
 )
-const pendingMessages = computed(() => messages.value.slice(0, 3))
+const recentMessages = computed(() => messages.value.slice(0, 3))
 const activeProjects = computed(() =>
   projects.value.filter(p => p.status === 'IN_PROGRESS' || p.status === 'NOT_STARTED').slice(0, 5)
 )
@@ -239,7 +229,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
 
     <!-- ================= CLIENT DASHBOARD ================= -->
     <template v-else-if="isClient">
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between">
             <div>
@@ -259,17 +249,6 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
             </div>
             <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
               <i class="fas fa-spinner text-yellow-600 text-xl"></i>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-600">Unread Messages</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ clientStats.unreadMessages }}</p>
-            </div>
-            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-comment-dots text-green-600 text-xl"></i>
             </div>
           </div>
         </div>
@@ -339,7 +318,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
 
     <!-- ================= user DASHBOARD ================= -->
     <template v-else-if="isUser">
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between">
             <div>
@@ -359,28 +338,6 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
             </div>
             <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
               <i class="fas fa-tasks text-yellow-600 text-xl"></i>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-600">Unread Messages</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ userStats.pendingMessages }}</p>
-            </div>
-            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-comment-dots text-green-600 text-xl"></i>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-600">Due This Week</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ userStats.dueThisWeek }}</p>
-            </div>
-            <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-clock text-red-600 text-xl"></i>
             </div>
           </div>
         </div>
@@ -417,8 +374,8 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
             <RouterLink to="/messages" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">Open inbox</RouterLink>
           </div>
           <div class="divide-y divide-gray-200">
-            <div v-if="pendingMessages.length === 0" class="p-6 text-sm text-gray-500">No messages yet.</div>
-            <div v-for="msg in pendingMessages" :key="msg.id" class="p-6 hover:bg-gray-50 transition-colors">
+            <div v-if="recentMessages.length === 0" class="p-6 text-sm text-gray-500">No messages yet.</div>
+            <div v-for="msg in recentMessages" :key="msg.id" class="p-6 hover:bg-gray-50 transition-colors">
               <div class="flex items-center justify-between mb-1">
                 <h3 class="font-medium text-gray-900 text-sm">{{ msg.projectName }}</h3>
                 <span class="text-xs text-gray-500">{{ relativeTime(msg.createdAt) }}</span>
