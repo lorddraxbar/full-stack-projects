@@ -6,10 +6,12 @@ import com.secphils.dto.ProjectHardDeleteRequest;
 import com.secphils.dto.ProjectRequest;
 import com.secphils.dto.ProjectResponse;
 import com.secphils.entity.Company;
+import com.secphils.entity.Message;
 import com.secphils.entity.Project;
 import com.secphils.entity.Service;
 import com.secphils.entity.User;
 import com.secphils.repository.CompanyRepository;
+import com.secphils.repository.MessageRepository;
 import com.secphils.repository.ProjectRepository;
 import com.secphils.repository.ServiceRepository;
 import com.secphils.security.AuthUser;
@@ -17,6 +19,9 @@ import com.secphils.security.CurrentUser;
 import com.secphils.service.ProjectArchiveService;
 import com.secphils.service.ProjectNotificationService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -34,17 +39,20 @@ public class ProjectController {
     private final ProjectRepository projectRepository;
     private final CompanyRepository companyRepository;
     private final ServiceRepository serviceRepository;
+    private final MessageRepository messageRepository;
     private final AuditService auditService;
     private final ProjectArchiveService archiveService;
     private final ProjectNotificationService notificationService;
 
     public ProjectController(ProjectRepository projectRepository, CompanyRepository companyRepository,
-                             ServiceRepository serviceRepository, AuditService auditService,
+                             ServiceRepository serviceRepository, MessageRepository messageRepository,
+                             AuditService auditService,
                              ProjectArchiveService archiveService,
                              ProjectNotificationService notificationService) {
         this.projectRepository = projectRepository;
         this.companyRepository = companyRepository;
         this.serviceRepository = serviceRepository;
+        this.messageRepository = messageRepository;
         this.auditService = auditService;
         this.archiveService = archiveService;
         this.notificationService = notificationService;
@@ -87,7 +95,22 @@ public class ProjectController {
             }
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
-        return ResponseEntity.ok(projectRepository.findAll(spec, page).map(ProjectResponse::from));
+        Page<Project> projects = projectRepository.findAll(spec, page);
+        // Latest message per project (for the "latest update" column) — one
+        // query scoped to the page's project ids.
+        List<Long> pageIds = projects.getContent().stream().map(Project::getId).toList();
+        Map<Long, Message> latestByProject = pageIds.isEmpty()
+                ? Map.of()
+                : messageRepository.findLatestPerProject(pageIds).stream()
+                        .collect(Collectors.toMap(
+                                m -> m.getProject().getId(), m -> m, (a, b) -> a));
+        Page<ProjectResponse> mapped = projects.map(p -> {
+            Message latest = latestByProject.get(p.getId());
+            return ProjectResponse.from(p,
+                    latest != null ? latest.getBody() : null,
+                    latest != null ? latest.getCreatedAt() : null);
+        });
+        return ResponseEntity.ok(mapped);
     }
 
     @PostMapping
@@ -136,6 +159,12 @@ public class ProjectController {
         }
         String oldStatus = project.getStatus();
         apply(project, req);
+        if ("COMPLETED".equals(project.getStatus()) && !"COMPLETED".equals(oldStatus)
+                && project.getCompletedAt() == null) {
+            // Remember the first completion for the list page; a later
+            // re-completion refreshes the timestamp.
+            project.setCompletedAt(java.time.LocalDateTime.now());
+        }
         project = projectRepository.save(project);
         auditService.audit(actor, "PROJECT_UPDATE", "Project", project.getId(), "Name: " + project.getName(), http);
         if (!java.util.Objects.equals(oldStatus, project.getStatus())) {

@@ -9,7 +9,7 @@ import NewProjectWizard from '@/components/NewProjectWizard.vue'
 import type { WizardData } from '@/components/NewProjectWizard.vue'
 import { useRole } from '@/composables/useRole'
 import { useGetMe, useGetProjects, useCreateProject, useUpdateProject, useCreateCompany, useUpdateCompany, useUploadDocument } from '@/services/api'
-import { projectStatusLabel, PROJECT_STATUS_COLORS } from '@/lib/labels'
+import { projectStatusLabel, PROJECT_STATUS_COLORS, formatPhp, formatDate, formatDateTime, timeAgo } from '@/lib/labels'
 
 const { isClient } = useRole()
 const router = useRouter()
@@ -28,6 +28,11 @@ interface ProjectRow {
   serviceType: string
   status: string
   progress: number
+  totalCost: number | null
+  latestUpdate: string | null
+  latestUpdatedAt: string | null
+  createdAt: string | null
+  completedAt: string | null
 }
 
 const projects = ref<ProjectRow[]>([])
@@ -42,6 +47,11 @@ function mapProject(p: any): ProjectRow {
     serviceType: p.serviceName || '—',
     status: projectStatusLabel(p.status),
     progress: p.progress ?? 0,
+    totalCost: p.totalCost != null ? Number(p.totalCost) : null,
+    latestUpdate: p.latestUpdateBody || null,
+    latestUpdatedAt: p.latestUpdateAt || null,
+    createdAt: p.createdAt || null,
+    completedAt: p.completedAt || null,
   }
 }
 
@@ -306,6 +316,29 @@ onMounted(init)
               </span>
               <span>
                 <i class="fas fa-tag text-xs mr-1 text-gray-400" />{{ project.serviceType }}
+              </span>
+              <span>
+                <i class="fas fa-money-bill-wave text-xs mr-1 text-gray-400" />{{ formatPhp(project.totalCost) }}
+              </span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-gray-500">
+              <span :title="project.latestUpdate ?? ''">
+                <i class="fas fa-comment-dots text-xs mr-1 text-gray-400" />
+                <template v-if="project.latestUpdate">
+                  {{ project.latestUpdate.length > 42 ? project.latestUpdate.slice(0, 42) + '…' : project.latestUpdate }}
+                  <span class="text-gray-400">· {{ timeAgo(project.latestUpdatedAt) || formatDateTime(project.latestUpdatedAt) }}</span>
+                </template>
+                <template v-else>
+                  No updates yet
+                </template>
+              </span>
+              <span>
+                <i class="fas fa-calendar-plus text-xs mr-1 text-gray-400" />
+                Created {{ formatDate(project.createdAt) }}
+              </span>
+              <span>
+                <i class="fas fa-flag-checkered text-xs mr-1 text-gray-400" />
+                Completed {{ project.completedAt ? formatDate(project.completedAt) : '—' }}
               </span>
             </div>
             </div>

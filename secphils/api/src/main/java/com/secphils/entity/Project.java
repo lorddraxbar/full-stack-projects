@@ -92,6 +92,10 @@ public class Project {
     @Column(name = "delete_at")
     private LocalDateTime deleteAt;
 
+    /** First time the project's status became COMPLETED. */
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
     /** Status before archiving; restored on un-archive. */
     @Column(name = "previous_status", length = 30)
     private String previousStatus;

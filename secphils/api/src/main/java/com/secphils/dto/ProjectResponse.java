@@ -27,10 +27,19 @@ public record ProjectResponse(
         Integer progress,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
+        LocalDateTime completedAt,
         LocalDateTime archivedAt,
-        LocalDateTime deleteAt
+        LocalDateTime deleteAt,
+        String latestUpdateBody,
+        LocalDateTime latestUpdateAt
 ) {
+    /** Entity-only — used for single-project reads; no latest-message enrichment. */
     public static ProjectResponse from(Project p) {
+        return from(p, null, null);
+    }
+
+    /** List-page use: pass the project's latest-update body + timestamp (nulls when none). */
+    public static ProjectResponse from(Project p, String latestUpdateBody, LocalDateTime latestUpdateAt) {
         return new ProjectResponse(
                 p.getId(),
                 p.getCompany() != null ? p.getCompany().getId() : null,
@@ -42,7 +51,9 @@ public record ProjectResponse(
                 p.getStatus(), p.getTotalCost(), p.getRawMaterials(), p.getProductionOutput(),
                 p.getWasteManagement(), p.getWasteMaterials(), p.getManufacturingProcedure(),
                 p.getProductionFlowchartUrl(), p.getProgress(),
-                p.getCreatedAt(), p.getUpdatedAt(),
-                p.getArchivedAt(), p.getDeleteAt());
+                p.getCreatedAt(), p.getUpdatedAt(), p.getCompletedAt(),
+                p.getArchivedAt(), p.getDeleteAt(),
+                latestUpdateBody,
+                latestUpdateAt);
     }
 }
