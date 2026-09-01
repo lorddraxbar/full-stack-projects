@@ -70,14 +70,12 @@ const destroyOverlayScrollbars = () => {
 // ---------- Company profile (Admin Panel > Company Settings) ----------
 const company = ref<LandingCompany | null>(null)
 
-// Fallbacks mirror www.secphils.com
+// Fallbacks mirror www.secphils.com (About has no fallback — it's a dedicated field)
 const fallback = {
   name: 'Strategic Engineering Consultancy',
   phone: '+63 2 8888 1234',
   email: 'manager@secphils.com',
   facebook: 'https://www.facebook.com/strategicengineeringconsultancy/',
-  description:
-    'We are a Filipino company, owned and operated by highly competitive engineers. Each professional on our team has multiple years of industry experience with very high attention to quality.',
 }
 
 const splitList = (raw: string | undefined | null): string[] =>
@@ -140,15 +138,14 @@ const socialLinks = computed<SocialLink[]>(() => {
   })
 })
 
-// The About section reads the dedicated "About" field from Company Settings
-// (falls back to the business description, then the static copy, if unset).
+// The About section is tied 1-to-1 to the dedicated "About" field from
+// Company Settings — no fallback chain (business description / static copy).
+// The section (and its nav link) render only when the field has content.
 const c = computed(() => ({
   name: company.value?.name?.trim() || fallback.name,
-  description:
-    company.value?.about?.trim() ||
-    company.value?.description?.trim() ||
-    fallback.description,
+  about: company.value?.about?.trim() || '',
 }))
+const hasAbout = computed(() => c.value.about !== '')
 
 // ---------- Brand color scheme (Admin Panel > Company Settings > Company Profile) ----------
 // The primary/secondary brand colors saved in the Admin profile drive the public
@@ -211,7 +208,7 @@ const navLinks = computed(() => {
     { id: 'services', label: 'Services' },
   ]
   if (hasReviews.value) links.push({ id: 'reviews', label: 'Reviews' })
-  links.push({ id: 'about', label: 'About' })
+  if (hasAbout.value) links.push({ id: 'about', label: 'About' })
   return links
 })
 
@@ -285,7 +282,8 @@ const marqueeDuration = computed(() => Math.max(20, reviews.value.length * 4) + 
 const sectionShades = computed<Record<string, string>>(() => {
   const order = ['services', 'portal']
   if (hasReviews.value) order.push('reviews')
-  order.push('about', 'contact')
+  if (hasAbout.value) order.push('about')
+  order.push('contact')
   const shades: Record<string, string> = {}
   order.forEach((id, i) => {
     shades[id] = i % 2 === 0 ? '#f9f9f9' : '#ffffff'
@@ -300,7 +298,8 @@ const sectionShades = computed<Record<string, string>>(() => {
 const cardShades = computed<Record<string, string>>(() => {
   const order = ['services', 'portal']
   if (hasReviews.value) order.push('reviews')
-  order.push('about', 'contact')
+  if (hasAbout.value) order.push('about')
+  order.push('contact')
   const shades: Record<string, string> = {}
   order.forEach((id, i) => {
     shades[id] = i % 2 === 0 ? '#ffffff' : '#f9f9f9'
@@ -697,8 +696,9 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <!-- ================= ABOUT (modernized) ================= -->
-    <section id="about" class="py-20 scroll-mt-16" :style="{ background: sectionShades.about, '--card-bg': cardShades.about }">
+    <!-- ================= ABOUT (modernized) — renders only when the Company
+         Profile "About" field has content (single source of truth) ================= -->
+    <section v-if="hasAbout" id="about" class="py-20 scroll-mt-16" :style="{ background: sectionShades.about, '--card-bg': cardShades.about }">
       <div class="mx-auto max-w-[1140px] px-4">
         <div class="pb-10">
           <p class="section-eyebrow">Who we are</p>
@@ -710,7 +710,7 @@ onBeforeUnmount(() => {
           <div class="flex flex-col rounded-2xl border p-8 sm:p-10" style="border-color: #e8e8e8; background: var(--card-bg)">
             <i class="fa-solid fa-building-columns mb-4 block text-2xl" style="color: var(--bsp)"></i>
             <h2 class="mb-3 font-light text-2xl sm:text-3xl" style="color: #353535">{{ c.name }}</h2>
-            <p class="text-base leading-7" style="color: #757575">{{ c.description }}</p>
+            <p class="text-base leading-7" style="color: #757575">{{ c.about }}</p>
           </div>
 
           <!-- Right: team photo collage -->
