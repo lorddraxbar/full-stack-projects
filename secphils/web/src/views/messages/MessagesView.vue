@@ -30,8 +30,15 @@ const searchQuery = ref('')
 const newMessage = ref('')
 const sending = ref(false)
 const sendError = ref('')
-// Staff/admin can mark a message internal (the client never sees it).
-const sendInternal = ref(false)
+// Safe by default: staff start staff-only. Flip `visibleToClient` to share
+// with the client. The client's composer is always client-visible (effectiveInternal).
+const sendInternal = ref(true)
+const visibleToClient = computed({
+  get: () => !isClient.value && !sendInternal.value,
+  set: (v: boolean) => { sendInternal.value = !v },
+})
+// What actually gets sent — a client can never be internal (the backend 403s it).
+const effectiveInternal = computed(() => !isClient.value && sendInternal.value)
 
 function isInternal(msg: any): boolean {
   return msg?.visibility === 'INTERNAL'
@@ -159,7 +166,7 @@ async function loadConversations() {
 async function selectConversation(id: number) {
   selectedId.value = id
   sendError.value = ''
-  sendInternal.value = false
+  sendInternal.value = true
   pendingFile.value = null
   if (fileInput.value) fileInput.value.value = ''
   try {
@@ -178,10 +185,11 @@ async function sendMessage() {
   sending.value = true
   sendError.value = ''
   try {
+    const internal = effectiveInternal.value
     if (file) {
-      await useUploadMessage({ projectId: selectedId.value, body: text || undefined, file, internal: sendInternal.value })
+      await useUploadMessage({ projectId: selectedId.value, body: text || undefined, file, internal })
     } else {
-      await useSendMessage(selectedId.value, text, sendInternal.value)
+      await useSendMessage(selectedId.value, text, internal)
     }
     newMessage.value = ''
     pendingFile.value = null
@@ -357,7 +365,6 @@ onMounted(loadConversations)
 
         <!-- Message Input -->
         <div class="p-4 border-t border-gray-200">
-          <p v-if="sendError" class="text-xs text-red-600 mb-2">{{ sendError }}</p>
           <div v-if="pendingFile" class="mb-2 flex items-center gap-2">
             <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-lg">
               <i class="fas fa-paperclip text-emerald-600"></i>
@@ -373,45 +380,64 @@ onMounted(loadConversations)
               </button>
             </span>
           </div>
-          <div class="flex gap-2 items-end">
-            <button
-              type="button"
-              @click="fileInput?.click()"
-              class="px-3 py-2 border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-emerald-600 transition-colors"
-              title="Attach a file"
+          <div
+            class="flex flex-col gap-3 rounded-lg border p-3"
+            :class="effectiveInternal ? 'border-slate-300 bg-slate-50' : 'border-emerald-300 bg-emerald-50/40'"
+          >
+            <!-- Audience banner: the single place you see who will see your message. -->
+            <div
+              class="flex items-center gap-2 text-sm font-medium"
+              :class="effectiveInternal ? 'text-slate-600' : 'text-emerald-800'"
             >
-              <i class="fas fa-paperclip"></i>
-            </button>
-            <input
-              ref="fileInput"
-              type="file"
-              class="hidden"
-              @change="onFilePicked"
-            />
-            <input
+              <template v-if="effectiveInternal">
+                <i class="fas fa-lock text-xs"></i>
+                <span>Staff only &mdash; your client won&rsquo;t see this message</span>
+              </template>
+              <template v-else>
+                <i class="fas fa-bullhorn text-xs"></i>
+                <span>Visible to the client</span>
+              </template>
+              <!-- Staff get the switch; clients can only post client-visible. -->
+              <label v-if="!isClient" class="ml-auto flex items-center gap-2 cursor-pointer select-none text-xs" :class="visibleToClient ? 'text-emerald-800' : 'text-slate-600'">
+                <span class="font-semibold">Visible to client</span>
+                <span class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" :class="visibleToClient ? 'bg-emerald-600' : 'bg-slate-300'">
+                  <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform" :class="visibleToClient ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                  <input v-model="visibleToClient" type="checkbox" class="sr-only" />
+                </span>
+              </label>
+            </div>
+
+            <textarea
               v-model="newMessage"
-              @keyup.enter="sendMessage"
-              type="text"
-              placeholder="Type a message..."
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            />
-            <div class="flex flex-col items-end gap-1.5">
+              @keyup.enter.exact="sendMessage"
+              rows="2"
+              :placeholder="effectiveInternal ? 'Type an internal staff note…' : 'Type a message…'"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm bg-white"
+            ></textarea>
+
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="fileInput?.click()"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg text-gray-500 hover:bg-white hover:text-emerald-600 transition-colors text-sm"
+                  title="Attach a file"
+                >
+                  <i class="fas fa-paperclip"></i>
+                  <span class="hidden sm:inline">Attach</span>
+                </button>
+                <input ref="fileInput" type="file" class="hidden" @change="onFilePicked" />
+                <p v-if="sendError" class="text-xs text-red-600">{{ sendError }}</p>
+              </div>
               <button
                 @click="sendMessage"
                 :disabled="sending || (!newMessage.trim() && !pendingFile)"
-                class="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50"
+                class="inline-flex items-center gap-2 px-5 py-2 rounded-lg text-white font-medium transition-colors disabled:opacity-50"
+                :class="effectiveInternal ? 'bg-slate-700 hover:bg-slate-800' : 'bg-emerald-600 hover:bg-emerald-700'"
               >
-                Send
+                <i :class="effectiveInternal ? 'fas fa-lock' : 'fas fa-paper-plane'"></i>
+                {{ sending ? 'Sending…' : (effectiveInternal ? 'Send to staff' : 'Send to client') }}
               </button>
-              <!-- Staff/admin only: mark the message internal (the client never sees it). -->
-              <label v-if="!isClient" class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  v-model="sendInternal"
-                  class="rounded border-gray-300 text-slate-700 focus:ring-slate-500"
-                />
-                <i class="fas fa-lock text-[10px] text-slate-500"></i> Internal (staff only)
-              </label>
             </div>
           </div>
         </div>

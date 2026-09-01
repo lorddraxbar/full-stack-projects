@@ -171,13 +171,19 @@ async function hardDeleteProject() {
 // ---------- Messages ----------
 const messageDraft = ref('')
 const sending = ref(false)
-// Staff/admin can mark a message internal (invisible to the client).
-const sendInternal = ref(false)
+// Safe by default: staff start staff-only; flip to share with the client.
+const sendInternal = ref(true)
+const visibleToClient = computed({
+  get: () => !isClient.value && !sendInternal.value,
+  set: (v: boolean) => { sendInternal.value = !v },
+})
+// What actually gets sent — a client can never be internal (the backend 403s it).
+const effectiveInternal = computed(() => !isClient.value && sendInternal.value)
 async function sendMessage() {
   if (!messageDraft.value.trim() || sending.value) return
   sending.value = true
   try {
-    await useSendMessage(projectId.value, messageDraft.value.trim(), sendInternal.value)
+    await useSendMessage(projectId.value, messageDraft.value.trim(), effectiveInternal.value)
     messageDraft.value = ''
     messages.value = await useGetMessages(projectId.value)
   } catch (err: any) {
@@ -1264,30 +1270,50 @@ async function saveProductionEdit() {
           </div>
         </div>
         <div class="p-6 border-t border-gray-200">
-          <div class="flex gap-3">
+          <div
+            class="flex flex-col gap-3 rounded-lg border p-3"
+            :class="effectiveInternal ? 'border-slate-300 bg-slate-50' : 'border-emerald-300 bg-emerald-50/40'"
+          >
+            <!-- Audience banner: where you see who will see this message. -->
+            <div
+              class="flex items-center gap-2 text-sm font-medium"
+              :class="effectiveInternal ? 'text-slate-600' : 'text-emerald-800'"
+            >
+              <template v-if="effectiveInternal">
+                <i class="fas fa-lock text-xs"></i>
+                <span>Staff only &mdash; your client won&rsquo;t see this message</span>
+              </template>
+              <template v-else>
+                <i class="fas fa-bullhorn text-xs"></i>
+                <span>Visible to the client</span>
+              </template>
+              <!-- Staff get the switch; clients can only post client-visible. -->
+              <label v-if="!isClient" class="ml-auto flex items-center gap-2 cursor-pointer select-none text-xs" :class="visibleToClient ? 'text-emerald-800' : 'text-slate-600'">
+                <span class="font-semibold">Visible to client</span>
+                <span class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" :class="visibleToClient ? 'bg-emerald-600' : 'bg-slate-300'">
+                  <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform" :class="visibleToClient ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                  <input v-model="visibleToClient" type="checkbox" class="sr-only" />
+                </span>
+              </label>
+            </div>
+
             <textarea
               v-model="messageDraft"
               rows="2"
-              placeholder="Type a message..."
-              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-            />
-            <div class="flex flex-col items-end justify-between gap-2 self-stretch">
+              :placeholder="effectiveInternal ? 'Type an internal staff note…' : 'Type a message…'"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm bg-white"
+            ></textarea>
+
+            <div class="flex items-center justify-end">
               <button
                 @click="sendMessage"
                 :disabled="sending || !messageDraft.trim()"
-                class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
+                class="inline-flex items-center gap-2 px-5 py-2 rounded-lg text-white font-medium transition-colors disabled:opacity-50"
+                :class="effectiveInternal ? 'bg-slate-700 hover:bg-slate-800' : 'bg-emerald-600 hover:bg-emerald-700'"
               >
-                Send
+                <i :class="effectiveInternal ? 'fas fa-lock' : 'fas fa-paper-plane'"></i>
+                {{ sending ? 'Sending…' : (effectiveInternal ? 'Send to staff' : 'Send to client') }}
               </button>
-              <!-- Staff/admin only: mark the message internal (client never sees it). -->
-              <label v-if="!isClient" class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  v-model="sendInternal"
-                  class="rounded border-gray-300 text-slate-700 focus:ring-slate-500"
-                />
-                <i class="fas fa-lock text-[10px] text-slate-500"></i> Internal (staff only)
-              </label>
             </div>
           </div>
         </div>
