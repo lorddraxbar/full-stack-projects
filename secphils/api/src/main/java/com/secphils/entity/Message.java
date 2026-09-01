@@ -43,6 +43,10 @@ public class Message {
     @Column(name = "attachment_content_type")
     private String attachmentContentType;
 
+    /** 'CLIENT' (default, visible to company members + admin) or 'INTERNAL' (provider staff only). */
+    @Column(nullable = false, length = 20)
+    private String visibility = "CLIENT";
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) createdAt = LocalDateTime.now();

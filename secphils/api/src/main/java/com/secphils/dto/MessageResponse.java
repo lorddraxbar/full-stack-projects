@@ -15,6 +15,8 @@ public record MessageResponse(
         String attachmentFileName,
         Long attachmentFileSize,
         String attachmentContentType,
+        /** 'CLIENT' (default) or 'INTERNAL'. Always present so the UI can flag internal bubbles. */
+        String visibility,
         LocalDateTime createdAt
 ) {
     public static MessageResponse from(Message m) {
@@ -27,6 +29,7 @@ public record MessageResponse(
                 m.getAttachmentFileName(),
                 m.getAttachmentFileSize(),
                 m.getAttachmentContentType(),
+                m.getVisibility() == null ? "CLIENT" : m.getVisibility(),
                 m.getCreatedAt());
     }
 }

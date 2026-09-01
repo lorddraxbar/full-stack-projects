@@ -449,15 +449,19 @@ export async function useDeleteDocument(id: number) {
  * Send a message with a file attachment. The file bytes are uploaded to
  * object storage (multipart) and the message row stores the s3:// reference.
  * Fails with 400 if the admin has not configured Object Storage yet.
+ * Pass `internal: true` (provider staff only) for a staff-only message that
+ * clients cannot see; the backend rejects it for a CLIENT-role sender.
  */
 export async function useUploadMessage(payload: {
   projectId: number
   body?: string
   file: File
+  internal?: boolean
 }) {
   const form = new FormData()
   form.append('projectId', String(payload.projectId))
   if (payload.body) form.append('body', payload.body)
+  if (payload.internal) form.append('visibility', 'INTERNAL')
   form.append('file', payload.file)
   const response = await api.post('/messages/upload', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -483,8 +487,10 @@ export async function useGetMessages(projectId: number) {
   return response.data
 }
 
-export async function useSendMessage(projectId: number, body: string) {
-  const response = await api.post('/messages', { projectId, body })
+export async function useSendMessage(projectId: number, body: string, internal = false) {
+  const payload: Record<string, unknown> = { projectId, body }
+  if (internal) payload.visibility = 'INTERNAL'
+  const response = await api.post('/messages', payload)
   return response.data
 }
 

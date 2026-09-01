@@ -5,5 +5,7 @@ import jakarta.validation.constraints.NotNull;
 
 public record MessageRequest(
         @NotNull Long projectId,
-        @NotBlank String body
+        @NotBlank String body,
+        /** 'CLIENT' (default) or 'INTERNAL' — internal is rejected for CLIENT-role senders. */
+        String visibility
 ) {}

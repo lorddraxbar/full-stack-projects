@@ -26,4 +26,17 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
            nativeQuery = true)
     List<Message> findLatestPerProject(@org.springframework.data.repository.query.Param("projectIds")
                                        Collection<Long> projectIds);
+
+    /**
+     * Latest message per project, excluding INTERNAL messages. Used to build the
+     * "latest update" preview for CLIENT-role viewers so an internal staff
+     * message can never surface in a client-facing project list.
+     */
+    @Query(value = "SELECT m.* FROM messages m " +
+            "WHERE m.id IN (" +
+            "  SELECT max(id) FROM messages WHERE project_id IN :projectIds " +
+            "    AND COALESCE(visibility,'CLIENT') <> 'INTERNAL' GROUP BY project_id)",
+           nativeQuery = true)
+    List<Message> findLatestNonInternalPerProject(@org.springframework.data.repository.query.Param("projectIds")
+                                                  Collection<Long> projectIds);
 }

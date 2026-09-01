@@ -171,11 +171,13 @@ async function hardDeleteProject() {
 // ---------- Messages ----------
 const messageDraft = ref('')
 const sending = ref(false)
+// Staff/admin can mark a message internal (invisible to the client).
+const sendInternal = ref(false)
 async function sendMessage() {
   if (!messageDraft.value.trim() || sending.value) return
   sending.value = true
   try {
-    await useSendMessage(projectId.value, messageDraft.value.trim())
+    await useSendMessage(projectId.value, messageDraft.value.trim(), sendInternal.value)
     messageDraft.value = ''
     messages.value = await useGetMessages(projectId.value)
   } catch (err: any) {
@@ -183,6 +185,10 @@ async function sendMessage() {
   } finally {
     sending.value = false
   }
+}
+
+function isInternal(msg: any): boolean {
+  return msg?.visibility === 'INTERNAL'
 }
 
 // ---------- Documents (add / delete) ----------
@@ -1223,12 +1229,24 @@ async function saveProductionEdit() {
             <div
               :class="[
                 'max-w-md rounded-lg p-4',
-                isMine(msg) ? 'bg-emerald-600 text-white' : 'bg-gray-100',
+                isInternal(msg)
+                  ? (isMine(msg) ? 'bg-slate-700 text-white ring-1 ring-dashed ring-slate-400' : 'bg-slate-100 ring-1 ring-dashed ring-slate-400')
+                  : (isMine(msg) ? 'bg-emerald-600 text-white' : 'bg-gray-100'),
               ]"
             >
               <div class="flex items-center justify-between gap-4 mb-1">
-                <p :class="['text-xs font-medium', isMine(msg) ? 'text-emerald-100' : 'text-gray-600']">
+                <p :class="['text-xs font-medium flex items-center gap-1.5', isMine(msg) ? 'text-emerald-100' : 'text-gray-600']">
                   {{ msg.senderName || '—' }}
+                  <span
+                    v-if="isInternal(msg)"
+                    :class="[
+                      'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border',
+                      isMine(msg) ? 'bg-white/20 text-white border-white/40' : 'bg-slate-200 text-slate-700 border-slate-400/60',
+                    ]"
+                    title="Internal — only visible to provider staff, not the client"
+                  >
+                    <i class="fas fa-lock"></i> Internal
+                  </span>
                 </p>
                 <p :class="['text-xs', isMine(msg) ? 'text-emerald-200' : 'text-gray-400']">
                   {{ formatDateTime(msg.createdAt) }}
@@ -1253,13 +1271,24 @@ async function saveProductionEdit() {
               placeholder="Type a message..."
               class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
-            <button
-              @click="sendMessage"
-              :disabled="sending"
-              class="self-end bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
-            >
-              Send
-            </button>
+            <div class="flex flex-col items-end justify-between gap-2 self-stretch">
+              <button
+                @click="sendMessage"
+                :disabled="sending || !messageDraft.trim()"
+                class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                Send
+              </button>
+              <!-- Staff/admin only: mark the message internal (client never sees it). -->
+              <label v-if="!isClient" class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  v-model="sendInternal"
+                  class="rounded border-gray-300 text-slate-700 focus:ring-slate-500"
+                />
+                <i class="fas fa-lock text-[10px] text-slate-500"></i> Internal (staff only)
+              </label>
+            </div>
           </div>
         </div>
       </div>

@@ -36,6 +36,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.net.URI;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,13 +45,26 @@ import org.springframework.transaction.annotation.Transactional;
  * Project-scoped team messaging.
  *
  * <p>{@code GET} lists a project's thread; {@code POST} appends a message as the
- * current user and fans a notification out to every other active member of the
- * project's company — an in-app {@link Notification} row plus a branded email,
- * each gated on the recipient's per-channel {@code newMessage} preference
- * (see {@code NotificationController} defaults; a missing key means "allowed").
- * Mirrors the announcement fan-out: mail failures never break the request
- * (MailService logs only), the author is skipped, and the audit trail records
- * the send.
+ * current user and fans a notification out to the audience — an in-app
+ * {@link Notification} row plus a branded email, each gated on the recipient's
+ * per-channel {@code newMessage} preference (see {@code NotificationController}
+ * defaults; a missing key means "allowed").
+ *
+ * <p><b>Internal messages.</b> A message may carry {@code visibility =
+ * "INTERNAL"} (default {@code "CLIENT"}). Internal messages are:
+ * <ul>
+ *   <li>creatable only by provider staff (USER/ADMIN roles) — a CLIENT-role
+ *       sender is rejected with 403;</li>
+ *   <li>never returned to a CLIENT-role user by {@code GET} (the row is
+ *       filtered in SQL-free memory, so the client never learns it exists);
+ *       attachment downloads are likewise 404 for clients;</li>
+ *   <li>fanned out to provider staff only (never to company/client members).</li>
+ * </ul>
+ * "Internal" here is defined by role, not by the (currently unused)
+ * {@code project_team_members} table. Public messages keep today's behaviour:
+ * visible to company members + admin, fanned out to company members.
+ * Mail failures never break the request (MailService logs only), the author
+ * is skipped, and the audit trail records the send.
  */
 @RestController
 @RequestMapping("/api/v1/messages")
@@ -99,9 +113,13 @@ public class MessageController {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> ApiException.notFound("Project"));
         requireVisibleTo(actor, project.getCompany().getId());
-        return ResponseEntity.ok(
-                messageRepository.findByProjectIdOrderByCreatedAtAsc(projectId).stream()
-                        .map(MessageResponse::from).toList());
+        List<Message> rows = messageRepository.findByProjectIdOrderByCreatedAtAsc(projectId);
+        // Internal messages are invisible to CLIENT-role users — filtered
+        // server-side so the client neither sees nor can infer them.
+        if (actor.isClient()) {
+            rows = rows.stream().filter(m -> !isInternal(m)).toList();
+        }
+        return ResponseEntity.ok(rows.stream().map(MessageResponse::from).toList());
     }
 
     @PostMapping
@@ -118,10 +136,17 @@ public class MessageController {
                 .orElseThrow(() -> ApiException.notFound("User"));
         message.setSender(sender);
         message.setBody(req.body());
+        message.setVisibility(normalizeVisibility(req.visibility()));
+        // Only provider staff may mark a message internal; a client's attempt
+        // is rejected (the UI never offers the toggle to them).
+        if (actor.isClient() && isInternal(message)) {
+            throw ApiException.forbidden("Internal messages are limited to provider staff");
+        }
         message.setCreatedAt(LocalDateTime.now());
         message = messageRepository.save(message);
         dispatch(message, project, sender, actor, http);
-        auditService.audit(actor, "MESSAGE_SEND", "Message", message.getId(), "Project: " + project.getId(), http);
+        auditService.audit(actor, "MESSAGE_SEND", "Message", message.getId(),
+                "Project: " + project.getId() + (isInternal(message) ? " [internal]" : ""), http);
         return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(message));
     }
 
@@ -137,6 +162,7 @@ public class MessageController {
     public ResponseEntity<MessageResponse> upload(
             @RequestParam("projectId") Long projectId,
             @RequestParam(required = false) String body,
+            @RequestParam(required = false) String visibility,
             @RequestParam("file") MultipartFile file,
             HttpServletRequest http) throws IOException {
         AuthUser actor = CurrentUser.require();
@@ -162,6 +188,10 @@ public class MessageController {
             message.setBody(body == null || body.isBlank()
                     ? (file.getOriginalFilename() == null ? "File attached" : file.getOriginalFilename())
                     : body.trim());
+            message.setVisibility(normalizeVisibility(visibility));
+            if (actor.isClient() && isInternal(message)) {
+                throw ApiException.forbidden("Internal messages are limited to provider staff");
+            }
             message.setAttachmentUrl(s3Uri);
             message.setAttachmentFileName(file.getOriginalFilename() == null ? "file" : file.getOriginalFilename());
             message.setAttachmentFileSize((long) bytes.length);
@@ -201,6 +231,11 @@ public class MessageController {
         Message m = messageRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Message"));
         requireVisibleTo(actor, m.getProject().getCompany().getId());
+        // Internal attachments are not downloadable by client-role users — 404,
+        // same as an unknown id (don't reveal the message exists).
+        if (actor.isClient() && isInternal(m)) {
+            throw ApiException.notFound("Message");
+        }
         String url = m.getAttachmentUrl();
         if (url == null || url.isBlank()) {
             throw ApiException.badRequest("This message has no file attached");
@@ -233,16 +268,36 @@ public class MessageController {
         }
     }
 
-    /** Fans the new message out to the project's company members (skipping the sender). */
+    /**
+     * Fans the new message out to the right audience (skipping the sender):
+     * <ul>
+     *   <li>INTERNAL → provider staff only (USER/ADMIN roles, any company);</li>
+     *   <li>CLIENT (default) → active members of the project's company, as before.</li>
+     * </ul>
+     * Each recipient gets an in-app {@link Notification} plus a branded email,
+     * gated on their per-channel {@code newMessage} preference.
+     */
     private void dispatch(Message m, Project project, User sender, AuthUser actor, HttpServletRequest http) {
         Company company = project.getCompany();
         if (company == null) return; // no company -> nothing to fan out to
 
-        String title = "New message from " + DisplayNamePolicy.nameFor(sender) + " · " + project.getName();
+        boolean internal = isInternal(m);
+        String title = (internal ? "Internal message from " : "New message from ")
+                + DisplayNamePolicy.nameFor(sender) + " · " + project.getName();
         String body = m.getBody() == null ? "" : m.getBody();
         String link = portalBaseUrl.endsWith("/") ? portalBaseUrl + "messages" : portalBaseUrl + "/messages";
+        // Internal messages link to the project's conversation (where the team
+        // reads them), public ones to the general messages inbox.
+        if (internal) {
+            String base = portalBaseUrl.endsWith("/") ? portalBaseUrl : portalBaseUrl + "/";
+            link = base + "projects/" + project.getId();
+        }
 
-        for (User u : userRepository.findByCompanyIdAndIsActiveTrue(company.getId())) {
+        List<User> recipients = internal
+                ? providerStaffRecipients()
+                : userRepository.findByCompanyIdAndIsActiveTrue(company.getId());
+
+        for (User u : recipients) {
             if (u.getId().equals(actor.id())) continue; // sender already knows
             NotificationPreference pref = preferenceRepository.findByUserId(u.getId()).orElse(null);
             boolean inApp = prefAllows(u, pref == null ? null : pref.getInApp());
@@ -255,7 +310,7 @@ public class MessageController {
                 n.setRecipient(ref);
                 n.setTitle(title);
                 n.setBody(body);
-                n.setType("MESSAGE");
+                n.setType(internal ? "MESSAGE_INTERNAL" : "MESSAGE");
                 n.setEntityType("Message");
                 n.setEntityId(m.getId());
                 n.setIsRead(false);
@@ -263,27 +318,56 @@ public class MessageController {
                 notificationRepository.save(n);
             }
             if (email && u.getEmail() != null && !u.getEmail().isBlank()) {
-                mailService.sendHtml(u.getEmail(), "New message from " + DisplayNamePolicy.nameFor(sender) + " — " + project.getName(),
-                        messageEmail(sender, project, body, link), link, DisplayNamePolicy.emailFor(sender));
+                mailService.sendHtml(u.getEmail(), title,
+                        messageEmail(sender, project, body, link, internal), link, DisplayNamePolicy.emailFor(sender));
             }
         }
     }
 
-    private String messageEmail(User sender, Project project, String body, String link) {
+    /** Active USER/ADMIN-role users (provider staff), de-duped by id. */
+    private List<User> providerStaffRecipients() {
+        List<User> staff = new java.util.ArrayList<>(userRepository.findByRoleAndIsActive("USER", true));
+        staff.addAll(userRepository.findByRoleAndIsActive("ADMIN", true));
+        staff.sort(Comparator.comparing(User::getId));
+        return staff;
+    }
+
+    private String messageEmail(User sender, Project project, String body, String link, boolean internal) {
+        String kicker = internal ? "SecPhils · Internal · " : "SecPhils · ";
         return "<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f4f5f7;\""
                 + "font-family:Arial,Helvetica,sans-serif;color:#1f2937;\">"
-                + "<div style=\"max-width:560px;margin:32px auto;padding:32px;background:#ffffff;"
+                + "<div style=\"max-width:560px;margin:32px auto;padding:32px;background:#ffffff;\""
                 + "border-radius:12px;border:1px solid #e5e7eb;\">"
-                + "<p style=\"margin:0 0 8px;font-size:13px;color:#059669;font-weight:bold;\">SecPhils · " + esc(project.getName()) + "</p>"
-                + "<h1 style=\"margin:0 0 16px;font-size:18px;font-weight:600;\">New message from " + esc(DisplayNamePolicy.nameFor(sender)) + "</h1>"
+                + "<p style=\"margin:0 0 8px;font-size:13px;color:#059669;font-weight:bold;\">" + kicker + esc(project.getName()) + "</p>"
+                + "<h1 style=\"margin:0 0 16px;font-size:18px;font-weight:600;\">" + esc(titleHead(sender, project, internal)) + "</h1>"
                 + "<p style=\"margin:0 0 16px;font-size:14px;line-height:1.6;\">" + esc(body).replace("\n", "<br>") + "</p>"
                 + "<p style=\"margin:0 0 8px;font-size:14px;line-height:1.6;\"><a href=\"" + link + "\" style=\"color:#059669;\">Open the conversation →</a></p>"
-                + "<p style=\"margin:16px 0 0;font-size:12px;color:#9ca3af;\">You're receiving this as a member of the project's company. Manage your notification preferences in the portal.</p>"
+                + "<p style=\"margin:16px 0 0;font-size:12px;color:#9ca3af;\">"
+                + (internal
+                    ? "You're receiving this as a provider team member. Internal messages are not visible to the client. Manage your notification preferences in the portal."
+                    : "You're receiving this as a member of the project's company. Manage your notification preferences in the portal.")
+                + "</p>"
                 + "</div></body></html>";
+    }
+
+    private String titleHead(User sender, Project project, boolean internal) {
+        return (internal ? "Internal message from " : "New message from ")
+                + DisplayNamePolicy.nameFor(sender);
     }
 
     private static String esc(String s) {
         return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    /** True when the message is an internal (provider-staff-only) one. */
+    private static boolean isInternal(Message m) {
+        return m != null && "INTERNAL".equalsIgnoreCase(m.getVisibility());
+    }
+
+    /** Normalise the incoming visibility value: blank/CLIENT → CLIENT, else INTERNAL. */
+    private static String normalizeVisibility(String raw) {
+        if (raw == null || raw.isBlank()) return "CLIENT";
+        return "INTERNAL".equalsIgnoreCase(raw.trim()) ? "INTERNAL" : "CLIENT";
     }
 
     /** Clients/staff may only touch messages of their own company; admin is unrestricted. */

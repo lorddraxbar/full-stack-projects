@@ -4,6 +4,7 @@ import {
   useGetMe, useGetProjects, useGetMessages, useSendMessage,
   useUploadMessage, useDownloadMessage,
 } from '@/services/api'
+import { useRole } from '@/composables/useRole'
 import { formatDateTime, timeAgo, formatFileSize } from '@/lib/labels'
 
 interface Conversation {
@@ -14,9 +15,12 @@ interface Conversation {
   lastMessageTime: string
   messageCount: number
   lastHasFile: boolean
+  /** True when the latest message is an internal (staff-only) one. */
+  lastMessageInternal: boolean
 }
 
 const me = ref<{ id: number; fullName: string; companyId: number | null } | null>(null)
+const { isClient } = useRole()
 const conversations = ref<Conversation[]>([])
 const selectedId = ref<number | null>(null)
 const messages = ref<any[]>([])
@@ -26,6 +30,12 @@ const searchQuery = ref('')
 const newMessage = ref('')
 const sending = ref(false)
 const sendError = ref('')
+// Staff/admin can mark a message internal (the client never sees it).
+const sendInternal = ref(false)
+
+function isInternal(msg: any): boolean {
+  return msg?.visibility === 'INTERNAL'
+}
 
 const pendingFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -120,6 +130,7 @@ async function loadConversations() {
           lastMessageTime: last ? timeAgo(last.createdAt) : '',
           messageCount: list.length,
           lastHasFile: !!(last && last.attachmentFileName),
+          lastMessageInternal: !!(last && isInternal(last)),
         })
       } catch {
         convs.push({
@@ -130,6 +141,7 @@ async function loadConversations() {
           lastMessageTime: '',
           messageCount: 0,
           lastHasFile: false,
+          lastMessageInternal: false,
         })
       }
     }
@@ -147,6 +159,7 @@ async function loadConversations() {
 async function selectConversation(id: number) {
   selectedId.value = id
   sendError.value = ''
+  sendInternal.value = false
   pendingFile.value = null
   if (fileInput.value) fileInput.value.value = ''
   try {
@@ -166,9 +179,9 @@ async function sendMessage() {
   sendError.value = ''
   try {
     if (file) {
-      await useUploadMessage({ projectId: selectedId.value, body: text || undefined, file })
+      await useUploadMessage({ projectId: selectedId.value, body: text || undefined, file, internal: sendInternal.value })
     } else {
-      await useSendMessage(selectedId.value, text)
+      await useSendMessage(selectedId.value, text, sendInternal.value)
     }
     newMessage.value = ''
     pendingFile.value = null
@@ -252,6 +265,7 @@ onMounted(loadConversations)
             </div>
             <p class="text-sm text-gray-600 truncate">
               <i v-if="conv.lastHasFile" class="fas fa-paperclip mr-1 text-emerald-600"></i>
+              <i v-if="conv.lastMessageInternal" class="fas fa-lock mr-1 text-slate-500" title="Last message is internal (staff only)"></i>
               {{ conv.lastMessage }}
             </p>
             <div class="flex items-center justify-between mt-2">
@@ -289,9 +303,23 @@ onMounted(loadConversations)
             </div>
             <div :class="[
               'max-w-[70%] rounded-lg p-3',
-              isOwn(msg) ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-900'
+              isInternal(msg)
+                ? (isOwn(msg) ? 'bg-slate-700 text-white ring-1 ring-dashed ring-slate-400' : 'bg-slate-100 text-gray-900 ring-1 ring-dashed ring-slate-400')
+                : (isOwn(msg) ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-900')
             ]">
-              <p class="text-sm font-medium mb-0.5">{{ msg.senderName }}</p>
+              <p class="text-sm font-medium mb-0.5 flex items-center gap-1.5">
+                {{ msg.senderName }}
+                <span
+                  v-if="isInternal(msg)"
+                  :class="[
+                    'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border',
+                    isOwn(msg) ? 'bg-white/20 text-white border-white/40' : 'bg-slate-200 text-slate-700 border-slate-400/60',
+                  ]"
+                  title="Internal — only visible to provider staff, not the client"
+                >
+                  <i class="fas fa-lock"></i> Internal
+                </span>
+              </p>
               <p class="text-sm">
                 {{ msg.body }}
                 <span v-if="msg.attachmentFileName" class="text-emerald-300">
@@ -345,7 +373,7 @@ onMounted(loadConversations)
               </button>
             </span>
           </div>
-          <div class="flex gap-2">
+          <div class="flex gap-2 items-end">
             <button
               type="button"
               @click="fileInput?.click()"
@@ -367,13 +395,24 @@ onMounted(loadConversations)
               placeholder="Type a message..."
               class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
             />
-            <button
-              @click="sendMessage"
-              :disabled="sending"
-              class="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50"
-            >
-              Send
-            </button>
+            <div class="flex flex-col items-end gap-1.5">
+              <button
+                @click="sendMessage"
+                :disabled="sending || (!newMessage.trim() && !pendingFile)"
+                class="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50"
+              >
+                Send
+              </button>
+              <!-- Staff/admin only: mark the message internal (the client never sees it). -->
+              <label v-if="!isClient" class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  v-model="sendInternal"
+                  class="rounded border-gray-300 text-slate-700 focus:ring-slate-500"
+                />
+                <i class="fas fa-lock text-[10px] text-slate-500"></i> Internal (staff only)
+              </label>
+            </div>
           </div>
         </div>
       </div>
