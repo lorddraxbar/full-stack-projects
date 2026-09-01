@@ -61,6 +61,7 @@ const users = ref<{ id: number; name: string }[]>([])
 const filterStatus = ref('ALL')
 const filterPriority = ref('ALL')
 const filterProject = ref('ALL')
+const searchQuery = ref('')
 // Scope: non-admins are always "my tasks"; admins can switch to "all".
 const scope = ref<'mine' | 'all'>('mine')
 const modalOpen = ref(false)
@@ -80,13 +81,34 @@ const priorityColors: Record<string, string> = {
   'urgent': 'bg-red-600 text-white',
 }
 
-const filteredTasks = computed(() =>
-  tasks.value.filter(t =>
+const filteredTasks = computed(() => {
+  let result = tasks.value.filter(t =>
     (filterStatus.value === 'ALL' || t.status === filterStatus.value) &&
     (filterPriority.value === 'ALL' || t.priority === filterPriority.value) &&
     (filterProject.value === 'ALL' || String(t.projectId) === filterProject.value)
   )
-)
+  // Standard search: every space-separated term must appear somewhere in the
+  // task's displayed fields (title, description, project, assignee, status,
+  // priority, due date, subtask titles). Same convention as Admin → Users.
+  const q = searchQuery.value.trim().toLowerCase()
+  if (q) {
+    const terms = q.split(/\s+/)
+    result = result.filter(t => {
+      const haystack = [
+        t.title,
+        t.description,
+        t.projectTitle,
+        t.assignee,
+        STATUS_LABELS[t.status] || t.status,
+        PRIORITY_LABELS[t.priority] || t.priority,
+        t.dueDate ? formatDate(t.dueDate) : '',
+        ...t.subtasks.map(s => s.title),
+      ].join(' ').toLowerCase()
+      return terms.every(term => haystack.includes(term))
+    })
+  }
+  return result
+})
 
 // ---- Data loading ----
 const loadTasks = async () => {
@@ -229,6 +251,23 @@ const subtaskProgress = (task: Task) => {
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow p-4 mb-6">
       <div class="flex flex-wrap items-center gap-3">
+        <div class="relative flex-1 min-w-[220px]">
+          <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search all tasks — title, project, assignee, priority, status, due date"
+            class="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-300 bg-white text-sm text-gray-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
+          />
+          <button
+            v-if="searchQuery"
+            @click="searchQuery = ''"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            aria-label="Clear search"
+          >
+            <i class="fas fa-xmark text-sm"></i>
+          </button>
+        </div>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="option in ['ALL', 'todo', 'in-progress', 'review', 'done']"

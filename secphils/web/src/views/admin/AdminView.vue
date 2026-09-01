@@ -633,6 +633,24 @@ const roleRowActions = (role: RoleItem): RowAction[] => {
 const services = ref<ServiceItem[]>([])
 const serviceListLoaded = ref(false)
 const serviceListError = ref('')
+const serviceSearchQuery = ref('')
+
+// Standard search: every space-separated term must appear somewhere in the
+// service's displayed fields (name, category, description, status).
+const filteredServices = computed(() => {
+  const q = serviceSearchQuery.value.trim().toLowerCase()
+  if (!q) return services.value
+  const terms = q.split(/\s+/)
+  return services.value.filter(s => {
+    const haystack = [
+      s.name,
+      s.category,
+      s.description || '',
+      s.isActive ? 'active' : 'archived',
+    ].join(' ').toLowerCase()
+    return terms.every(t => haystack.includes(t))
+  })
+})
 
 // Service categories are first-class records (service_categories table). Their
 // names/icons/order drive the "Our Services" tabs on the landing page.
@@ -904,6 +922,38 @@ const loadDropdowns = async () => {
     dropdownLoading.value = false
   }
 }
+
+// ---------- Project Config search (covers the Dropdown Value Management list) ----------
+// Workflow steps & project statuses are small in-place config editors with
+// reorder-by-index controls, so they are intentionally NOT filtered (filtering
+// a reorderable list by display index corrupts ordering). The searchable
+// "item list" on this tab is the dropdown category/value management panel.
+const configSearch = ref('')
+
+const termsOf = (q: string) => q.trim().toLowerCase().split(/\s+/).filter(Boolean)
+
+// A category matches on its own name/description OR any of its values. When it
+// matches on its own name, all its values show; otherwise only the matching
+// values show. (Same multi-term AND convention as the rest of the portal.)
+const filteredDropdownCategories = computed(() => {
+  const terms = termsOf(configSearch.value)
+  if (!terms.length) return dropdownCategories.value
+  const out: DropdownCategoryItem[] = []
+  for (const category of dropdownCategories.value) {
+    const catHit = terms.every(t => `${category.name} ${category.description || ''}`.toLowerCase().includes(t))
+    const values = category.values || []
+    const valueHits = values.filter(v => {
+      const h = `${v.displayLabel || ''} ${v.value || ''}`.toLowerCase()
+      return terms.every(t => h.includes(t))
+    })
+    if (catHit) {
+      out.push(category)
+    } else if (valueHits.length) {
+      out.push({ ...category, values: valueHits })
+    }
+  }
+  return out
+})
 const newDropdownValues: Record<number, string> = {}
 const addDropdownCategory = (category: DropdownCategoryItem) => {
   dropdownCategories.value.push(category)
@@ -989,6 +1039,30 @@ const publishing = ref(false)
 const communicationLogs = ref<AnnouncementRow[]>([])
 const communicationLoading = ref(false)
 const projectOptions = ref<{ id: number; name: string }[]>([])
+const commLogSearch = ref('')
+
+// Standard search over the Communication Logs: every space-separated term must
+// appear somewhere in the row's displayed fields (date, title, audience,
+// project, author, channel).
+const filteredCommunicationLogs = computed(() => {
+  const terms = commLogSearch.value.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (!terms.length) return communicationLogs.value
+  return communicationLogs.value.filter(log => {
+    const projName = log.projectId
+      ? (projectOptions.value.find(p => p.id === log.projectId)?.name || '')
+      : ''
+    const haystack = [
+      log.date,
+      log.title,
+      audienceDisplay(log.audience),
+      projName,
+      log.author,
+      log.channel,
+      log.category || '',
+    ].join(' ').toLowerCase()
+    return terms.every(t => haystack.includes(t))
+  })
+})
 
 const fmtAnnDate = (s: string | null | undefined) => {
   if (!s) return '—'
@@ -1840,6 +1914,26 @@ const timeOfDay = (ts: string) => {
           </button>
         </div>
 
+        <div class="p-5 border-b border-gray-200">
+          <div class="relative max-w-md">
+            <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+            <input
+              v-model="serviceSearchQuery"
+              type="text"
+              placeholder="Search services — name, category, description, status"
+              class="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-300 bg-white text-sm text-gray-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
+            />
+            <button
+              v-if="serviceSearchQuery"
+              @click="serviceSearchQuery = ''"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Clear search"
+            >
+              <i class="fas fa-xmark text-sm"></i>
+            </button>
+          </div>
+        </div>
+
         <div v-if="serviceListError" class="p-4 mb-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 mx-5">
           {{ serviceListError }}
         </div>
@@ -1856,7 +1950,7 @@ const timeOfDay = (ts: string) => {
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
-              <tr v-for="service in services" :key="service.id" class="hover:bg-gray-50">
+              <tr v-for="service in filteredServices" :key="service.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-2.5 font-medium text-gray-900">
                     <i v-if="service.icon" :class="service.icon" class="w-4 text-center text-gray-400"></i>
@@ -1879,9 +1973,11 @@ const timeOfDay = (ts: string) => {
                   <RowActionsMenu :actions="serviceRowActions(service)" />
                 </td>
               </tr>
-              <tr v-if="services.length === 0">
+              <tr v-if="filteredServices.length === 0">
                 <td colspan="5" class="px-6 py-10 text-center text-sm text-gray-500">
-                  {{ serviceListLoaded ? 'No services in the catalog yet. Use "+ Add Service" to create one.' : 'Loading services…' }}
+                  {{ filteredServices.length === 0 && services.length > 0
+                    ? 'No services match your search.'
+                    : (serviceListLoaded ? 'No services in the catalog yet. Use "+ Add Service" to create one.' : 'Loading services…') }}
                 </td>
               </tr>
             </tbody>
@@ -2214,7 +2310,24 @@ const timeOfDay = (ts: string) => {
       <!-- Dropdown Value Management -->
       <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-2">Dropdown Value Management</h2>
-        <p class="text-sm text-gray-600 mb-4">All static dropdown values used throughout the portal.</p>
+        <p class="text-sm text-gray-600 mb-3">All static dropdown values used throughout the portal.</p>
+        <div class="relative max-w-md mb-4">
+          <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+          <input
+            v-model="configSearch"
+            type="text"
+            placeholder="Search dropdowns — category, description, value"
+            class="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-300 bg-white text-sm text-gray-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
+          />
+          <button
+            v-if="configSearch"
+            @click="configSearch = ''"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            aria-label="Clear search"
+          >
+            <i class="fas fa-xmark text-sm"></i>
+          </button>
+        </div>
 
         <!-- Create category -->
         <div class="flex flex-wrap items-center gap-2 mb-6">
@@ -2240,10 +2353,12 @@ const timeOfDay = (ts: string) => {
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div v-if="dropdownCategories.length === 0" class="col-span-full text-sm text-gray-500">
-            {{ dropdownLoading ? 'Loading dropdowns…' : 'No dropdown categories. Add one above.' }}
+          <div v-if="filteredDropdownCategories.length === 0" class="col-span-full text-sm text-gray-500">
+            {{ configSearch && dropdownCategories.length > 0
+              ? 'No dropdowns match your search.'
+              : (dropdownLoading ? 'Loading dropdowns…' : 'No dropdown categories. Add one above.') }}
           </div>
-          <div v-for="category in dropdownCategories" :key="category.id" class="border border-gray-200 rounded-lg p-4">
+          <div v-for="category in filteredDropdownCategories" :key="category.id" class="border border-gray-200 rounded-lg p-4">
             <div class="flex items-start justify-between mb-1">
               <h3 class="font-semibold text-gray-900 text-sm">{{ category.name }}</h3>
               <div class="flex items-center gap-2">
@@ -2339,11 +2454,30 @@ const timeOfDay = (ts: string) => {
 
       <div class="bg-white rounded-lg shadow">
         <div class="p-6 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-900">Communication Logs</h2>
+          <h2 class="text-lg font-semibold text-gray-900 mb-3">Communication Logs</h2>
+          <div class="relative max-w-md">
+            <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+            <input
+              v-model="commLogSearch"
+              type="text"
+              placeholder="Search logs — date, title, audience, project, author, channel"
+              class="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-300 bg-white text-sm text-gray-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
+            />
+            <button
+              v-if="commLogSearch"
+              @click="commLogSearch = ''"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Clear search"
+            >
+              <i class="fas fa-xmark text-sm"></i>
+            </button>
+          </div>
         </div>
         <div class="overflow-x-auto">
-          <p v-if="communicationLogs.length === 0" class="px-6 py-6 text-sm text-gray-500">
-            {{ communicationLoading ? 'Loading announcements…' : 'No announcements yet. Publish one above.' }}
+          <p v-if="filteredCommunicationLogs.length === 0" class="px-6 py-6 text-sm text-gray-500">
+            {{ commLogSearch && communicationLogs.length > 0
+              ? 'No communication logs match your search.'
+              : (communicationLoading ? 'Loading announcements…' : 'No announcements yet. Publish one above.') }}
           </p>
           <table v-else class="w-full">
             <thead class="bg-gray-50">
@@ -2357,7 +2491,7 @@ const timeOfDay = (ts: string) => {
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
-              <tr v-for="log in communicationLogs" :key="log.id" class="hover:bg-gray-50">
+              <tr v-for="log in filteredCommunicationLogs" :key="log.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ log.date }}</td>
                 <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ log.title }}</td>
                 <td class="px-6 py-4 text-sm text-gray-600">

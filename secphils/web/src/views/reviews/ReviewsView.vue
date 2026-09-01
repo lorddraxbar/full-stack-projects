@@ -33,14 +33,33 @@ const projects = ref<{ id: number; name: string }[]>([])
 const loading = ref(true)
 const error = ref('')
 const selectedStatus = ref('ALL')
+const searchQuery = ref('')
 const customers = ref<{ id: number; name: string }[]>([])
 
 const projectById = (id: number) => projects.value.find(p => p.id === id)
 
 const filteredReviews = computed(() => {
-  const list = selectedStatus.value === 'ALL'
+  let list = selectedStatus.value === 'ALL'
     ? reviews.value
     : reviews.value.filter(r => r.status === selectedStatus.value)
+  // Standard search: every space-separated term must appear somewhere in the
+  // review's displayed fields (title, customer, project, rating, status, date).
+  const q = searchQuery.value.trim().toLowerCase()
+  if (q) {
+    const terms = q.split(/\s+/)
+    list = list.filter(r => {
+      const projName = projectById(r.projectId)?.name || `Project #${r.projectId}`
+      const haystack = [
+        r.title,
+        r.customerName || '',
+        projName,
+        `${r.rating}/5`,
+        statusLabels[r.status] || r.status,
+        formatDate(r.createdAt),
+      ].join(' ').toLowerCase()
+      return terms.every(t => haystack.includes(t))
+    })
+  }
   return [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 })
 
@@ -181,6 +200,23 @@ async function setStatus(id: number, status: string) {
     <Card class="mb-6">
       <CardContent class="p-4">
         <div class="flex flex-col sm:flex-row gap-4">
+          <div class="flex-1 relative">
+            <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none" />
+            <Input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search all reviews — title, customer, project, rating, status, date"
+              class="pl-9 pr-9"
+            />
+            <button
+              v-if="searchQuery"
+              @click="searchQuery = ''"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Clear search"
+            >
+              <i class="fas fa-xmark text-sm" />
+            </button>
+          </div>
           <select
             v-model="selectedStatus"
             class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"

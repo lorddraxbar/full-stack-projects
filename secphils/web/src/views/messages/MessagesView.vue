@@ -22,6 +22,7 @@ const selectedId = ref<number | null>(null)
 const messages = ref<any[]>([])
 const loading = ref(true)
 const loadError = ref('')
+const searchQuery = ref('')
 const newMessage = ref('')
 const sending = ref(false)
 const sendError = ref('')
@@ -34,6 +35,23 @@ const MAX_UPLOAD_BYTES = 25 * 1024 * 1024 // matches backend maxUploadMb / nginx
 const selectedConversation = computed(() =>
   conversations.value.find(c => c.id === selectedId.value) || null
 )
+
+// Standard search: every space-separated term must appear somewhere in the
+// conversation's displayed fields (project, last message, sender, count).
+const filteredConversations = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return conversations.value
+  const terms = q.split(/\s+/)
+  return conversations.value.filter(c => {
+    const haystack = [
+      c.project,
+      c.lastMessage,
+      c.lastMessageBy,
+      c.messageCount ? String(c.messageCount) : '',
+    ].join(' ').toLowerCase()
+    return terms.every(t => haystack.includes(t))
+  })
+})
 
 function initials(name: string): string {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
@@ -193,11 +211,34 @@ onMounted(loadConversations)
       <!-- Conversations List -->
       <div class="bg-white rounded-lg shadow overflow-hidden flex flex-col">
         <div class="p-4 border-b border-gray-200">
-          <h2 class="font-semibold text-gray-900">Conversations</h2>
+          <h2 class="font-semibold text-gray-900 mb-3">Conversations</h2>
+          <div class="relative">
+            <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search conversations — project, message, sender"
+              class="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-300 bg-white text-sm text-gray-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
+            />
+            <button
+              v-if="searchQuery"
+              @click="searchQuery = ''"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Clear search"
+            >
+              <i class="fas fa-xmark text-sm"></i>
+            </button>
+          </div>
         </div>
         <div class="divide-y divide-gray-200 overflow-y-auto flex-1">
           <div
-            v-for="conv in conversations"
+            v-if="filteredConversations.length === 0 && searchQuery"
+            class="p-4 text-sm text-gray-500"
+          >
+            No conversations match "{{ searchQuery }}".
+          </div>
+          <div
+            v-for="conv in filteredConversations"
             :key="conv.id"
             @click="selectConversation(conv.id)"
             :class="[

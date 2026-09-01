@@ -113,17 +113,29 @@ const subheading = computed(() =>
 const filteredProjects = computed(() => {
   let result = projects.value
 
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    result = result.filter(
-      p =>
-        p.name.toLowerCase().includes(query) ||
-        p.client.toLowerCase().includes(query)
-    )
-  }
-
   if (selectedStatus.value !== 'ALL') {
     result = result.filter(p => p.status === projectStatusLabel(selectedStatus.value))
+  }
+
+  // Standard search: every space-separated term must appear somewhere in the
+  // row's displayed fields (name, client, service, status, cost, latest update,
+  // created/completed dates). Same multi-term AND convention as Admin → Users.
+  const q = searchQuery.value.trim().toLowerCase()
+  if (q) {
+    const terms = q.split(/\s+/)
+    result = result.filter(p => {
+      const haystack = [
+        p.name,
+        p.client,
+        p.serviceType,
+        p.status,
+        formatPhp(p.totalCost),
+        p.latestUpdate || '',
+        formatDate(p.createdAt),
+        p.completedAt ? formatDate(p.completedAt) : '',
+      ].join(' ').toLowerCase()
+      return terms.every(t => haystack.includes(t))
+    })
   }
 
   return result
@@ -261,13 +273,23 @@ onMounted(init)
     <Card class="mb-6">
       <CardContent class="p-4">
         <div class="flex flex-col sm:flex-row gap-4">
-          <div class="flex-1">
-            <Input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Search projects..."
-            />
-          </div>
+        <div class="flex-1 relative">
+          <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none" />
+          <Input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search all projects — name, client, service, status, cost, updates, dates"
+            class="pl-9 pr-9"
+          />
+          <button
+            v-if="searchQuery"
+            @click="searchQuery = ''"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            aria-label="Clear search"
+          >
+            <i class="fas fa-xmark text-sm" />
+          </button>
+        </div>
           <select
             v-model="selectedStatus"
             class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"

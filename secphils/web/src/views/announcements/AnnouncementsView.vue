@@ -27,9 +27,18 @@ interface Announcement {
   createdAt: string
 }
 
+function categoryLabel(c: string) {
+  return ANNOUNCEMENT_CATEGORY_LABELS[c] || (c ? c.replace('_', ' ') : 'General')
+}
+
+function formatDate(d: string) {
+  return d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
+}
+
 const announcements = ref<Announcement[]>([])
 const loading = ref(true)
 const error = ref('')
+const searchQuery = ref('')
 
 const projects = ref<{ id: number; name: string }[]>([])
 
@@ -40,18 +49,43 @@ const projectById = (id: number | null) =>
  * Staff: the backend already returns drafts for their own company, so show
  * everything. Clients: the backend filters to published-only; the client-side
  * filter is a second line of defense (drafts must never leak to clients).
+ *
+ * Standard search: every space-separated term must appear somewhere in the
+ * announcement's displayed fields (title, body, category, audience, project,
+ * author, date). Same multi-term AND convention as Admin → Users.
  */
 const visibleAnnouncements = computed(() => {
   const list = isUser.value
     ? announcements.value
     : announcements.value.filter(a => a.isPublished)
-  if (!isCustomer.value) return list
-  // Clients see company-wide announcements plus project announcements
-  // for projects they can see.
-  const myProjectIds = new Set(projects.value.map(p => p.id))
-  return list.filter(a =>
-    a.audience === 'COMPANY' || (a.audience === 'PROJECT' && a.projectId && myProjectIds.has(a.projectId)),
-  )
+  let out = list
+  if (!isCustomer.value) {
+    const myProjectIds = new Set(projects.value.map(p => p.id))
+    out = list.filter(a =>
+      a.audience === 'COMPANY' || (a.audience === 'PROJECT' && a.projectId && myProjectIds.has(a.projectId)),
+    )
+  }
+  const q = searchQuery.value.trim().toLowerCase()
+  if (q) {
+    const terms = q.split(/\s+/)
+    out = out.filter(a => {
+      const projName = a.audience === 'PROJECT' && a.projectId
+        ? (projectById(a.projectId)?.name || a.projectName || '')
+        : ''
+      const haystack = [
+        a.title,
+        a.body,
+        categoryLabel(a.category),
+        ANNOUNCEMENT_AUDIENCE_LABELS[a.audience] || a.audience,
+        a.isPublished ? 'published' : 'draft',
+        projName,
+        a.createdByName || '',
+        formatDate(a.createdAt),
+      ].join(' ').toLowerCase()
+      return terms.every(t => haystack.includes(t))
+    })
+  }
+  return out
 })
 
 const isCustomer = computed(() => isClient.value)
@@ -180,16 +214,8 @@ async function remove(a: Announcement) {
 const canDelete = (a: Announcement) =>
   isUser.value && (currentUserId.value > 0 && a.createdById === currentUserId.value)
 
-function categoryLabel(c: string) {
-  return ANNOUNCEMENT_CATEGORY_LABELS[c] || (c ? c.replace('_', ' ') : 'General')
-}
-
 function categoryColor(c: string) {
   return ANNOUNCEMENT_CATEGORY_COLORS[c] || 'bg-gray-100 text-gray-800'
-}
-
-function formatDate(d: string) {
-  return d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
 }
 </script>
 
@@ -207,6 +233,27 @@ function formatDate(d: string) {
       >
         + New Announcement
       </button>
+    </div>
+
+    <!-- Search -->
+    <div class="bg-white rounded-lg shadow p-4 mb-6">
+      <div class="relative">
+        <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none" />
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search all announcements — title, body, category, audience, project, author, date"
+          class="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+        />
+        <button
+          v-if="searchQuery"
+          @click="searchQuery = ''"
+          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          aria-label="Clear search"
+        >
+          <i class="fas fa-xmark text-sm" />
+        </button>
+      </div>
     </div>
 
     <!-- Create / edit form -->
@@ -372,7 +419,9 @@ function formatDate(d: string) {
 
     <div v-if="!loading && visibleAnnouncements.length === 0" class="bg-white rounded-lg shadow p-12 text-center">
       <p class="text-gray-600">
-        {{ isUser ? 'No announcements yet. Use "+ New Announcement" to create one.' : 'No announcements available.' }}
+        {{ visibleAnnouncements.length === 0 && (isUser ? announcements.length : true) && searchQuery
+          ? 'No announcements match your search.'
+          : (isUser ? 'No announcements yet. Use "+ New Announcement" to create one.' : 'No announcements available.') }}
       </p>
     </div>
     <div v-if="loading" class="bg-white rounded-lg shadow p-12 text-center">

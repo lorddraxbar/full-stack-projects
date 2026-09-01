@@ -61,13 +61,25 @@ const projectById = computed(() => {
 
 const filteredDocuments = computed(() => {
   let result = documents.value
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    result = result.filter(d =>
-      d.title.toLowerCase().includes(q) ||
-      d.project.toLowerCase().includes(q) ||
-      (d.description || '').toLowerCase().includes(q)
-    )
+
+  // Standard search: every space-separated term must appear somewhere in the
+  // row's displayed fields (title, project, description, file type, uploader,
+  // version, uploaded date). Same multi-term AND convention as Admin → Users.
+  const q = searchQuery.value.trim().toLowerCase()
+  if (q) {
+    const terms = q.split(/\s+/)
+    result = result.filter(d => {
+      const haystack = [
+        d.title,
+        d.project,
+        d.description,
+        d.fileTypeLabel,
+        d.uploaderName,
+        d.version ? `v${d.version}` : '',
+        formatDate(d.uploadedAt),
+      ].join(' ').toLowerCase()
+      return terms.every(t => haystack.includes(t))
+    })
   }
   if (selectedProject.value !== 'ALL') {
     result = result.filter(d => d.projectId === Number(selectedProject.value))
@@ -192,13 +204,22 @@ onMounted(async () => {
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow p-4 mb-6">
       <div class="flex flex-col sm:flex-row gap-4">
-        <div class="flex-1">
+        <div class="flex-1 relative">
+          <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none" />
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Search documents..."
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            placeholder="Search all documents — title, project, type, uploader, description, date"
+            class="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
           />
+          <button
+            v-if="searchQuery"
+            @click="searchQuery = ''"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            aria-label="Clear search"
+          >
+            <i class="fas fa-xmark text-sm" />
+          </button>
         </div>
         <select
           v-model="selectedProject"
