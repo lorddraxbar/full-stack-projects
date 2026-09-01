@@ -297,51 +297,56 @@ onMounted(init)
         <div v-else-if="filteredProjects.length === 0" class="p-12 text-center">
           <p class="text-gray-600">No projects found matching your criteria.</p>
         </div>
-        <div v-else class="divide-y divide-gray-200">
+        <!-- One project card per row. Desktop: icon tile | content | status
+             pill + dates (right column). Mobile (<640px): icon beside the
+             content, pill + dates drop to a second row. -->
+        <div v-else class="p-4 sm:p-5 flex flex-col gap-3">
           <div
             v-for="project in filteredProjects"
             :key="project.id"
             @click="goToProject(project.id)"
-            class="p-6 hover:bg-gray-50 transition-colors cursor-pointer"
+            class="grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1fr_auto] items-center gap-3 sm:gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 transition-all hover:border-primary hover:shadow-[0_4px_14px_rgba(41,202,142,0.10)] cursor-pointer"
           >
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="font-medium text-gray-900">{{ project.name }}</h3>
+            <div class="col-start-1 row-start-1 w-[52px] h-[52px] flex-none rounded-[11px] bg-accent text-accent-foreground flex items-center justify-center text-lg">
+              <i class="fas fa-clipboard-list" />
+            </div>
+            <div class="col-start-2 row-start-1 min-w-0">
+              <h3 class="text-base font-semibold text-gray-900 leading-snug">{{ project.name }}</h3>
+              <div class="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-gray-500">
+                <span class="inline-flex items-center">
+                  <i class="fas fa-building text-xs mr-1.5 text-gray-400" />{{ project.client }}
+                </span>
+                <span class="w-[3px] h-[3px] flex-none rounded-full bg-gray-300" />
+                <span class="inline-flex items-center">
+                  <i class="fas fa-tag text-xs mr-1.5 text-gray-400" />{{ project.serviceType }}
+                </span>
+                <span class="w-[3px] h-[3px] flex-none rounded-full bg-gray-300" />
+                <span class="inline-flex items-center font-semibold text-gray-900">
+                  <i class="fas fa-money-bill-wave text-xs mr-1.5 text-gray-400" />{{ formatPhp(project.totalCost) }}
+                </span>
+              </div>
+              <div class="mt-2 truncate text-[13px]" :title="project.latestUpdate ?? ''">
+                <template v-if="project.latestUpdate">
+                  <span class="text-[#536976]">“{{ project.latestUpdate }}”</span>
+                  <span class="text-gray-400"> · {{ timeAgo(project.latestUpdatedAt) || formatDateTime(project.latestUpdatedAt) }}</span>
+                </template>
+                <span v-else class="text-gray-400">No updates yet</span>
+              </div>
+            </div>
+            <div class="col-start-2 row-start-2 sm:col-start-3 sm:row-start-1 flex flex-row flex-wrap items-center justify-between gap-2 sm:gap-2.5 sm:flex-col sm:items-end">
               <Badge :class="statusColors[project.status]">
                 {{ project.status }}
               </Badge>
+              <div class="flex flex-row sm:flex-col items-center gap-3 sm:gap-1 text-xs text-gray-400">
+                <span>
+                  <i class="fas fa-calendar-plus text-[11px] mr-1" />Created {{ formatDate(project.createdAt) }}
+                </span>
+                <span>
+                  <i class="fas fa-flag-checkered text-[11px] mr-1" />Completed {{ project.completedAt ? formatDate(project.completedAt) : '—' }}
+                </span>
+              </div>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-gray-600 mb-3">
-              <span>
-                <i class="fas fa-building text-xs mr-1 text-gray-400" />{{ project.client }}
-              </span>
-              <span>
-                <i class="fas fa-tag text-xs mr-1 text-gray-400" />{{ project.serviceType }}
-              </span>
-              <span>
-                <i class="fas fa-money-bill-wave text-xs mr-1 text-gray-400" />{{ formatPhp(project.totalCost) }}
-              </span>
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-gray-500">
-              <span :title="project.latestUpdate ?? ''">
-                <i class="fas fa-comment-dots text-xs mr-1 text-gray-400" />
-                <template v-if="project.latestUpdate">
-                  {{ project.latestUpdate.length > 42 ? project.latestUpdate.slice(0, 42) + '…' : project.latestUpdate }}
-                  <span class="text-gray-400">· {{ timeAgo(project.latestUpdatedAt) || formatDateTime(project.latestUpdatedAt) }}</span>
-                </template>
-                <template v-else>
-                  No updates yet
-                </template>
-              </span>
-              <span>
-                <i class="fas fa-calendar-plus text-xs mr-1 text-gray-400" />
-                Created {{ formatDate(project.createdAt) }}
-              </span>
-              <span>
-                <i class="fas fa-flag-checkered text-xs mr-1 text-gray-400" />
-                Completed {{ project.completedAt ? formatDate(project.completedAt) : '—' }}
-              </span>
-            </div>
-            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
