@@ -51,7 +51,9 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: always
+      # Anonymous callers (e.g. the public /api/health probe) see only the
+      # overall status; component details (DB URL etc.) require auth.
+      show-details: when-authorized
 
 springdoc:
   api-docs:

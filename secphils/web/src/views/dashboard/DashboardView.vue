@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRole } from '@/composables/useRole'
 import {
   useGetMe, useGetProjects, useGetTasks, useGetMessages,
-  useGetAuditLogs, useGetCompanies, useGetUsers,
+  useGetAuditLogs, useGetCompanies, useGetUsers, useGetApiHealth, useGetLanding,
 } from '@/services/api'
 import {
   projectStatusLabel, taskStatusLabel, priorityLabel,
@@ -59,10 +59,20 @@ const auditLogs = ref<{ id: number; userId: number | string; action: string; ent
 const users = ref<Record<number, string>>({})
 const loading = ref(true)
 const loadError = ref('')
+// System Health (admin + staff dashboards)
+const apiHealth = ref<'UP' | 'DOWN' | 'UNKNOWN'>('UNKNOWN')
+const apiHealthChecked = ref<Date | null>(null)
+const maintenanceMode = ref(false)
 
 function projectName(id: number | null): string {
   if (id == null) return '—'
   return projects.value.find(p => p.id === id)?.name ?? `Project #${id}`
+}
+
+// Local clock with seconds for the "health checked" row.
+function formatTime(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 function relativeTime(iso: string): string {
@@ -129,7 +139,8 @@ async function load() {
       // only sees their own tasks on the dashboard.
       useGetTasks(isAdmin.value ? { scope: 'ALL' } : undefined),
     ])
-    me.value = meRes.user ?? null
+    // GET /users/me returns the UserResponse body directly (no envelope).
+    me.value = meRes || null
     const projContent = Array.isArray(projRes) ? projRes : projRes?.content ?? []
     projects.value = projContent.map(mapProject)
     tasks.value = (Array.isArray(taskRes) ? taskRes : []).map(mapTask)
@@ -161,7 +172,32 @@ async function load() {
   }
 }
 
-onMounted(load)
+// ---------- System Health ----------
+// Live probes, never blocking the dashboard load:
+//  - API: Spring actuator via the nginx /api/health route (UP/DOWN + time)
+//  - Maintenance: system setting, mirrored off the public landing endpoint
+//    (the admin /settings endpoint is admin-only, but this card is shared
+//    with the staff dashboard).
+let healthTimer: ReturnType<typeof setInterval> | null = null
+async function refreshSystemHealth() {
+  const t = await useGetApiHealth()
+    .then(r => (r?.status === 'UP' || r?.status === 'DOWN') ? r.status as 'UP' | 'DOWN' : 'UNKNOWN')
+    .catch(() => 'UNKNOWN' as const)
+  apiHealth.value = t
+  apiHealthChecked.value = new Date()
+  await useGetLanding()
+    .then(l => { maintenanceMode.value = !!l?.maintenanceMode })
+    .catch(() => {})
+}
+
+onMounted(() => {
+  load()
+  refreshSystemHealth()
+  healthTimer = setInterval(refreshSystemHealth, 5 * 60 * 1000)
+})
+onBeforeUnmount(() => {
+  if (healthTimer) clearInterval(healthTimer)
+})
 
 // ---------- Client ----------
 const clientStats = computed(() => ({
@@ -472,7 +508,21 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <span class="text-gray-700">API</span>
-              <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">REACHABLE</span>
+              <span
+                class="px-2 py-1 text-xs font-medium rounded-full"
+                :class="apiHealth === 'UP'
+                  ? 'bg-green-100 text-green-800'
+                  : apiHealth === 'DOWN'
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-gray-100 text-gray-600'"
+              >{{ apiHealth === 'UP' ? 'UP' : apiHealth === 'DOWN' ? 'DOWN' : 'CHECKING…' }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-gray-700">Maintenance Mode</span>
+              <span
+                class="px-2 py-1 text-xs font-medium rounded-full"
+                :class="maintenanceMode ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'"
+              >{{ maintenanceMode ? 'ON' : 'OFF' }}</span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-gray-700">Authenticated User</span>
@@ -481,6 +531,10 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
             <div class="flex items-center justify-between">
               <span class="text-gray-700">Role</span>
               <span class="text-sm text-gray-600">{{ me?.role || '—' }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-gray-700">Health checked</span>
+              <span class="text-sm text-gray-500">{{ apiHealthChecked ? formatTime(apiHealthChecked.toISOString()) : '—' }}</span>
             </div>
           </div>
         </div>

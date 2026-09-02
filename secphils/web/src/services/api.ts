@@ -164,6 +164,14 @@ export async function useGetMe() {
   return response.data
 }
 
+// Backend liveness probe → Spring actuator via the nginx /api/health route
+// (deliberately not under the /api/v1 baseURL, so no auth interceptor is
+// involved — the endpoint is public and returns { status: 'UP'|'DOWN' }).
+export async function useGetApiHealth() {
+  const response = await axios.get('/api/health', { timeout: 10000 })
+  return response.data as { status?: string }
+}
+
 export async function useCreateUser(data: { firstName: string; lastName: string; email: string; role: string; companyId?: number | null; password?: string; isActive?: boolean }) {
   const response = await api.post('/users', data)
   return response.data
