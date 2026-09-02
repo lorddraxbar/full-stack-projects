@@ -9,7 +9,7 @@ import {
 import {
   projectStatusLabel, taskStatusLabel, priorityLabel,
   PROJECT_STATUS_COLORS, PRIORITY_COLORS, TASK_STATUS_COLORS,
-  formatDate, formatDateTime, formatPhpCompact,
+  formatDate, formatDateTime,
 } from '@/lib/labels'
 
 const { isClient, isAdmin } = useRole()
@@ -187,15 +187,10 @@ const activeProjects = computed(() =>
 const projectUpdates = computed(() => messages.value.slice(0, 3))
 
 // ---------- Admin ----------
-const adminStats = computed(() => {
-  const totalCost = projects.value.reduce((sum, p) => sum + ((p as any).totalCost ?? 0), 0)
-  return {
-    totalClients: companies.value.length,
-    activeProjects: projects.value.filter(p => p.status === 'IN_PROGRESS').length,
-    totalRevenue: totalCost,
-    projectedRevenue: totalCost,
-  }
-})
+const adminStats = computed(() => ({
+  totalClients: companies.value.length,
+  activeProjects: projects.value.filter(p => p.status === 'IN_PROGRESS').length,
+}))
 const recentActivity = computed(() => auditLogs.value.slice(0, 8))
 
 const goToProject = (id: number) => router.push(`/projects/${id}`)
@@ -435,7 +430,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
 
     <!-- ================= ADMIN DASHBOARD ================= -->
     <template v-else>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between">
             <div>
@@ -466,17 +461,6 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
             </div>
             <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
               <i class="fas fa-file-contract text-purple-600 text-xl"></i>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-600">Contract Value</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ formatPhpCompact(adminStats.totalRevenue) }}</p>
-            </div>
-            <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-coins text-yellow-600 text-xl"></i>
             </div>
           </div>
         </div>
