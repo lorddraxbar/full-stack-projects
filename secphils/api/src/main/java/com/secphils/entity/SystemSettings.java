@@ -50,6 +50,10 @@ public class SystemSettings {
     @Column(name = "landing_contact_email", length = 255)
     private String landingContactEmail;
 
+    /** Configurable brand (default "SECPhils") — collapsed provider sender name + drawer wordmark. */
+    @Column(name = "brand_name", length = 255)
+    private String brandName;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 

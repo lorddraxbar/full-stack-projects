@@ -2,9 +2,11 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useRole } from '../composables/useRole'
+import { useBrand } from '../composables/useBrand'
 import { useGetNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '../services/api'
 
 const { role, setRole } = useRole()
+const { brand } = useBrand()
 const router = useRouter()
 
 const allNavItems = [
@@ -171,7 +173,7 @@ const logout = () => {
       <div class="h-16 flex items-center justify-center border-b border-gray-200">
         <img src="/images/landing/seclogo.png" alt="SECPhils" class="h-8 w-auto" :class="{ 'mr-2': isSidebarOpen }" />
         <h1 class="text-lg font-bold text-emerald-600" :class="{ 'hidden': !isSidebarOpen }">
-          SECPhils
+          {{ brand }}
         </h1>
       </div>
 

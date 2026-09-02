@@ -123,7 +123,7 @@ public class MessageController {
         if (actor.isClient()) {
             rows = rows.stream().filter(m -> !isInternal(m)).toList();
         }
-        return ResponseEntity.ok(rows.stream().map(MessageResponse::from).toList());
+        return ResponseEntity.ok(rows.stream().map(m -> unmaskIfNeeded(m, MessageResponse.from(m))).toList());
     }
 
     @PostMapping
@@ -151,7 +151,7 @@ public class MessageController {
         dispatch(message, project, sender, actor, http);
         auditService.audit(actor, "MESSAGE_SEND", "Message", message.getId(),
                 "Project: " + project.getId() + (isInternal(message) ? " [internal]" : ""), http);
-        return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(message));
+        return ResponseEntity.status(HttpStatus.CREATED).body(unmaskIfNeeded(message, MessageResponse.from(message)));
     }
 
     /**
@@ -216,7 +216,7 @@ public class MessageController {
             doc = documentRepository.save(doc);
             auditService.audit(actor, "MESSAGE_UPLOAD", "Message", message.getId(),
                     "Project: " + project.getId() + " (file: " + message.getAttachmentFileName() + ", " + bytes.length + " bytes); saved as Document " + doc.getId(), http);
-            return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(message));
+            return ResponseEntity.status(HttpStatus.CREATED).body(unmaskIfNeeded(message, MessageResponse.from(message)));
         } catch (RuntimeException e) {
             storageService.deleteQuietly(s3Uri); // don't leak an orphaned object (message + document roll back)
             throw e;
@@ -286,8 +286,27 @@ public class MessageController {
         if (company == null) return; // no company -> nothing to fan out to
 
         boolean internal = isInternal(m);
+        // Sender identity: client-visible stays collapsed to the brand +
+        // no-reply (the privacy guarantee clients rely on); internal
+        // messages never reach a client (filtered server-side), so we show
+        // the real colleague + their real Reply-To — staff can tell who
+        // wrote it and reply directly.
+        String senderName = internal
+                ? (sender.getFullName() == null || sender.getFullName().isBlank()
+                        ? (sender.getEmail() == null ? "a teammate" : sender.getEmail())
+                        : sender.getFullName())
+                : DisplayNamePolicy.nameFor(sender);
+        if (senderName == null || senderName.isBlank()) {
+            senderName = sender.getEmail() == null ? "a teammate" : sender.getEmail();
+        }
+        // For internal, use the sender's real address as Reply-To so staff
+        // can answer the colleague directly; client-visible stays no-reply.
+        String replyToAddr = internal
+                ? (sender.getEmail() == null || sender.getEmail().isBlank() ? DisplayNamePolicy.NO_REPLY_EMAIL : sender.getEmail())
+                : DisplayNamePolicy.emailFor(sender);
+
         String title = (internal ? "Internal message from " : "New message from ")
-                + DisplayNamePolicy.nameFor(sender) + " · " + project.getName();
+                + senderName + " · " + project.getName();
         String body = m.getBody() == null ? "" : m.getBody();
         String link = portalBaseUrl.endsWith("/") ? portalBaseUrl + "messages" : portalBaseUrl + "/messages";
         // Internal messages link to the project's conversation (where the team
@@ -298,8 +317,6 @@ public class MessageController {
         }
         String templateName = internal
                 ? EmailTemplateService.INTERNAL_MESSAGE : EmailTemplateService.CLIENT_MESSAGE;
-        String senderName = DisplayNamePolicy.nameFor(sender);
-        if (senderName == null) senderName = sender.getEmail() == null ? "a teammate" : sender.getEmail();
         Map<String, String> vars = Map.of(
                 "sender", senderName,
                 "project", project.getName() == null ? "" : project.getName(),
@@ -331,7 +348,7 @@ public class MessageController {
             }
             if (email && u.getEmail() != null && !u.getEmail().isBlank()) {
                 mailService.sendHtml(u.getEmail(), templateService.subject(templateName, vars),
-                        messageEmail(templateName, vars, link), link, DisplayNamePolicy.emailFor(sender));
+                        messageEmail(templateName, vars, link), link, replyToAddr);
             }
         }
     }
@@ -358,6 +375,26 @@ public class MessageController {
     /** True when the message is an internal (provider-staff-only) one. */
     private static boolean isInternal(Message m) {
         return m != null && "INTERNAL".equalsIgnoreCase(m.getVisibility());
+    }
+
+    /**
+     * For internal (staff-only) messages, surface the real colleague's name in
+     * the response instead of the collapsed brand — these never reach a client
+     * (filtered server-side), so showing who wrote them is desirable and safe.
+     * Client-visible messages are returned unchanged (brand-masked).
+     */
+    private MessageResponse unmaskIfNeeded(Message m, MessageResponse resp) {
+        if (isInternal(m) && m.getSender() != null) {
+            String real = m.getSender().getFullName();
+            if (real == null || real.isBlank()) real = m.getSender().getEmail();
+            if (real != null && !real.isBlank()) {
+                return new MessageResponse(resp.id(), resp.projectId(), resp.senderId(), real,
+                        resp.body(), resp.attachmentUrl(), resp.attachmentFileName(),
+                        resp.attachmentFileSize(), resp.attachmentContentType(),
+                        resp.visibility(), resp.createdAt());
+            }
+        }
+        return resp;
     }
 
     /** Normalise the incoming visibility value: blank/CLIENT → CLIENT, else INTERNAL. */

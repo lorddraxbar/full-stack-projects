@@ -17,6 +17,8 @@ function storeSession(data: any) {
   setRole(data.user?.role || 'CLIENT')
   localStorage.setItem('userName', data.user?.fullName || 'User')
   if (data.user?.id) localStorage.setItem('userId', String(data.user.id))
+  if (data.brand) localStorage.setItem('brandName', data.brand)
+  if (data.portalName) localStorage.setItem('portalName', data.portalName)
 }
 
 onMounted(async () => {

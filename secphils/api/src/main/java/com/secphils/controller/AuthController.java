@@ -7,6 +7,7 @@ import com.secphils.entity.SystemSettings;
 import com.secphils.entity.User;
 import com.secphils.repository.SystemSettingsRepository;
 import com.secphils.repository.UserRepository;
+import com.secphils.policy.DisplayNamePolicy;
 import com.secphils.security.CurrentUser;
 import com.secphils.security.JwtService;
 import com.secphils.service.SsoService;
@@ -35,11 +36,13 @@ public class AuthController {
     private final TwoFactorService twoFactorService;
     private final SsoService ssoService;
     private final SystemSettingsRepository settingsRepository;
+    private final DisplayNamePolicy displayNamePolicy;
 
     public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder,
                           JwtService jwtService, AuditService auditService,
                           TwoFactorService twoFactorService, SsoService ssoService,
-                          SystemSettingsRepository settingsRepository) {
+                          SystemSettingsRepository settingsRepository,
+                          DisplayNamePolicy displayNamePolicy) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -47,6 +50,7 @@ public class AuthController {
         this.twoFactorService = twoFactorService;
         this.ssoService = ssoService;
         this.settingsRepository = settingsRepository;
+        this.displayNamePolicy = displayNamePolicy;
     }
 
     @PostMapping("/login")
@@ -65,7 +69,7 @@ public class AuthController {
             String pending = jwtService.generate(user.getId(), user.getEmail(), user.getRole(),
                     JwtService.TokenType.PENDING_2FA);
             return ResponseEntity.ok(new LoginResponse(true, pending, null, null, null, null,
-                    UserResponse.from(user)));
+                    UserResponse.from(user), portalName(), displayNamePolicy.getBrand()));
         }
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
@@ -293,6 +297,14 @@ public class AuthController {
     private LoginResponse buildTokenResponse(User user) {
         String access = jwtService.generate(user.getId(), user.getEmail(), user.getRole(), JwtService.TokenType.ACCESS);
         String refresh = jwtService.generate(user.getId(), user.getEmail(), user.getRole(), JwtService.TokenType.REFRESH);
-        return new LoginResponse(false, null, access, refresh, "Bearer", 900L, UserResponse.from(user));
+        return new LoginResponse(false, null, access, refresh, "Bearer", 900L,
+                UserResponse.from(user), portalName(), displayNamePolicy.getBrand());
+    }
+
+    /** The admin-configurable app title (default "SECPhils Portal"). */
+    private String portalName() {
+        String p = settingsRepository.findAll().stream().findFirst()
+                .map(SystemSettings::getPortalName).orElse(null);
+        return (p == null || p.isBlank()) ? "SECPhils Portal" : p;
     }
 }

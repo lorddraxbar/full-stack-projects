@@ -1,4 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { usePortalName } from '../composables/useBrand'
+
+const { portalName } = usePortalName()
 
 const routes: RouteRecordRaw[] = [
   {
@@ -132,7 +135,7 @@ router.beforeEach((to, _from, next) => {
 })
 
 router.afterEach((to) => {
-  document.title = (to.meta.title as string) || 'SECPhils Portal'
+  document.title = (to.meta.title as string) || portalName.value
 })
 
 export default router

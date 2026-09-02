@@ -1146,6 +1146,7 @@ const deleteAnnouncement = async (log: AnnouncementRow) => {
 // ---------- System Settings (real API) ----------
 const systemSettings = ref({
   portalName: 'SECPhils Portal',
+  brandName: 'SECPhils',
   maintenanceMode: false,
   inviteBaseUrl: '',
   securityPolicies: {
@@ -1306,6 +1307,7 @@ const loadSystemSettings = async () => {
   try {
     const data: any = await useGetSystemSettings()
     systemSettings.value.portalName = data.portalName ?? systemSettings.value.portalName
+    systemSettings.value.brandName = data.brandName || 'SECPhils'
     systemSettings.value.maintenanceMode = !!data.maintenanceMode
     systemSettings.value.inviteBaseUrl = data.inviteBaseUrl ?? ''
     systemSettings.value.landingContactEmail = data.landingContactEmail ?? ''
@@ -1347,6 +1349,7 @@ const saveGeneralSettings = async () => {
   try {
     await useUpdateSystemSettings({
       portalName: systemSettings.value.portalName,
+      brandName: systemSettings.value.brandName.trim() || 'SECPhils',
       maintenanceMode: systemSettings.value.maintenanceMode,
       inviteBaseUrl: systemSettings.value.inviteBaseUrl.trim(),
       securityPolicies: JSON.stringify(systemSettings.value.securityPolicies),
@@ -2714,6 +2717,18 @@ const timeOfDay = (ts: string) => {
               type="text"
               class="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Brand Name</label>
+            <input
+              v-model="systemSettings.brandName"
+              type="text"
+              class="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+            <p class="text-xs text-gray-500 mt-1">
+              The sender name shown for provider staff on client-visible messages, announcements, documents and tasks, and the wordmark next to the logo in the portal drawer. Staff-only (internal) messages always show the sender's real name.
+            </p>
           </div>
 
           <div>

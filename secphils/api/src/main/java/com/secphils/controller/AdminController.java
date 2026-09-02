@@ -6,6 +6,7 @@ import com.secphils.common.ApiException;
 import com.secphils.dto.GoogleSsoConfig;
 import com.secphils.entity.AuditLog;
 import com.secphils.entity.SystemSettings;
+import com.secphils.policy.DisplayNamePolicy;
 import com.secphils.repository.CompanyRepository;
 import com.secphils.repository.ProjectRepository;
 import com.secphils.repository.ReviewRepository;
@@ -42,11 +43,13 @@ public class AdminController {
     private final ReviewRepository reviewRepository;
     private final DataSource dataSource;
     private final S3StorageService storageService;
+    private final DisplayNamePolicy displayNamePolicy;
 
     public AdminController(SystemSettingsRepository settingsRepository, AuditService auditService,
                            UserRepository userRepository, CompanyRepository companyRepository,
                            ProjectRepository projectRepository, ReviewRepository reviewRepository,
-                           DataSource dataSource, S3StorageService storageService) {
+                           DataSource dataSource, S3StorageService storageService,
+                           DisplayNamePolicy displayNamePolicy) {
         this.settingsRepository = settingsRepository;
         this.auditService = auditService;
         this.userRepository = userRepository;
@@ -55,6 +58,7 @@ public class AdminController {
         this.reviewRepository = reviewRepository;
         this.dataSource = dataSource;
         this.storageService = storageService;
+        this.displayNamePolicy = displayNamePolicy;
     }
 
     /**
@@ -145,8 +149,15 @@ public class AdminController {
             }
             settings.setLandingContactEmail(addr == null ? null : (addr.isEmpty() ? null : addr));
         }
+        if (body.containsKey("brandName")) {
+            String bn = body.get("brandName") == null ? null : String.valueOf(body.get("brandName")).trim();
+            settings.setBrandName(bn == null ? null : (bn.isEmpty() ? null : bn));
+        }
         settings.setUpdatedAt(LocalDateTime.now());
         settings = settingsRepository.save(settings);
+        // Push the new brand to the display-name policy so client-visible
+        // surfaces reflect the change without a restart.
+        displayNamePolicy.refresh();
         auditService.audit(actor, "SETTINGS_UPDATE", "SystemSettings", settings.getId(), null, http);
         return ResponseEntity.ok(maskStorage(maskSso(settings)));
     }

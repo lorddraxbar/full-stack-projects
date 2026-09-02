@@ -46,6 +46,10 @@ function storeSession(data: any) {
   setRole(data.user?.role || 'CLIENT')
   localStorage.setItem('userName', data.user?.fullName || 'User')
   if (data.user?.id) localStorage.setItem('userId', String(data.user.id))
+  // Admin-configurable brand + app title (echoed on every login/SSO path) so
+  // the drawer wordmark and document.title can render them without a fetch.
+  if (data.brand) localStorage.setItem('brandName', data.brand)
+  if (data.portalName) localStorage.setItem('portalName', data.portalName)
 }
 
 function finishLogin() {
