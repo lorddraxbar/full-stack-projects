@@ -1154,6 +1154,7 @@ const systemSettings = ref({
     sessionTimeoutMinutes: 30,
     maxLoginAttempts: 5,
   },
+  landingContactEmail: '',
 })
 const systemSettingsMessage = ref<{ ok: boolean; text: string } | null>(null)
 const integrationsMessage = ref<{ ok: boolean; text: string } | null>(null)
@@ -1304,12 +1305,35 @@ const saveSsoSettings = async () => {
 const loadSystemSettings = async () => {
   try {
     const data: any = await useGetSystemSettings()
-    if (!data) return
     systemSettings.value.portalName = data.portalName ?? systemSettings.value.portalName
     systemSettings.value.maintenanceMode = !!data.maintenanceMode
     systemSettings.value.inviteBaseUrl = data.inviteBaseUrl ?? ''
+    systemSettings.value.landingContactEmail = data.landingContactEmail ?? ''
     systemSettings.value.securityPolicies = parseJson<any>(data.securityPolicies, systemSettings.value.securityPolicies)
-    emailTemplates.value = parseJson<any[]>(data.emailTemplates, DEFAULT_EMAIL_TEMPLATES.map(t => ({ ...t })))
+    // Stored templates win per-field; anything the admin hasn't saved yet
+    // keeps its default. One legacy alias mirrors the backend: the pre-
+    // catalog "Team Invitation" entry maps onto `invite` (it was the only
+    // old entry the app actually sent).
+    const stored = parseJson<any[]>(data.emailTemplates, [])
+    const storedByName = new Map<string, any>(
+      (Array.isArray(stored) ? stored : []).filter(t => t && typeof t === 'object' && t.name).map(t => [String(t.name).toLowerCase(), t])
+    )
+    const storedFor = (name: string) =>
+      name === 'invite'
+        ? storedByName.get('team invitation') ?? storedByName.get('invite')
+        : storedByName.get(name)
+    emailTemplates.value = EMAIL_TEMPLATE_DEFAULTS.map(t => {
+      const s = storedFor(t.name)
+      return {
+        ...t,
+        subject: s?.subject ?? t.subject,
+        kicker: s?.kicker ?? t.kicker,
+        heading: s?.heading ?? t.heading,
+        body: s?.body ?? t.body,
+        cta: s?.cta ?? t.cta,
+        footer: s?.footer ?? t.footer,
+      }
+    })
     integrations.value = parseJson<any[]>(data.integrations, DEFAULT_INTEGRATIONS.map(t => ({ ...t })))
     loadStorageSettings(data)
     loadSsoSettings(data)
@@ -1336,7 +1360,11 @@ const saveGeneralSettings = async () => {
 const saveEmailTemplates = async () => {
   systemSettingsMessage.value = null
   try {
-    await useUpdateSystemSettings({ emailTemplates: JSON.stringify(emailTemplates.value) })
+    // Persist only the backend-consumed fields per template.
+    await useUpdateSystemSettings({
+      emailTemplates: JSON.stringify(emailTemplates.value.map(({ name, subject, kicker, heading, body, cta, footer }) =>
+        ({ name, subject, kicker, heading, body, cta, footer }))),
+    })
     systemSettingsMessage.value = { ok: true, text: 'Email templates saved.' }
   } catch (err: any) {
     systemSettingsMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save email templates' }
@@ -1353,10 +1381,170 @@ const saveIntegrations = async () => {
   }
 }
 
-const DEFAULT_EMAIL_TEMPLATES = [
-  { id: 1, name: 'Welcome Email', subject: 'Welcome to the SECPhils Portal', body: 'Hi {{name}},\n\nYour account is ready. Sign in to view your assigned projects.\n\n— SECPhils Team' },
-  { id: 2, name: 'Team Invitation', subject: 'You have been invited to {{company}}', body: 'Hi {{name}},\n\n{{inviter}} has invited you to join {{company}} on the SECPhils Portal.\n\nSetup link: {{setupLink}}\n\n— SECPhils Team' },
-  { id: 3, name: 'Project Update', subject: 'Update on {{project}}', body: 'Hi {{name}},\n\nNew update on {{project}}: {{updateText}}\n\n— SECPhils Team' },
+// The live email template catalog — one entry per transactional email the
+// app sends, mirrored 1:1 by EmailTemplateService.DEFAULTS on the backend.
+// `name` is the stable key the backend resolves; the UI edits
+// subject/kicker/heading/body/cta/footer (blank fields fall back to the
+// default server-side). The `landing` template's body is full HTML.
+const EMAIL_TEMPLATE_DEFAULTS = [
+  {
+    name: 'internalMessage',
+    title: 'New message — internal (staff only)',
+    hint: 'Sent to provider staff when a message is sent with "Visible to client" OFF.',
+    subject: 'Internal message from {{sender}} · {{project}}',
+    kicker: 'SecPhils · Internal · {{project}}',
+    heading: 'Internal message from {{sender}}',
+    body: '{{body}}',
+    cta: 'Open the conversation',
+    footer: "You're receiving this as a provider team member. Internal messages are not visible to the client. Manage your notification preferences in the portal.",
+    vars: ['{{sender}}', '{{project}}', '{{body}}'],
+  },
+  {
+    name: 'clientMessage',
+    title: 'New message — visible to client',
+    hint: 'Sent to the project\u2019s company members when a message is visible to the client (and for every message a client sends).',
+    subject: 'New message from {{sender}} · {{project}}',
+    kicker: 'SecPhils · {{project}}',
+    heading: 'New message from {{sender}}',
+    body: '{{body}}',
+    cta: 'Open the conversation',
+    footer: "You're receiving this as a member of the project's company. Manage your notification preferences in the portal.",
+    vars: ['{{sender}}', '{{project}}', '{{body}}'],
+  },
+  {
+    name: 'announcement',
+    title: 'New announcement',
+    hint: 'Sent to the announcement\u2019s audience when staff publish an announcement.',
+    subject: 'SecPhils — {{title}}',
+    kicker: 'SecPhils · {{category}}',
+    heading: '{{title}}{{projectRef}}',
+    body: '{{body}}',
+    cta: 'View all announcements',
+    footer: "You're receiving this as a member of {{company}}. Manage your notification preferences in the portal.",
+    vars: ['{{title}}', '{{category}}', '{{projectRef}}', '{{body}}', '{{company}}'],
+  },
+  {
+    name: 'invite',
+    title: 'User / company-rep invite',
+    hint: 'Sent when an admin invites a staff user or an authorized representative (one-time set-password link).',
+    subject: 'Your SECPhils Portal access is ready',
+    kicker: 'SecPhils',
+    heading: 'Welcome, {{name}}',
+    body: 'Hi {{name}},\n\n{{inviter}} invited you to the SECPhils portal.\n\nSet your password via the button below to activate your account — no one else, including us, knows it.',
+    cta: 'Set my password',
+    footer: 'This link expires in 24 hours. If you were not expecting this email, you can safely ignore it.',
+    vars: ['{{name}}', '{{inviter}}', '{{company}}'],
+  },
+  {
+    name: 'projectCreatedRep',
+    title: 'New project — authorized rep',
+    hint: 'Sent to the customer\u2019s authorized representative when a project is submitted.',
+    subject: 'New project submitted for {{company}}',
+    kicker: 'SecPhils',
+    heading: 'New project submitted — {{project}}',
+    body: 'Hi {{name}},\n\n{{company}} just submitted the project "{{project}}" for review. Please open it in the portal, check the details, and mark it complete when everything looks right.',
+    cta: 'Open {{project}}',
+    footer: "You're receiving this as the authorized representative of the customer company. Manage your notification preferences in the portal.",
+    vars: ['{{name}}', '{{company}}', '{{project}}'],
+  },
+  {
+    name: 'projectCreatedStaff',
+    title: 'New project — provider staff',
+    hint: 'Sent to every other active provider staff member when a project is submitted.',
+    subject: 'New project for {{company}} — {{project}}',
+    kicker: 'SecPhils',
+    heading: 'New project — {{project}}',
+    body: 'Hi {{name}},\n\n{{company}} submitted a new project, "{{project}}"{{repNote}}. It is waiting for review and completion.',
+    cta: 'View the project',
+    footer: "You're receiving this as a member of the SECPhils provider team. Manage your notification preferences in the portal.",
+    vars: ['{{name}}', '{{company}}', '{{project}}', '{{repNote}}'],
+  },
+  {
+    name: 'projectStatusRep',
+    title: 'Project status change — authorized rep',
+    hint: 'Sent to the authorized representative when the project moves between statuses.',
+    subject: '{{project}} is now {{statusLabel}}',
+    kicker: 'SecPhils',
+    heading: 'Project {{statusLabel}} — {{project}}',
+    body: 'Hi {{name}},\n\nThe project "{{project}}" ({{company}}) is now **{{statusLabel}}**.',
+    cta: 'View the project',
+    footer: "You're receiving this as the authorized representative of the customer company. Manage your notification preferences in the portal.",
+    vars: ['{{name}}', '{{project}}', '{{company}}', '{{statusLabel}}'],
+  },
+  {
+    name: 'projectStatusStaff',
+    title: 'Project status change — provider staff',
+    hint: 'Sent to provider staff when the project moves between statuses.',
+    subject: '{{project}} is now {{statusLabel}}',
+    kicker: 'SecPhils',
+    heading: 'Project {{statusLabel}} — {{project}}',
+    body: 'Hi {{name}},\n\n{{company}}\u2019s project "{{project}}" is now **{{statusLabel}}**.',
+    cta: 'View the project',
+    footer: "You're receiving this as a member of the SECPhils provider team. Manage your notification preferences in the portal.",
+    vars: ['{{name}}', '{{project}}', '{{company}}', '{{statusLabel}}'],
+  },
+  {
+    name: 'projectArchived',
+    title: 'Project archived',
+    hint: 'Sent to the project\u2019s company members when a project is archived (7-day grace before permanent deletion).',
+    subject: 'Project archived: {{project}}',
+    kicker: 'SecPhils · Project update',
+    heading: 'Project archived: {{project}}',
+    body: "The project '{{project}}' has been archived by {{actor}}. It will be permanently removed on {{deleteDate}} unless restored earlier.",
+    cta: 'View the project',
+    footer: "You're receiving this as a member of the project's company. Manage your notification preferences in the portal.",
+    vars: ['{{project}}', '{{actor}}', '{{deleteDate}}'],
+  },
+  {
+    name: 'projectRestored',
+    title: 'Project restored',
+    hint: 'Sent to the project\u2019s company members when an archived project is restored.',
+    subject: 'Project restored: {{project}}',
+    kicker: 'SecPhils · Project update',
+    heading: 'Project restored: {{project}}',
+    body: "The project '{{project}}' has been restored by {{actor}}.",
+    cta: 'View the project',
+    footer: "You're receiving this as a member of the project's company. Manage your notification preferences in the portal.",
+    vars: ['{{project}}', '{{actor}}'],
+  },
+  {
+    name: 'landing',
+    title: 'Landing page — contact form',
+    hint: 'Sent to the company profile email addresses (or the default recipient below) when the website contact form is submitted. Body is full HTML.',
+    subject: 'Landing page inquiry from {{firstName}} {{lastName}}',
+    kicker: '',
+    heading: '',
+    body: `<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+        <tr><td style="background:#29ca8e;padding:24px 32px;">
+          <span style="color:#ffffff;font-size:20px;font-weight:bold;">New Website Inquiry</span>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <p style="margin:0 0 20px;font-size:14px;line-height:1.6;">Someone submitted the contact form on your website. Details below.</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;">
+            <tr><td style="padding:12px 16px;font-size:14px;"><strong>Full name:</strong> {{fullName}}</td></tr>
+            <tr><td style="padding:12px 16px;font-size:14px;background:#f9fafb;border-top:1px solid #e5e7eb;"><strong>Email:</strong> {{email}}</td></tr>
+            <tr><td style="padding:12px 16px;font-size:14px;border-top:1px solid #e5e7eb;"><strong>Phone:</strong> {{phone}}</td></tr>
+            <tr><td style="padding:12px 16px;font-size:14px;background:#f9fafb;border-top:1px solid #e5e7eb;"><strong>How can we help?</strong><br>{{message}}</td></tr>
+          </table>
+          <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">Reply directly to reach this visitor: <a href="mailto:{{email}}" style="color:#29ca8e;">{{email}}</a></p>
+        </td></tr>
+        <tr><td style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;">Received via the SECPhils website contact form.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    cta: '',
+    footer: '',
+    vars: ['{{firstName}}', '{{lastName}}', '{{fullName}}', '{{email}}', '{{phone}}', '{{message}}'],
+  },
 ]
 const DEFAULT_INTEGRATIONS = [
   { id: 1, name: 'Gmail / Google Workspace', type: 'Email', status: 'Connected', detail: 'notifications@secphils.com' },
@@ -1364,7 +1552,7 @@ const DEFAULT_INTEGRATIONS = [
   { id: 3, name: 'Microsoft Teams', type: 'Notifications', status: 'Disconnected', detail: '—' },
   { id: 4, name: 'DocuSign', type: 'Documents', status: 'Connected', detail: 'secphils@docusign.net' },
 ]
-const emailTemplates = ref<any[]>(DEFAULT_EMAIL_TEMPLATES.map(t => ({ ...t })))
+const emailTemplates = ref<any[]>(EMAIL_TEMPLATE_DEFAULTS.map(t => ({ ...t })))
 const integrations = ref<any[]>(DEFAULT_INTEGRATIONS.map(t => ({ ...t })))
 
 // Optimistic toggle + immediate persist; rolls back on failure.
@@ -1395,8 +1583,6 @@ const tabItems = [
   { id: 'audit', label: 'Audit Logs' },
 ]
 const isActiveTab = (tab: string) => activeTab.value === tab
-
-const emailPlaceholderVars = ['name', 'company', 'project', 'inviter', 'setupLink', 'updateText'].map(v => '{{' + v + '}}')
 
 // Health badge color by status value.
 const healthBadge = (status: string) => {
@@ -2818,32 +3004,99 @@ const timeOfDay = (ts: string) => {
 
       <!-- Email Templates -->
       <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Email Templates</h2>
-        <p class="text-sm text-gray-600 mb-4">Available variables: {{ emailPlaceholderVars.join('  ') }}</p>
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">Email Templates</h2>
+        <p class="text-sm text-gray-600 mb-1">Every transactional email the app sends. Edit the subject, kicker, heading, body, button label, and footer — a blank field keeps the built-in default, and each recipient's own notification preferences still gate delivery.</p>
+        <p class="text-sm text-gray-500 mb-4">The placeholders shown inside each card are the variables that template can use.</p>
         <div class="space-y-4">
-          <div v-for="template in emailTemplates" :key="template.id" class="border border-gray-200 rounded-lg p-4">
-            <input
-              v-model="template.name"
-              type="text"
-              class="font-semibold text-gray-900 w-full px-2 py-1 border-b border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-t-lg bg-transparent mb-2"
-            />
-            <input
-              v-model="template.subject"
-              type="text"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm mb-2"
-              placeholder="Subject"
-            />
-            <textarea
-              v-model="template.body"
-              rows="4"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono"
-            />
+          <div v-for="template in emailTemplates" :key="template.name" class="border border-gray-200 rounded-lg p-4">
+            <div class="flex flex-wrap items-baseline gap-x-2 mb-1">
+              <h3 class="font-semibold text-gray-900">{{ template.title }}</h3>
+              <span class="text-xs text-gray-400 font-mono">{{ template.name }}</span>
+            </div>
+            <p class="text-sm text-gray-600 mb-3">{{ template.hint }}</p>
+            <div class="flex flex-wrap gap-1.5 mb-3">
+              <span v-for="v in template.vars" :key="v" class="px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-xs font-mono text-gray-600">{{ v }}</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label class="block md:col-span-2">
+                <span class="text-xs font-medium text-gray-500">Subject</span>
+                <input
+                  v-model="template.subject"
+                  type="text"
+                  class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  placeholder="Blank = default"
+                />
+              </label>
+              <label class="block">
+                <span class="text-xs font-medium text-gray-500">Kicker (small teal line above the heading)</span>
+                <input
+                  v-model="template.kicker"
+                  type="text"
+                  class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  placeholder="Blank = default"
+                />
+              </label>
+              <label class="block">
+                <span class="text-xs font-medium text-gray-500">Heading (card title)</span>
+                <input
+                  v-model="template.heading"
+                  type="text"
+                  class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  placeholder="Blank = default"
+                />
+              </label>
+              <label class="block md:col-span-2">
+                <span class="text-xs font-medium text-gray-500">
+                  Body<span v-if="template.name !== 'landing'"> (plain text; **bold** supported)</span>
+                  <span v-else> (full HTML)</span>
+                </span>
+                <textarea
+                  v-model="template.body"
+                  :rows="template.name === 'landing' ? 12 : 5"
+                  class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono"
+                />
+              </label>
+              <label class="block">
+                <span class="text-xs font-medium text-gray-500">Button label (the link target is set by the app)</span>
+                <input
+                  v-model="template.cta"
+                  type="text"
+                  class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  placeholder="Blank = no button"
+                />
+              </label>
+              <label class="block">
+                <span class="text-xs font-medium text-gray-500">Footer note</span>
+                <input
+                  v-model="template.footer"
+                  type="text"
+                  class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  placeholder="Blank = default"
+                />
+              </label>
+            </div>
           </div>
         </div>
-        <div class="mt-4 flex justify-end">
-          <button @click="saveEmailTemplates" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
-            Save Templates
-          </button>
+        <div class="mt-4 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <label class="block md:max-w-sm">
+            <span class="text-xs font-medium text-gray-500">
+              Default landing-page recipient <span class="text-gray-400">(used when the company profile has no email address)</span>
+            </span>
+            <input
+              v-model="systemSettings.landingContactEmail"
+              type="email"
+              class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+              placeholder="manager@secphils.com"
+            />
+          </label>
+          <div class="flex items-center justify-end gap-3">
+            <p v-if="systemSettingsMessage" :class="['text-sm', systemSettingsMessage.ok ? 'text-green-700' : 'text-red-600']">
+              {{ systemSettingsMessage.text }}
+            </p>
+            <button @click="saveEmailTemplates" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
+              Save Templates
+            </button>
+          </div>
         </div>
       </div>
 

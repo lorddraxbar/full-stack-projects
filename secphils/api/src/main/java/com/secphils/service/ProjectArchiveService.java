@@ -63,6 +63,7 @@ public class ProjectArchiveService {
     private final NotificationPreferenceRepository preferences;
     private final S3StorageService s3;
     private final MailService mail;
+    private final EmailTemplateService templateService;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String portalBaseUrl;
@@ -71,6 +72,7 @@ public class ProjectArchiveService {
                                  UserRepository users, NotificationRepository notifications,
                                  NotificationPreferenceRepository preferences,
                                  S3StorageService s3, MailService mail,
+                                 EmailTemplateService templateService,
                                  PasswordEncoder passwordEncoder,
                                  @Value("${app.invite.base-url:http://localhost:3000}") String portalBaseUrl) {
         this.projects = projects;
@@ -80,6 +82,7 @@ public class ProjectArchiveService {
         this.preferences = preferences;
         this.s3 = s3;
         this.mail = mail;
+        this.templateService = templateService;
         this.passwordEncoder = passwordEncoder;
         this.portalBaseUrl = portalBaseUrl;
     }
@@ -110,7 +113,8 @@ public class ProjectArchiveService {
                 "Project archived: " + p.getName(),
                 "The project '" + p.getName() + "' has been archived by " + actorName(actor)
                         + ". It will be permanently removed on " + p.getDeleteAt().toLocalDate()
-                        + " unless restored earlier.");
+                        + " unless restored earlier.",
+                EmailTemplateService.PROJECT_ARCHIVED);
         log.info("Archived project {} ({}), hard-delete at {}", p.getId(), p.getName(), p.getDeleteAt());
         return p;
     }
@@ -135,8 +139,9 @@ public class ProjectArchiveService {
         systemMessage(p, actor, "Project was restored by " + actorName(actor) + ".");
         notifyCompany(p, actor,
                 "Project restored: " + p.getName(),
-                "The project '" + p.getName() + "' has been restored by " + actorName(actor) + ".");
-        log.info("Restored project {}", p.getId());
+                "The project '" + p.getName() + "' has been restored by " + actorName(actor) + ".",
+                EmailTemplateService.PROJECT_RESTORED);
+        log.info("Restored project {} ({})", p.getId(), p.getName());
         return p;
     }
 
@@ -272,10 +277,27 @@ public class ProjectArchiveService {
     }
 
     /** In-app + email fan-out to the project's company members (skip actor),
-     * honoring each member's "projectStatusChanged" preference. */
-    private void notifyCompany(Project p, AuthUser actor, String title, String body) {
+     * honoring each member's "projectStatusChanged" preference. The email
+     * subject + card come from the admin-editable template {@code templateName};
+     * the in-app notification title/body stay the stable system strings. */
+    private void notifyCompany(Project p, AuthUser actor, String title, String body, String templateName) {
         if (p.getCompany() == null) return; // no company -> nothing to fan out to
         String link = portalBaseUrl.endsWith("/") ? portalBaseUrl + "projects" : portalBaseUrl + "/projects";
+        String projectName = p.getName() == null ? "" : p.getName();
+        String actorName = actorName(actor);
+        String deleteDate = p.getDeleteAt() != null ? p.getDeleteAt().toLocalDate().toString() : "";
+        Map<String, String> vars = Map.of(
+                "project", projectName,
+                "actor", actorName,
+                "deleteDate", deleteDate);
+        String subject = templateService.subject(templateName, vars);
+        String card = templateService.brandedCard(
+                templateService.kicker(templateName, vars),
+                templateService.heading(templateName, vars),
+                templateService.bodyHtml(templateName, vars),
+                templateService.cta(templateName, vars),
+                link,
+                templateService.footer(templateName, vars));
         for (User u : users.findByCompanyIdAndIsActiveTrue(p.getCompany().getId())) {
             if (u.getId().equals(actor.id())) continue; // actor already knows
             NotificationPreference pref = preferences.findByUserId(u.getId()).orElse(null);
@@ -296,7 +318,7 @@ public class ProjectArchiveService {
                 notifications.save(n);
             }
             if (email && u.getEmail() != null && !u.getEmail().isBlank()) {
-                mail.sendHtml(u.getEmail(), title, lifecycleEmail(title, body, link), link,
+                mail.sendHtml(u.getEmail(), subject, card, link,
                         users.findById(actor.id()).map(DisplayNamePolicy::emailFor).orElse(DisplayNamePolicy.NO_REPLY_EMAIL));
             }
         }
@@ -316,24 +338,5 @@ public class ProjectArchiveService {
         } catch (Exception e) {
             return true;
         }
-    }
-
-    private String lifecycleEmail(String title, String body, String link) {
-        return "<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f4f5f7;\""
-                + "font-family:Arial,Helvetica,sans-serif;color:#1f2937;\">"
-                + "<div style=\"max-width:560px;margin:32px auto;padding:32px;background:#ffffff;"
-                + "border-radius:12px;border:1px solid #e5e7eb;\">"
-                + "<p style=\"margin:0 0 8px;font-size:13px;color:#059669;font-weight:bold;\">SecPhils &middot; Project update</p>"
-                + "<h1 style=\"margin:0 0 16px;font-size:18px;font-weight:600;\">" + esc(title) + "</h1>"
-                + "<p style=\"margin:0 0 16px;font-size:14px;line-height:1.6;\">"
-                + esc(body).replace("\n", "<br>") + "</p>"
-                + "<p style=\"margin:0 0 8px;font-size:14px;line-height:1.6;\"><a href=\"" + link
-                + "\" style=\"color:#059669;\">View the project &#8594;</a></p>"
-                + "<p style=\"margin:16px 0 0;font-size:12px;color:#9ca3af;\">You're receiving this as a member of the project's company. Manage your notification preferences in the portal.</p>"
-                + "</div></body></html>";
-    }
-
-    private static String esc(String s) {
-        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 }

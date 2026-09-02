@@ -245,7 +245,7 @@ public class UserController {
         user.setPasswordResetRequestedAt(LocalDateTime.now());
         userRepository.save(user);
         String link = resolveInviteBaseUrl(http) + "/auth/set-password?token=" + token;
-        mailService.sendHtml(user.getEmail(), "Your SECPhils Portal access is ready",
+        mailService.sendHtml(user.getEmail(), mailService.inviteSubject(),
                 mailService.inviteEmail(user.getFirstName(), user.getFullName(), link), link);
         auditService.audit(actor, "USER_INVITE_SENT", "User", user.getId(), "Email: " + user.getEmail(), http);
     }

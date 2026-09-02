@@ -1,5 +1,6 @@
 package com.secphils.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.secphils.common.AuditService;
 import com.secphils.common.ApiException;
 import com.secphils.dto.GoogleSsoConfig;
@@ -121,7 +122,11 @@ public class AdminController {
         SystemSettings settings = settingsRepository.findAll().stream().findFirst()
                 .orElseThrow(() -> ApiException.notFound("System settings"));
         if (body.containsKey("portalName")) settings.setPortalName((String) body.get("portalName"));
-        if (body.containsKey("emailTemplates")) settings.setEmailTemplates((String) body.get("emailTemplates"));
+        if (body.containsKey("emailTemplates")) {
+            String json = body.get("emailTemplates") == null ? null : String.valueOf(body.get("emailTemplates"));
+            if (json != null && !json.isBlank()) requireJsonArray(json);
+            settings.setEmailTemplates(json == null || json.isBlank() ? null : json);
+        }
         if (body.containsKey("integrations")) settings.setIntegrations((String) body.get("integrations"));
         if (body.containsKey("securityPolicies")) settings.setSecurityPolicies((String) body.get("securityPolicies"));
         if (body.containsKey("storage")) settings.setStorage(normalizeStorage(body.get("storage"), settings.getStorage()));
@@ -133,10 +138,30 @@ public class AdminController {
             String url = body.get("inviteBaseUrl") == null ? null : String.valueOf(body.get("inviteBaseUrl")).trim();
             settings.setInviteBaseUrl(url == null || url.isEmpty() ? null : url);
         }
+        if (body.containsKey("landingContactEmail")) {
+            String addr = body.get("landingContactEmail") == null ? null : String.valueOf(body.get("landingContactEmail")).trim();
+            if (addr != null && !addr.isEmpty() && !addr.contains("@")) {
+                throw ApiException.badRequest("Default landing-page recipient must be an email address (or leave it blank for manager@secphils.com)");
+            }
+            settings.setLandingContactEmail(addr == null ? null : (addr.isEmpty() ? null : addr));
+        }
         settings.setUpdatedAt(LocalDateTime.now());
         settings = settingsRepository.save(settings);
         auditService.audit(actor, "SETTINGS_UPDATE", "SystemSettings", settings.getId(), null, http);
         return ResponseEntity.ok(maskStorage(maskSso(settings)));
+    }
+
+    /** Rejects non-JSON-array emailTemplates payloads before they corrupt the settings row. */
+    private void requireJsonArray(String json) {
+        try {
+            if (!new ObjectMapper().readTree(json).isArray()) {
+                throw ApiException.badRequest("emailTemplates must be a JSON array");
+            }
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw ApiException.badRequest("emailTemplates is not valid JSON: " + e.getMessage());
+        }
     }
 
     /**

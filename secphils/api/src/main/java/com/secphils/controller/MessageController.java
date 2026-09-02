@@ -22,6 +22,7 @@ import com.secphils.security.AuthUser;
 import com.secphils.entity.User;
 import com.secphils.security.CurrentUser;
 import com.secphils.service.MailService;
+import com.secphils.service.EmailTemplateService;
 import com.secphils.service.S3StorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -79,6 +80,7 @@ public class MessageController {
     private final NotificationRepository notificationRepository;
     private final NotificationPreferenceRepository preferenceRepository;
     private final MailService mailService;
+    private final EmailTemplateService templateService;
     private final S3StorageService storageService;
     private final DocumentRepository documentRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -90,6 +92,7 @@ public class MessageController {
                              NotificationRepository notificationRepository,
                              NotificationPreferenceRepository preferenceRepository,
                              MailService mailService,
+                             EmailTemplateService templateService,
                              S3StorageService storageService,
                              DocumentRepository documentRepository,
                              AuditService auditService,
@@ -101,6 +104,7 @@ public class MessageController {
         this.notificationRepository = notificationRepository;
         this.preferenceRepository = preferenceRepository;
         this.mailService = mailService;
+        this.templateService = templateService;
         this.storageService = storageService;
         this.documentRepository = documentRepository;
         this.portalBaseUrl = portalBaseUrl;
@@ -292,6 +296,14 @@ public class MessageController {
             String base = portalBaseUrl.endsWith("/") ? portalBaseUrl : portalBaseUrl + "/";
             link = base + "projects/" + project.getId();
         }
+        String templateName = internal
+                ? EmailTemplateService.INTERNAL_MESSAGE : EmailTemplateService.CLIENT_MESSAGE;
+        String senderName = DisplayNamePolicy.nameFor(sender);
+        if (senderName == null) senderName = sender.getEmail() == null ? "a teammate" : sender.getEmail();
+        Map<String, String> vars = Map.of(
+                "sender", senderName,
+                "project", project.getName() == null ? "" : project.getName(),
+                "body", body);
 
         List<User> recipients = internal
                 ? providerStaffRecipients()
@@ -318,8 +330,8 @@ public class MessageController {
                 notificationRepository.save(n);
             }
             if (email && u.getEmail() != null && !u.getEmail().isBlank()) {
-                mailService.sendHtml(u.getEmail(), title,
-                        messageEmail(sender, project, body, link, internal), link, DisplayNamePolicy.emailFor(sender));
+                mailService.sendHtml(u.getEmail(), templateService.subject(templateName, vars),
+                        messageEmail(templateName, vars, link), link, DisplayNamePolicy.emailFor(sender));
             }
         }
     }
@@ -332,31 +344,15 @@ public class MessageController {
         return staff;
     }
 
-    private String messageEmail(User sender, Project project, String body, String link, boolean internal) {
-        String kicker = internal ? "SecPhils · Internal · " : "SecPhils · ";
-        return "<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f4f5f7;\""
-                + "font-family:Arial,Helvetica,sans-serif;color:#1f2937;\">"
-                + "<div style=\"max-width:560px;margin:32px auto;padding:32px;background:#ffffff;\""
-                + "border-radius:12px;border:1px solid #e5e7eb;\">"
-                + "<p style=\"margin:0 0 8px;font-size:13px;color:#059669;font-weight:bold;\">" + kicker + esc(project.getName()) + "</p>"
-                + "<h1 style=\"margin:0 0 16px;font-size:18px;font-weight:600;\">" + esc(titleHead(sender, project, internal)) + "</h1>"
-                + "<p style=\"margin:0 0 16px;font-size:14px;line-height:1.6;\">" + esc(body).replace("\n", "<br>") + "</p>"
-                + "<p style=\"margin:0 0 8px;font-size:14px;line-height:1.6;\"><a href=\"" + link + "\" style=\"color:#059669;\">Open the conversation →</a></p>"
-                + "<p style=\"margin:16px 0 0;font-size:12px;color:#9ca3af;\">"
-                + (internal
-                    ? "You're receiving this as a provider team member. Internal messages are not visible to the client. Manage your notification preferences in the portal."
-                    : "You're receiving this as a member of the project's company. Manage your notification preferences in the portal.")
-                + "</p>"
-                + "</div></body></html>";
-    }
-
-    private String titleHead(User sender, Project project, boolean internal) {
-        return (internal ? "Internal message from " : "New message from ")
-                + DisplayNamePolicy.nameFor(sender);
-    }
-
-    private static String esc(String s) {
-        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    /** Card built from the admin-editable template (kicker / heading / body / CTA / footer). */
+    private String messageEmail(String templateName, Map<String, String> vars, String link) {
+        return templateService.brandedCard(
+                templateService.kicker(templateName, vars),
+                templateService.heading(templateName, vars),
+                templateService.bodyHtml(templateName, vars),
+                templateService.cta(templateName, vars),
+                link,
+                templateService.footer(templateName, vars));
     }
 
     /** True when the message is an internal (provider-staff-only) one. */

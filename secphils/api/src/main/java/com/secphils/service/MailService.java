@@ -1,9 +1,5 @@
 package com.secphils.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.secphils.entity.SystemSettings;
-import com.secphils.repository.SystemSettingsRepository;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +7,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
 
 /**
  * Transactional mail via the configured SMTP provider (Zoho).
@@ -24,15 +22,14 @@ public class MailService {
 
     private final JavaMailSender mailSender;
     private final String fromAddress;
-    private final SystemSettingsRepository settingsRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final EmailTemplateService templateService;
 
     public MailService(JavaMailSender mailSender,
                        @Value("${spring.mail.from}") String fromAddress,
-                       SystemSettingsRepository settingsRepository) {
+                       EmailTemplateService templateService) {
         this.mailSender = mailSender;
         this.fromAddress = fromAddress;
-        this.settingsRepository = settingsRepository;
+        this.templateService = templateService;
     }
 
     public void sendHtml(String to, String subject, String htmlBody, String link) {
@@ -62,10 +59,19 @@ public class MailService {
     }
 
     /**
-     * Invite email. Prefers the admin-editable "Team Invitation" template from
-     * system_settings.email_templates (subject + body with {{placeholders}});
-     * falls back to the built-in branded HTML if the template is absent,
-     * malformed, or empty.
+     * Invite email subject. Prefers the admin-editable "invite" template
+     * subject; the default is the historical "Your SECPhils Portal access is
+     * ready" line (the template has no variables, so it's resolved once here).
+     */
+    public String inviteSubject() {
+        return templateService.subject(EmailTemplateService.INVITE, java.util.Map.of());
+    }
+
+    /**
+     * Invite email. Renders the admin-editable "invite" template
+     * (subject/kicker/heading/body/CTA/footer from the Email Templates
+     * settings; blanks fall back to the built-in defaults) into the shared
+     * branded card, with the setup link as the CTA target.
      */
     public String inviteEmail(String firstName, String fullName, String link) {
         return renderInvite(firstName, fullName, link, null, null);
@@ -80,100 +86,22 @@ public class MailService {
     }
 
     private String renderInvite(String firstName, String fullName, String link, String inviter, String company) {
-        JsonNode template = findInviteTemplate();
-        if (template != null) {
-            String body = template.path("body").asText("");
-            if (!body.isBlank()) {
-                String rendered = body
-                        .replace("{{name}}", firstNonBlank(firstName, fullName))
-                        .replace("{{fullName}}", firstNonBlank(fullName, firstName))
-                        .replace("{{inviter}}", inviter != null ? inviter : "A member")
-                        .replace("{{company}}", company != null ? company : "the SECPhils Portal")
-                        .replace("{{setupLink}}", link);
-                // Simple text -> HTML so it reads well in an HTML mailbox.
-                return "<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f4f5f7;"
-                        + "font-family:Arial,Helvetica,sans-serif;color:#1f2937;\">"
-                        + "<div style=\"max-width:560px;margin:32px auto;padding:32px;background:#ffffff;"
-                        + "border-radius:12px;border:1px solid #e5e7eb;\">"
-                        + "<p style=\"font-size:14px;line-height:1.6;\">"
-                        + rendered.replace("\n", "<br>")
-                        + "</p></div></body></html>";
-            }
-        }
-        return defaultInviteEmail(firstName, fullName, link);
-    }
-
-    /** Locate the admin-editable invite template in system_settings.email_templates. */
-    private JsonNode findInviteTemplate() {
-        try {
-            SystemSettings settings = settingsRepository.findAll().stream().findFirst().orElse(null);
-            if (settings == null || settings.getEmailTemplates() == null || settings.getEmailTemplates().isBlank()) {
-                return null;
-            }
-            JsonNode root = objectMapper.readTree(settings.getEmailTemplates());
-            if (root.isArray()) {
-                for (JsonNode node : root) {
-                    String name = node.path("name").asText("");
-                    if (name.equalsIgnoreCase("Team Invitation") || name.equalsIgnoreCase("Invite")) {
-                        return node;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Could not read email_templates; using default invite email: {}", e.getMessage());
-        }
-        return null;
+        Map<String, String> vars = Map.of(
+                "name", firstNonBlank(firstName, fullName),
+                "fullName", firstNonBlank(fullName, firstName),
+                "inviter", inviter != null ? inviter : "A member",
+                "company", company != null ? company : "the SECPhils Portal",
+                "setupLink", link);
+        return templateService.brandedCard(
+                templateService.kicker(EmailTemplateService.INVITE, vars),
+                templateService.heading(EmailTemplateService.INVITE, vars),
+                templateService.bodyHtml(EmailTemplateService.INVITE, vars),
+                templateService.cta(EmailTemplateService.INVITE, vars),
+                link,
+                templateService.footer(EmailTemplateService.INVITE, vars));
     }
 
     private static String firstNonBlank(String a, String b) {
         return a != null && !a.isBlank() ? a : (b != null ? b : "");
-    }
-
-    private String defaultInviteEmail(String firstName, String fullName, String link) {
-        return """
-                <!DOCTYPE html>
-                <html>
-                <body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 0;">
-                    <tr><td align="center">
-                      <table role="presentation" width="560" cellpadding="0" cellspacing="0"
-                             style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
-                        <tr><td style="background:#1d4ed8;padding:24px 32px;">
-                          <span style="color:#ffffff;font-size:20px;font-weight:bold;">SECPhils</span>
-                        </td></tr>
-                        <tr><td style="padding:32px;">
-                          <h1 style="margin:0 0 16px;font-size:18px;font-weight:600;">Welcome, %FIRSTNAME%</h1>
-                          <p style="margin:0 0 16px;font-size:14px;line-height:1.6;">
-                            You have been invited to join the SECPhils portal.
-                            Set your password to activate it — no one else, including us, knows it.
-                          </p>
-                          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0;">
-                            <tr><td style="background:#1d4ed8;border-radius:8px;">
-                              <a href="%LINK%"
-                                 style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;
-                                        color:#ffffff;text-decoration:none;border-radius:8px;">
-                                Set my password
-                              </a>
-                            </td></tr>
-                          </table>
-                          <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#6b7280;">
-                            Or paste this link into your browser:
-                          </p>
-                          <p style="margin:0 0 24px;font-size:13px;word-break:break-all;color:#6b7280;">%LINK%</p>
-                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">
-                            This link expires in 24 hours. If you were not expecting this email, you can safely ignore it.
-                          </p>
-                        </td></tr>
-                        <tr><td style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;">
-                          <p style="margin:0;font-size:12px;color:#9ca3af;">SECPhils Portal — notifications@secphils.com</p>
-                        </td></tr>
-                      </table>
-                    </td></tr>
-                  </table>
-                </body>
-                </html>
-                """.replace("%FIRSTNAME%", firstName)
-                   .replace("%FULLNAME%", fullName)
-                   .replace("%LINK%", link);
     }
 }

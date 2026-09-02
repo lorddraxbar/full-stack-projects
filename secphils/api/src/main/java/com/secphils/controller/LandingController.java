@@ -11,6 +11,7 @@ import com.secphils.repository.ServiceRepository;
 import com.secphils.repository.SystemSettingsRepository;
 import com.secphils.repository.UserRepository;
 import com.secphils.service.MailService;
+import com.secphils.service.EmailTemplateService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,19 +44,22 @@ public class LandingController {
     private final UserRepository userRepository;
     private final ServiceRepository serviceRepository;
     private final MailService mailService;
+    private final EmailTemplateService templateService;
 
     public LandingController(SystemSettingsRepository settingsRepository,
                              CompanyRepository companyRepository,
                              ReviewRepository reviewRepository,
                              UserRepository userRepository,
                              ServiceRepository serviceRepository,
-                             MailService mailService) {
+                             MailService mailService,
+                             EmailTemplateService templateService) {
         this.settingsRepository = settingsRepository;
         this.companyRepository = companyRepository;
         this.reviewRepository = reviewRepository;
         this.userRepository = userRepository;
         this.serviceRepository = serviceRepository;
         this.mailService = mailService;
+        this.templateService = templateService;
     }
 
     @GetMapping
@@ -119,10 +123,12 @@ public class LandingController {
     /**
      * Public contact form. Emails the submission to every address in the
      * provider's Company Profile "Email Addresses" (comma- or space-separated),
-     * falling back to a single profile email, then to a hard default. Mail
-     * failures are logged by MailService and never block the response — the
-     * form always reports success so a visitor's inquiry is never lost to a
-     * transient SMTP outage at the relay.
+     * falling back to the admin-configured default recipient (Admin Settings →
+     * Email Templates), then to the hard default. The subject and HTML body
+     * come from the admin-editable "landing" template. Mail failures are
+     * logged by MailService and never block the response — the form always
+     * reports success so a visitor's inquiry is never lost to a transient SMTP
+     * outage at the relay.
      */
     @PostMapping("/contact")
     public ResponseEntity<Map<String, Object>> contact(@Valid @RequestBody LandingContactRequest request) {
@@ -138,11 +144,18 @@ public class LandingController {
             }
         }
         if (recipients.isEmpty()) {
-            recipients.add("manager@secphils.com");
+            recipients.add(defaultLandingRecipient());
         }
 
-        String subject = "Landing page inquiry from " + request.firstName().trim() + " " + request.lastName().trim();
-        String html = contactEmailHtml(request, replyTo);
+        Map<String, String> vars = Map.of(
+                "firstName", request.firstName().trim(),
+                "lastName", request.lastName().trim(),
+                "fullName", request.firstName().trim() + " " + request.lastName().trim(),
+                "email", replyTo,
+                "phone", request.phone() == null ? "" : request.phone().trim(),
+                "message", request.message() == null ? "" : request.message().trim());
+        String subject = templateService.subject(EmailTemplateService.LANDING, vars);
+        String html = templateService.landingContactHtml(vars);
 
         for (String to : recipients) {
             mailService.sendHtml(to, subject, html, null, replyTo);
@@ -154,49 +167,12 @@ public class LandingController {
         return ResponseEntity.ok(out);
     }
 
-    private String contactEmailHtml(LandingContactRequest r, String replyTo) {
-        return """
-                <!DOCTYPE html>
-                <html>
-                <body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
-                  <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 0;">
-                    <tr><td align="center">
-                      <table role="presentation" width="600" cellpadding="0" cellspacing="0"
-                             style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
-                        <tr><td style="background:#29ca8e;padding:24px 32px;">
-                          <span style="color:#ffffff;font-size:20px;font-weight:bold;">New Website Inquiry</span>
-                        </td></tr>
-                        <tr><td style="padding:32px;">
-                          <p style="margin:0 0 20px;font-size:14px;line-height:1.6;">
-                            Someone submitted the contact form on your website. Details below.
-                          </p>
-                          <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;">
-                            <tr><td style="padding:12px 16px;font-size:14px;"><strong>Full name:</strong> %FULLNAME%</td></tr>
-                            <tr><td style="padding:12px 16px;font-size:14px;background:#f9fafb;border-top:1px solid #e5e7eb;"><strong>Email:</strong> %EMAIL%</td></tr>
-                            <tr><td style="padding:12px 16px;font-size:14px;border-top:1px solid #e5e7eb;"><strong>Phone:</strong> %PHONE%</td></tr>
-                            <tr><td style="padding:12px 16px;font-size:14px;background:#f9fafb;border-top:1px solid #e5e7eb;"><strong>How can we help?</strong><br>%MESSAGE%</td></tr>
-                          </table>
-                          <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">
-                            Reply directly to reach this visitor: <a href="mailto:%EMAIL%" style="color:#29ca8e;">%EMAIL%</a>
-                          </p>
-                        </td></tr>
-                        <tr><td style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;">
-                          <p style="margin:0;font-size:12px;color:#9ca3af;">Received via the SECPhils website contact form.</p>
-                        </td></tr>
-                      </table>
-                    </td></tr>
-                  </table>
-                </body>
-                </html>
-                """.replace("%FULLNAME%", escape(r.firstName().trim()) + " " + escape(r.lastName().trim()))
-                   .replace("%EMAIL%", escape(replyTo))
-                   .replace("%PHONE%", escape(r.phone().trim()))
-                   .replace("%MESSAGE%", escape(r.message().trim()).replace("\n", "<br>"));
-    }
-
-    private static String escape(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    /** Admin-configured fallback recipient (System Settings → Email Templates), else the hard default. */
+    private String defaultLandingRecipient() {
+        SystemSettings settings = settingsRepository.findAll().stream().findFirst().orElse(null);
+        String adminDefault = settings != null ? settings.getLandingContactEmail() : null;
+        if (adminDefault != null && adminDefault.trim().contains("@")) return adminDefault.trim();
+        return "manager@secphils.com";
     }
 
     private List<Map<String, Object>> activeServices() {

@@ -20,6 +20,7 @@ import com.secphils.repository.UserRepository;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
 import com.secphils.service.MailService;
+import com.secphils.service.EmailTemplateService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,6 +64,7 @@ public class AnnouncementController {
     private final NotificationRepository notificationRepository;
     private final AuditService auditService;
     private final MailService mailService;
+    private final EmailTemplateService templateService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String portalBaseUrl;
 
@@ -74,6 +76,7 @@ public class AnnouncementController {
                                   NotificationRepository notificationRepository,
                                   AuditService auditService,
                                   MailService mailService,
+                                  EmailTemplateService templateService,
                                   @Value("${app.invite.base-url}") String portalBaseUrl) {
         this.announcementRepository = announcementRepository;
         this.companyRepository = companyRepository;
@@ -83,6 +86,7 @@ public class AnnouncementController {
         this.notificationRepository = notificationRepository;
         this.auditService = auditService;
         this.mailService = mailService;
+        this.templateService = templateService;
         this.portalBaseUrl = portalBaseUrl;
     }
 
@@ -196,32 +200,32 @@ public class AnnouncementController {
                 notificationRepository.save(n);
             }
             if (email && u.getEmail() != null && !u.getEmail().isBlank()) {
-                mailService.sendHtml(u.getEmail(), "SecPhils — " + a.getTitle(), announcementEmail(a, link), link);
+                Map<String, String> vars = Map.of(
+                        "title", a.getTitle() == null ? "" : a.getTitle(),
+                        "category", a.getCategory() == null ? "Update" : a.getCategory().replace('_', ' '),
+                        "projectRef", a.getProject() != null && a.getProject().getName() != null
+                                ? " — " + a.getProject().getName() : "",
+                        "body", body,
+                        "company", a.getCompany() != null ? a.getCompany().getName() : "your company");
+                mailService.sendHtml(u.getEmail(),
+                        templateService.subject(EmailTemplateService.ANNOUNCEMENT, vars),
+                        announcementEmail(EmailTemplateService.ANNOUNCEMENT, vars, link),
+                        link);
             }
         }
         auditService.audit(actor, "ANNOUNCEMENT_PUBLISH", "Announcement", a.getId(),
                 "Title: " + a.getTitle(), request);
     }
 
-    private String announcementEmail(Announcement a, String link) {
-        String category = a.getCategory() == null ? "Update" : a.getCategory().replace('_', ' ');
-        String project = a.getProject() != null ? " — " + a.getProject().getName() : "";
-        String company = a.getCompany() != null ? a.getCompany().getName() : "your company";
-        return "<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f4f5f7;\"\n"
-                + "font-family:Arial,Helvetica,sans-serif;color:#1f2937;\">\n"
-                + "<div style=\"max-width:560px;margin:32px auto;padding:32px;background:#ffffff;\n"
-                + "border-radius:12px;border:1px solid #e5e7eb;\">\n"
-                + "<p style=\"margin:0 0 8px;font-size:13px;color:#059669;font-weight:bold;\">SecPhils · " + esc(category) + "</p>\n"
-                + "<h1 style=\"margin:0 0 16px;font-size:18px;font-weight:600;\">" + esc(a.getTitle()) + esc(project) + "</h1>\n"
-                + "<p style=\"margin:0 0 16px;font-size:14px;line-height:1.6;\">" + esc(a.getBody()).replace("\n", "<br>") + "</p>\n"
-                + "<p style=\"margin:0 0 8px;font-size:14px;\"><a href=\"" + link + "\" style=\"color:#059669;\">View all announcements →</a></p>\n"
-                + "<p style=\"margin:16px 0 0;font-size:12px;color:#9ca3af;\">You're receiving this as a member of "
-                + esc(company) + ". Manage your notification preferences in the portal.</p>\n"
-                + "</div></body></html>";
-    }
-
-    private static String esc(String s) {
-        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    /** Card built from the admin-editable announcement template. */
+    private String announcementEmail(String templateName, Map<String, String> vars, String link) {
+        return templateService.brandedCard(
+                templateService.kicker(templateName, vars),
+                templateService.heading(templateName, vars),
+                templateService.bodyHtml(templateName, vars),
+                templateService.cta(templateName, vars),
+                link,
+                templateService.footer(templateName, vars));
     }
 
     // ---------- endpoints ----------

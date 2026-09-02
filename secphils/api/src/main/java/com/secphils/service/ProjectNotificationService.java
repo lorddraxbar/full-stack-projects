@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Project lifecycle notifications. When a project is created via the wizard
@@ -50,6 +51,7 @@ public class ProjectNotificationService {
     private final NotificationRepository notifications;
     private final NotificationPreferenceRepository preferences;
     private final MailService mail;
+    private final EmailTemplateService templateService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String portalBaseUrl;
 
@@ -58,12 +60,14 @@ public class ProjectNotificationService {
                                       NotificationRepository notifications,
                                       NotificationPreferenceRepository preferences,
                                       MailService mail,
+                                      EmailTemplateService templateService,
                                       @Value("${app.invite.base-url:http://localhost:3000}") String portalBaseUrl) {
         this.projects = projects;
         this.users = users;
         this.notifications = notifications;
         this.preferences = preferences;
         this.mail = mail;
+        this.templateService = templateService;
         this.portalBaseUrl = portalBaseUrl;
     }
 
@@ -72,33 +76,32 @@ public class ProjectNotificationService {
         String link = projectDetailLink(project.getId());
         String repName = displayName(project.getCompany().getAuthorizedRep());
         // 1) The customer's authorized rep: review + complete the project.
+        String repSubject = templateService.subject(EmailTemplateService.PROJECT_CREATED_REP, Map.of(
+                "company", companyName(project), "project", projectName(project)));
         deliver(project, project.getCompany().getAuthorizedRep(), actorId,
                 "New project submitted — " + project.getName(),
-                "New project submitted for " + esc(companyName(project)),
-                brandedEmail(
-                        "New project submitted — " + esc(project.getName()),
-                        "<p>Hi " + esc(firstName(project.getCompany().getAuthorizedRep())) + ",</p>"
-                                + "<p><strong>" + esc(companyName(project)) + "</strong> just submitted the project "
-                                + "<strong>\"" + esc(project.getName()) + "\"</strong> for review. Please open it in "
-                                + "the portal, check the details, and mark it complete when everything looks right.</p>"
-                                + ctaButton("Open " + esc(project.getName()), link),
-                        "You're receiving this as the authorized representative of the customer company. Manage your notification preferences in the portal."),
+                repSubject,
+                templateCard(EmailTemplateService.PROJECT_CREATED_REP, Map.of(
+                        "name", firstName(project.getCompany().getAuthorizedRep()),
+                        "company", companyName(project),
+                        "project", projectName(project)),
+                        link),
                 link, "NEW_PROJECT");
         // 2) Provider side: every other active staff user.
+        String staffSubject = templateService.subject(EmailTemplateService.PROJECT_CREATED_STAFF, Map.of(
+                "company", companyName(project), "project", projectName(project)));
+        String repNote = repName != null ? ", with " + repName + " as the authorized representative" : "";
         for (User u : activeProviderUsers(project.getCompany())) {
             if (u.getId().equals(actorId)) continue;
             deliver(project, u, actorId,
                     "New project — " + project.getName(),
-                    "New project for " + esc(companyName(project)) + " — " + esc(project.getName()),
-                    brandedEmail(
-                            "New project — " + esc(project.getName()),
-                            "<p>Hi " + esc(firstName(u)) + ",</p>"
-                                    + "<p>" + esc(companyName(project)) + " submitted a new project, <strong>\""
-                                    + esc(project.getName()) + "\"</strong>"
-                                    + (repName != null ? ", with " + esc(repName) + " as the authorized representative" : "")
-                                    + ". It is waiting for review and completion.</p>"
-                                    + inlineLink("View the project", link),
-                            "You're receiving this as a member of the SECPhils provider team."),
+                    staffSubject,
+                    templateCard(EmailTemplateService.PROJECT_CREATED_STAFF, Map.of(
+                            "name", firstName(u),
+                            "company", companyName(project),
+                            "project", projectName(project),
+                            "repNote", repNote),
+                    link),
                     link, "NEW_PROJECT");
         }
     }
@@ -108,29 +111,32 @@ public class ProjectNotificationService {
         if (oldStatus == null || oldStatus.equals(newStatus)) return;
         String label = labelFor(newStatus);
         String link = projectDetailLink(project.getId());
+        Map<String, String> vars = Map.of(
+                "project", projectName(project),
+                "company", companyName(project),
+                "statusLabel", label);
+        String subject = templateService.subject(EmailTemplateService.PROJECT_STATUS_REP, vars);
         deliver(project, project.getCompany().getAuthorizedRep(), actorId,
                 "Project " + label + " — " + project.getName(),
-                project.getName() + " is now " + label,
-                brandedEmail(
-                        "Project " + label + " — " + esc(project.getName()),
-                        "<p>Hi " + esc(firstName(project.getCompany().getAuthorizedRep())) + ",</p>"
-                                + "<p>The project <strong>\"" + esc(project.getName()) + "\"</strong> ("
-                                + esc(companyName(project)) + ") is now <strong>" + esc(label) + "</strong>.</p>"
-                                + inlineLink("View the project", link),
-                        "You're receiving this as the authorized representative of the customer company. Manage your notification preferences in the portal."),
+                subject,
+                templateCard(EmailTemplateService.PROJECT_STATUS_REP,
+                        Map.of("name", firstName(project.getCompany().getAuthorizedRep()),
+                                "project", projectName(project),
+                                "company", companyName(project),
+                                "statusLabel", label),
+                        link),
                 link, "PROJECT_STATUS");
         for (User u : activeProviderUsers(project.getCompany())) {
             if (u.getId().equals(actorId)) continue;
             deliver(project, u, actorId,
                     "Project " + label + " — " + project.getName(),
-                    project.getName() + " is now " + label,
-                    brandedEmail(
-                            "Project " + label + " — " + esc(project.getName()),
-                            "<p>Hi " + esc(firstName(u)) + ",</p>"
-                                    + "<p>" + esc(companyName(project)) + "'s project <strong>\"" + esc(project.getName())
-                                    + "\"</strong> is now <strong>" + esc(label) + "</strong>.</p>"
-                                    + inlineLink("View the project", link),
-                            "You're receiving this as a member of the SECPhils provider team."),
+                    subject,
+                    templateCard(EmailTemplateService.PROJECT_STATUS_STAFF,
+                            Map.of("name", firstName(u),
+                                    "project", projectName(project),
+                                    "company", companyName(project),
+                                    "statusLabel", label),
+                            link),
                     link, "PROJECT_STATUS");
         }
     }
@@ -200,26 +206,19 @@ public class ProjectNotificationService {
         return base + "/projects/" + id;
     }
 
-    /** Same branded shell the message/archive emails use. */
-    private String brandedEmail(String headerTitle, String bodyHtml, String footerNote) {
-        return "<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f4f5f7;\""
-                + "font-family:Arial,Helvetica,sans-serif;color:#1f2937;\">"
-                + "<div style=\"max-width:560px;margin:32px auto;padding:32px;background:#ffffff;"
-                + "border-radius:12px;border:1px solid #e5e7eb;\">"
-                + "<p style=\"margin:0 0 8px;font-size:13px;color:#059669;font-weight:bold;\">SecPhils</p>"
-                + "<h1 style=\"margin:0 0 16px;font-size:18px;font-weight:600;\">" + headerTitle + "</h1>"
-                + bodyHtml
-                + "<p style=\"margin:16px 0 0;font-size:12px;color:#9ca3af;\">" + esc(footerNote) + "</p>"
-                + "</div></body></html>";
+    /** Branded card built from an admin-editable template (kicker/heading/body/CTA/footer). */
+    private String templateCard(String templateName, Map<String, String> vars, String link) {
+        return templateService.brandedCard(
+                templateService.kicker(templateName, vars),
+                templateService.heading(templateName, vars),
+                templateService.bodyHtml(templateName, vars),
+                templateService.cta(templateName, vars),
+                link,
+                templateService.footer(templateName, vars));
     }
 
-    private String ctaButton(String label, String link) {
-        return "<p style=\"margin:16px 0 0;\"><a href=\"" + link + "\" style=\"display:inline-block;background:#059669;color:#ffffff;"
-                + "padding:10px 18px;border-radius:8px;font-weight:bold;text-decoration:none;\">" + label + "</a></p>";
-    }
-
-    private String inlineLink(String label, String link) {
-        return "<p style=\"margin:16px 0 0;font-size:14px;\"><a href=\"" + link + "\" style=\"color:#059669;text-decoration:underline;\">" + label + " →</a></p>";
+    private String projectName(Project p) {
+        return p.getName() == null ? "" : p.getName();
     }
 
     private String labelFor(String code) {
@@ -243,9 +242,5 @@ public class ProjectNotificationService {
 
     private String firstName(User u) {
         return u == null || u.getFirstName() == null ? "there" : u.getFirstName();
-    }
-
-    private static String esc(String s) {
-        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 }

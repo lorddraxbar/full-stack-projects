@@ -47,6 +47,9 @@ public class SystemSettings {
     @Column(name = "invite_base_url")
     private String inviteBaseUrl;
 
+    @Column(name = "landing_contact_email", length = 255)
+    private String landingContactEmail;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
