@@ -67,7 +67,9 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [revRes, projRes] = await Promise.all([useGetReviews(), useGetProjects()])
+    // Full list — a page-capped fetch would leave older projects out of the
+    // review-attribution picker.
+    const [revRes, projRes] = await Promise.all([useGetReviews(), useGetProjects({ size: 10000 })])
     reviews.value = (revRes as Review[]) || []
     const projList = Array.isArray(projRes) ? projRes : ((projRes as any)?.content ?? [])
     projects.value = (projList as { id: number; name: string }[]).map(p => ({ id: p.id, name: p.name }))

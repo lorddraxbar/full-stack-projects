@@ -126,7 +126,8 @@ function mapDoc(d: any): DocRow {
 
 async function loadProjects() {
   try {
-    const data = await useGetProjects()
+    // Full list — a page-capped fetch would hide older projects from the filter.
+    const data = await useGetProjects({ size: 10000 })
     const content = Array.isArray(data) ? data : data?.content ?? []
     projects.value = content.map((p: any) => ({ id: p.id, name: p.name }))
   } catch {

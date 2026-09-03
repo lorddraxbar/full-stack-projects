@@ -68,7 +68,11 @@ async function loadProjects() {
       // Server-side scope: clients only see their own company's projects.
       params.companyId = meCompanyId.value
     }
-    const data = await useGetProjects(params)
+    // Fetch the full list (not the default 20-row page): the status filter
+    // and search below run client-side, and a page-capped fetch silently
+    // drops older statuses (Not Started / Archived) from the list and from
+    // search results.
+    const data = await useGetProjects({ ...params, size: 10000 })
     const content = Array.isArray(data) ? data : data?.content ?? []
     projects.value = content.map(mapProject)
   } catch (e: any) {

@@ -1051,7 +1051,9 @@ const audienceDisplay = (a: string | null | undefined) => {
 
 const loadProjects = async () => {
   try {
-    const data = (await useGetProjects()) as any[]
+    // Full list — a page-capped fetch would leave older projects out of the
+    // announcement-target picker and the audit-log project names.
+    const data = (await useGetProjects({ size: 10000 })) as any[]
     projectOptions.value = (data || []).map((p) => ({ id: Number(p.id), name: p.name || `Project #${p.id}` }))
   } catch {
     projectOptions.value = []

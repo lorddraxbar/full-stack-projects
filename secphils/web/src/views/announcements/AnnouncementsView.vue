@@ -94,7 +94,8 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [annRes, projRes] = await Promise.all([useGetAnnouncements(), useGetProjects()])
+    // Full list — a page-capped fetch would hide older projects from the filter.
+    const [annRes, projRes] = await Promise.all([useGetAnnouncements(), useGetProjects({ size: 10000 })])
     announcements.value = (annRes as Announcement[]) || []
     const projList = Array.isArray(projRes) ? projRes : ((projRes as any)?.content ?? [])
     projects.value = (projList as { id: number; name: string }[]).map(p => ({ id: p.id, name: p.name }))

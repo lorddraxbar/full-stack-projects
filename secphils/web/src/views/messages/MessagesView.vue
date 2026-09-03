@@ -117,9 +117,12 @@ async function loadConversations() {
     const meRes = await useGetMe()
     // GET /users/me returns the UserResponse body directly (no envelope)
     me.value = meRes || null
-    // Clients see only their own company's projects (their conversations)
+    // Clients see only their own company's projects (their conversations).
+    // Full list: a page-capped fetch would hide a client's older
+    // conversations (the 20 newest by created_at only).
     const page = await useGetProjects({
       companyId: me.value?.companyId ?? undefined,
+      size: 10000,
     })
     const projects = Array.isArray(page) ? page : (page?.content ?? [])
 
