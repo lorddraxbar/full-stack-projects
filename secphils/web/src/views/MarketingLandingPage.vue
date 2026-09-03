@@ -610,7 +610,7 @@ onBeforeUnmount(() => {
             </div>
             <h2 class="mt-4 text-xl font-semibold" style="color: #353535">Progress you can watch</h2>
             <p class="mt-2 text-sm leading-6" style="color: #757575">
-              Tasks, milestones and document updates the second they happen. Open the portal and your
+              Status updates, milestones and document uploads the second they happen. Open the portal and your
               project is exactly where it is — you'll always know.
             </p>
           </div>

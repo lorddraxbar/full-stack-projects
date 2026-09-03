@@ -9,36 +9,12 @@ export const PROJECT_STATUS_LABELS: Record<string, string> = {
   ARCHIVED: 'Archived',
 }
 
-export const TASK_STATUS_LABELS: Record<string, string> = {
-  TO_DO: 'To Do',
-  IN_PROGRESS: 'In Progress',
-  DONE: 'Done',
-}
-
-export const PRIORITY_LABELS: Record<string, string> = {
-  LOW: 'Low',
-  MEDIUM: 'Medium',
-  HIGH: 'High',
-}
-
 export const PROJECT_STATUS_COLORS: Record<string, string> = {
   'Not Started': 'bg-gray-100 text-gray-800',
   'In Progress': 'bg-teal-100 text-teal-800',
   'On Hold': 'bg-red-100 text-red-800',
   'Completed': 'bg-green-100 text-green-800',
   'Archived': 'bg-gray-100 text-gray-500',
-}
-
-export const PRIORITY_COLORS: Record<string, string> = {
-  'High': 'bg-red-100 text-red-800',
-  'Medium': 'bg-yellow-100 text-yellow-800',
-  'Low': 'bg-green-100 text-green-800',
-}
-
-export const TASK_STATUS_COLORS: Record<string, string> = {
-  'To Do': 'bg-gray-100 text-gray-800',
-  'In Progress': 'bg-teal-100 text-teal-800',
-  'Done': 'bg-green-100 text-green-800',
 }
 
 export const FILE_TYPE_LABELS: Record<string, string> = {
@@ -148,16 +124,6 @@ export function formatPhpCompact(value: number | null | undefined): string {
 export function projectStatusLabel(code: string | null | undefined): string {
   if (!code) return 'Unknown'
   return PROJECT_STATUS_LABELS[code] || code
-}
-
-export function taskStatusLabel(code: string | null | undefined): string {
-  if (!code) return 'Unknown'
-  return TASK_STATUS_LABELS[code] || code
-}
-
-export function priorityLabel(code: string | null | undefined): string {
-  if (!code) return 'Medium'
-  return PRIORITY_LABELS[code] || code
 }
 
 export function formatDate(d: string | null | undefined): string {

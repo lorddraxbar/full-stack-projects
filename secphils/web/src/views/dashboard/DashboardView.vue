@@ -3,12 +3,12 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRole } from '@/composables/useRole'
 import {
-  useGetMe, useGetProjects, useGetTasks, useGetMessages,
+  useGetMe, useGetProjects, useGetMessages,
   useGetAuditLogs, useGetCompanies, useGetUsers, useGetApiHealth, useGetLanding,
 } from '@/services/api'
 import {
-  projectStatusLabel, taskStatusLabel, priorityLabel,
-  PROJECT_STATUS_COLORS, PRIORITY_COLORS, TASK_STATUS_COLORS,
+  projectStatusLabel,
+  PROJECT_STATUS_COLORS,
   formatDate, formatDateTime,
 } from '@/lib/labels'
 
@@ -26,21 +26,6 @@ interface ProjectRow {
   progress: number
 }
 
-interface TaskRow {
-  id: number
-  projectId: number | null
-  assigneeId: number | null
-  projectName: string
-  title: string
-  assigneeName: string | null
-  status: string
-  statusLabel: string
-  priority: string
-  priorityLabel: string
-  dueDate: string | null
-  createdAt: string
-}
-
 interface MessageRow {
   id: number
   projectId: number | null
@@ -52,7 +37,6 @@ interface MessageRow {
 
 const me = ref<{ id: number; fullName: string; role: string } | null>(null)
 const projects = ref<ProjectRow[]>([])
-const tasks = ref<TaskRow[]>([])
 const messages = ref<MessageRow[]>([])
 const companies = ref<{ id: number; name: string }[]>([])
 const auditLogs = ref<{ id: number; userId: number | string; action: string; entityType: string; details: string; createdAt: string }[]>([])
@@ -101,23 +85,6 @@ function mapProject(p: any): ProjectRow {
   }
 }
 
-function mapTask(t: any): TaskRow {
-  return {
-    id: t.id,
-    projectId: t.projectId,
-    assigneeId: t.assigneeId ?? null,
-    projectName: projectName(t.projectId),
-    title: t.title,
-    assigneeName: t.assigneeName ?? null,
-    status: t.status,
-    statusLabel: taskStatusLabel(t.status),
-    priority: t.priority,
-    priorityLabel: priorityLabel(t.priority),
-    dueDate: t.dueDate ?? null,
-    createdAt: t.createdAt,
-  }
-}
-
 function mapMessage(m: any): MessageRow {
   return {
     id: m.id,
@@ -133,17 +100,13 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const [meRes, projRes, taskRes] = await Promise.all([
+    const [meRes, projRes] = await Promise.all([
       useGetMe(), useGetProjects(),
-      // Admins keep the pre-scoping behaviour (all tasks); everyone else now
-      // only sees their own tasks on the dashboard.
-      useGetTasks(isAdmin.value ? { scope: 'ALL' } : undefined),
     ])
     // GET /users/me returns the UserResponse body directly (no envelope).
     me.value = meRes || null
     const projContent = Array.isArray(projRes) ? projRes : projRes?.content ?? []
     projects.value = projContent.map(mapProject)
-    tasks.value = (Array.isArray(taskRes) ? taskRes : []).map(mapTask)
 
     // Messages live per project — fetch for each project in parallel.
     const msgResults = await Promise.all(
@@ -213,9 +176,6 @@ const latestUpdates = computed(() => messages.value.slice(0, 3))
 const userStats = computed(() => ({
   activeProjects: projects.value.filter(p => p.status === 'IN_PROGRESS').length,
 }))
-const recentTasks = computed(() =>
-  [...tasks.value].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5)
-)
 const recentMessages = computed(() => messages.value.slice(0, 3))
 const activeProjects = computed(() =>
   projects.value.filter(p => p.status === 'IN_PROGRESS' || p.status === 'NOT_STARTED').slice(0, 5)
@@ -242,7 +202,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
         {{ isClient
           ? 'Your projects and latest updates from your consultants.'
           : isUser
-            ? 'Your tasks, active projects, and recent messages.'
+            ? 'Your active projects and recent messages.'
             : 'System overview, key metrics, and recent activity.' }}
       </p>
     </div>
@@ -361,44 +321,9 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
             </div>
           </div>
         </div>
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-600">Total Tasks</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ tasks.length }}</p>
-            </div>
-            <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-tasks text-yellow-600 text-xl"></i>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div class="bg-white rounded-lg shadow">
-          <div class="p-6 border-b border-gray-200 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-900">Recent Tasks</h2>
-            <RouterLink to="/tasks" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View all</RouterLink>
-          </div>
-          <div class="divide-y divide-gray-200">
-            <div v-if="recentTasks.length === 0" class="p-6 text-sm text-gray-500">No tasks yet.</div>
-            <div v-for="task in recentTasks" :key="task.id" class="p-6 hover:bg-gray-50 transition-colors">
-              <div class="flex items-center justify-between mb-2">
-                <h3 class="font-medium text-gray-900">{{ task.title }}</h3>
-                <span :class="['px-2 py-1 text-xs font-medium rounded-full', PRIORITY_COLORS[task.priorityLabel]]">
-                  {{ task.priorityLabel }}
-                </span>
-              </div>
-              <p class="text-sm text-gray-600">{{ task.projectName }}</p>
-              <p class="text-sm text-gray-500 mt-1">
-                Due: {{ formatDate(task.dueDate) }} &middot;
-                <span :class="['font-medium', TASK_STATUS_COLORS[task.statusLabel]]">{{ task.statusLabel }}</span>
-                <template v-if="task.assigneeName"> &middot; {{ task.assigneeName }}</template>
-              </p>
-            </div>
-          </div>
-        </div>
-
         <div class="bg-white rounded-lg shadow">
           <div class="p-6 border-b border-gray-200 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900">Recent Messages</h2>

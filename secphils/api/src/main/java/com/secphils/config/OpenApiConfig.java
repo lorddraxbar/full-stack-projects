@@ -21,7 +21,7 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("SECPhils API")
-                        .description("Client portal backend — projects, tasks, documents, messaging, "
+                        .description("Client portal backend — projects, documents, messaging, "
                                 + "announcements, reviews, services, notifications, and admin.")
                         .version("v1")
                         .contact(new Contact().name("SECPhils Engineering")))

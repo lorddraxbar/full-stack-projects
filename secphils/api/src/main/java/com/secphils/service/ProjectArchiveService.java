@@ -176,7 +176,7 @@ public class ProjectArchiveService {
         }
 
         deleteStorage(p);
-        // Team members, tasks, documents, document comments, reviews and
+        // Team members, documents, document comments, reviews and
         // messages fall away via the DB ON DELETE CASCADE on project_id.
         projects.delete(p);
         log.warn("Permanently deleted project {} ({}) by {} (window passed: {})",

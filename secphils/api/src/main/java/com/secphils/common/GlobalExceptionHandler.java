@@ -64,6 +64,12 @@ public class GlobalExceptionHandler {
                 .body(new ProblemResponse(400, "Bad Request", "Missing required parameter: " + ex.getParameterName(), LocalDateTime.now()));
     }
 
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ProblemResponse> handleNoResource(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ProblemResponse(404, "Not Found", "No such endpoint: " + ex.getResourcePath(), LocalDateTime.now()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemResponse> handleGeneric(Exception ex) {
         log.error("Unhandled exception", ex);

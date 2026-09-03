@@ -3,8 +3,7 @@ import { ref, computed } from 'vue'
 import { useGetProjects } from '@/services/api'
 import { projectStatusLabel } from '@/lib/labels'
 
-// Backend ProjectResponse -> store shape (keeps dependents like
-// TasksView / TaskDetailModal working without changes).
+// Backend ProjectResponse -> store shape.
 interface ProjectRow {
   id: number
   name: string

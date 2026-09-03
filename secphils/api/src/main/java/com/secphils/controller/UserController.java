@@ -401,7 +401,7 @@ public class UserController {
             userRepository.delete(user);
             userRepository.flush();
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            throw ApiException.conflict("Cannot delete: this user still has related records (e.g. tasks, documents, audit history)");
+            throw ApiException.conflict("Cannot delete: this user still has related records (e.g. documents, audit history)");
         }
         auditService.audit(actor, "USER_HARD_DELETE", "User", user.getId(), "Email: " + user.getEmail(), http);
         return ResponseEntity.noContent().build();

@@ -372,27 +372,6 @@ export async function useUpdateMe(data: Record<string, unknown>) {
   return response.data
 }
 
-// ---------- Tasks ----------
-export async function useGetTasks(params?: { projectId?: number; status?: string; priority?: string; assigneeId?: number; scope?: string }) {
-  const response = await api.get('/tasks', { params })
-  return response.data
-}
-
-export async function useCreateTask(data: Record<string, unknown>) {
-  const response = await api.post('/tasks', data)
-  return response.data
-}
-
-export async function useUpdateTask(id: number, data: Record<string, unknown>) {
-  const response = await api.put(`/tasks/${id}`, data)
-  return response.data
-}
-
-export async function useDeleteTask(id: number) {
-  const response = await api.delete(`/tasks/${id}`)
-  return response.data
-}
-
 // ---------- Documents (backend: /api/v1/documents) ----------
 export async function useGetDocuments(params?: { projectId?: number; category?: string }) {
   const response = await api.get('/documents', { params })

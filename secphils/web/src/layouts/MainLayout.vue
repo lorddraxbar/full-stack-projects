@@ -12,7 +12,6 @@ const router = useRouter()
 const allNavItems = [
   { name: 'Dashboard', path: '/dashboard', icon: 'fas fa-chart-bar', roles: ['CLIENT', 'USER', 'ADMIN'] },
   { name: 'Projects', path: '/projects', icon: 'fas fa-folder', roles: ['CLIENT', 'USER', 'ADMIN'] },
-  { name: 'Tasks', path: '/tasks', icon: 'fas fa-check-square', roles: ['USER', 'ADMIN'] },
   { name: 'Documents', path: '/documents', icon: 'fas fa-file-alt', roles: ['CLIENT', 'USER', 'ADMIN'] },
   { name: 'Messages', path: '/messages', icon: 'fas fa-comment-dots', roles: ['CLIENT', 'USER', 'ADMIN'] },
   { name: 'Announcements', path: '/announcements', icon: 'fas fa-bullhorn', roles: ['CLIENT', 'USER', 'ADMIN'] },
@@ -48,7 +47,6 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.isRead).le
 const notifRoute = (n: Notif) => {
   switch (n.entityType) {
     case 'Announcement': return '/announcements'
-    case 'Task': return '/tasks'
     case 'Message': return '/messages'
     case 'Project': return '/projects'
     default: return '/dashboard'

@@ -2727,7 +2727,7 @@ const timeOfDay = (ts: string) => {
               class="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
             <p class="text-xs text-gray-500 mt-1">
-              The sender name shown for provider staff on client-visible messages, announcements, documents and tasks, and the wordmark next to the logo in the portal drawer. Staff-only (internal) messages always show the sender's real name.
+              The sender name shown for provider staff on client-visible messages, announcements, documents and reviews, and the wordmark next to the logo in the portal drawer. Staff-only (internal) messages always show the sender's real name.
             </p>
           </div>
 

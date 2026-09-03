@@ -34,11 +34,11 @@ public class NotificationController {
     static {
         // Keys owned by the Settings UI (email-handles panel).
         for (String k : new String[]{"projectCreated", "newMessage", "projectUpdate",
-                "documentUploaded", "documentRequested", "taskAssigned", "taskStatusChanged",
+                "documentUploaded", "documentRequested",
                 "projectStatusChanged", "announcement", "teamInvitation"}) {
             DEFAULT_EMAIL.put(k, true);
         }
-        for (String k : new String[]{"newMessage", "documentUploaded", "taskAssigned",
+        for (String k : new String[]{"newMessage", "documentUploaded",
                 "projectStatusChanged", "announcement"}) {
             DEFAULT_IN_APP.put(k, true);
         }

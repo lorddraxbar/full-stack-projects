@@ -69,13 +69,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/projects/ProjectDetailView.vue'),
       },
       {
-        path: 'tasks',
-        name: 'Tasks',
-        component: () => import('@/views/tasks/TasksView.vue'),
-        // Staff-only: keep in sync with the Tasks entry in MainLayout nav.
-        meta: { roles: ['USER', 'ADMIN'] },
-      },
-      {
         path: 'documents',
         name: 'Documents',
         component: () => import('@/views/documents/DocumentsView.vue'),
