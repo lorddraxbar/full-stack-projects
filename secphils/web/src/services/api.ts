@@ -611,7 +611,7 @@ export async function useGetAdminStats(): Promise<AdminStats> {
   return response.data
 }
 
-export async function useGetAuditLogs(params?: { action?: string; userId?: number; limit?: number }) {
+export async function useGetAuditLogs(params?: { action?: string; userId?: number; search?: string; limit?: number }) {
   const response = await api.get('/admin/audit-logs', { params })
   return response.data
 }

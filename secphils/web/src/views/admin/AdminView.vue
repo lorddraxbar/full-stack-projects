@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
@@ -41,13 +41,20 @@ interface AuditLogRow {
 const auditLogs = ref<AuditLogRow[]>([])
 const auditLoading = ref(false)
 const auditSearch = ref('')
-
-// Newest 200 are loaded in one shot; the audit tab filters them client-side
-// (the backend filter is exact-match, which is clunky for free search).
+let auditSearchTimer: ReturnType<typeof setTimeout> | null = null
+onBeforeUnmount(() => {
+  if (auditSearchTimer) clearTimeout(auditSearchTimer)
+})
+// Server-side search over the FULL audit log (the endpoint's limit only caps
+// how many of the matched rows are returned — the default 100 would still
+// silently drop older rows). The search box below is debounced.
 const loadAuditLogs = async () => {
   auditLoading.value = true
   try {
-    const raw = await useGetAuditLogs({ limit: 200 }) as any[]
+    const raw = await useGetAuditLogs({
+      limit: 500,
+      search: auditSearch.value.trim() || undefined,
+    }) as any[]
     auditLogs.value = (raw || []).map((l) => ({
       id: Number(l.id),
       timestamp: String(l.createdAt ?? ''),
@@ -63,6 +70,12 @@ const loadAuditLogs = async () => {
     auditLoading.value = false
   }
 }
+// Keep the local list in sync as the user types (no need to re-run the full
+// row list on every keystroke — the server does the filtering).
+watch(auditSearch, () => {
+  if (auditSearchTimer) clearTimeout(auditSearchTimer)
+  auditSearchTimer = setTimeout(() => loadAuditLogs(), 300)
+})
 
 const filteredAuditLogs = computed(() => {
   const q = auditSearch.value.trim().toLowerCase()
@@ -3081,8 +3094,9 @@ const isActiveTab = (tab: string) => activeTab.value === tab
         </div>
       </div>
       <div class="overflow-x-auto">
-        <p v-if="auditLogs.length === 0" class="px-6 py-6 text-sm text-gray-500">
-          {{ auditLoading ? 'Loading audit logs…' : 'No audit logs recorded yet.' }}
+        <p v-if="auditLoading" class="px-6 py-6 text-sm text-gray-500">Loading audit logs…</p>
+        <p v-else-if="auditLogs.length === 0 && !auditSearch" class="px-6 py-6 text-sm text-gray-500">
+          No audit logs recorded yet.
         </p>
         <p v-else-if="filteredAuditLogs.length === 0" class="px-6 py-6 text-sm text-gray-500">
           No logs match "{{ auditSearch }}".

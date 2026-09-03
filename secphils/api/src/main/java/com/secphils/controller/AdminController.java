@@ -301,8 +301,9 @@ public class AdminController {
     public ResponseEntity<List<Map<String, Object>>> auditLogs(
             @RequestParam(required = false) String action,
             @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "100") int limit) {
-        List<com.secphils.entity.AuditLog> logs = auditService.query(action, userId, limit);
+        List<com.secphils.entity.AuditLog> logs = auditService.query(action, userId, limit, search);
         return ResponseEntity.ok(logs.stream().map(l -> Map.<String, Object>of(
                 "id", l.getId(),
                 "userId", l.getUser() != null ? l.getUser().getId() : "",
