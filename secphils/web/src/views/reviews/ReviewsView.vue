@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRole } from '@/composables/useRole'
 import { useGetReviews, useSubmitReview, useUpdateReviewStatus, useGetProjects, useGetUsers } from '@/services/api'
+import Pagination from '@/components/Pagination.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -35,6 +36,9 @@ const error = ref('')
 const selectedStatus = ref('ALL')
 const searchQuery = ref('')
 const customers = ref<{ id: number; name: string }[]>([])
+const page = ref(1)
+const pageSize = 20
+watch([selectedStatus, searchQuery], () => { page.value = 1 })
 
 const projectById = (id: number) => projects.value.find(p => p.id === id)
 
@@ -62,6 +66,10 @@ const filteredReviews = computed(() => {
   }
   return [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 })
+
+const paginatedReviews = computed(() =>
+  filteredReviews.value.slice((page.value - 1) * pageSize, page.value * pageSize),
+)
 
 async function load() {
   loading.value = true
@@ -237,7 +245,7 @@ async function setStatus(id: number, status: string) {
     <!-- Reviews List -->
     <div class="grid gap-6">
       <Card
-        v-for="review in filteredReviews"
+        v-for="review in paginatedReviews"
         :key="review.id"
         class="hover:shadow-md transition-shadow"
       >
@@ -287,6 +295,9 @@ async function setStatus(id: number, status: string) {
           </div>
         </CardContent>
       </Card>
+    </div>
+    <div v-if="!loading && filteredReviews.length > 0" class="bg-white rounded-lg shadow">
+      <Pagination v-model:page="page" :total="filteredReviews.length" :page-size="pageSize" />
     </div>
 
     <div v-if="!loading && filteredReviews.length === 0" class="p-12 text-center">

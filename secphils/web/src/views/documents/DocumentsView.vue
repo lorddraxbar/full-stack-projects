@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRole } from '@/composables/useRole'
 import {
   useGetDocuments, useDeleteDocument, useUploadDocument, useDownloadDocument, useGetProjects,
   useGetTrashDocuments, useRestoreDocument, useDeleteDocumentPermanently, useEmptyTrash,
 } from '@/services/api'
 import { useRetention } from '@/composables/useRetention'
+import Pagination from '@/components/Pagination.vue'
 import {
   fileTypeLabel, FILE_TYPE_LABELS, FILE_TYPE_COLORS,
   formatDate, formatFileSize,
@@ -50,6 +51,13 @@ const loadError = ref('')
 const searchQuery = ref('')
 const selectedProject = ref('ALL')
 const selectedType = ref('ALL')
+
+// Client-side pagination over the full fetch (preserves the multi-field search).
+const pageSize = 20
+const docPage = ref(1)
+const trashPage = ref(1)
+watch([searchQuery, selectedProject, selectedType], () => { docPage.value = 1 })
+watch(view, () => { docPage.value = 1; trashPage.value = 1 })
 
 const showUploadModal = ref(false)
 const uploading = ref(false)
@@ -106,6 +114,17 @@ const filteredDocuments = computed(() => {
   }
   return result
 })
+
+const paginatedDocuments = computed(() =>
+  filteredDocuments.value.slice((docPage.value - 1) * pageSize, docPage.value * pageSize),
+)
+
+const sortedTrash = computed(() =>
+  [...trashDocs.value].sort((a, b) => String(b.deletedAt).localeCompare(String(a.deletedAt))),
+)
+const paginatedTrash = computed(() =>
+  sortedTrash.value.slice((trashPage.value - 1) * pageSize, trashPage.value * pageSize),
+)
 
 function mapDoc(d: any): DocRow {
   return {
@@ -365,7 +384,7 @@ onMounted(async () => {
     <div v-else-if="view === 'documents'" class="bg-white rounded-lg shadow overflow-hidden">
       <div class="divide-y divide-gray-200">
         <div
-          v-for="doc in filteredDocuments"
+          v-for="doc in paginatedDocuments"
           :key="doc.id"
           class="p-6 hover:bg-gray-50 transition-colors"
         >
@@ -418,6 +437,7 @@ onMounted(async () => {
           {{ documents.length === 0 ? 'No documents yet. Upload the first one.' : 'No documents found matching your criteria.' }}
         </p>
       </div>
+      <Pagination v-model:page="docPage" :total="filteredDocuments.length" :page-size="pageSize" />
     </div>
 
     <!-- Trash panel (staff + admin only) -->
@@ -449,7 +469,7 @@ onMounted(async () => {
         </div>
         <div class="divide-y divide-gray-200">
           <div
-            v-for="doc in [...trashDocs].sort((a, b) => String(b.deletedAt).localeCompare(String(a.deletedAt)))"
+            v-for="doc in paginatedTrash"
             :key="doc.id"
             class="p-6 hover:bg-gray-50 transition-colors"
           >
@@ -491,6 +511,7 @@ onMounted(async () => {
             </div>
           </div>
         </div>
+        <Pagination v-model:page="trashPage" :total="trashDocs.length" :page-size="pageSize" />
       </template>
     </div>
 

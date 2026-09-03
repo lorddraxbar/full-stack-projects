@@ -128,7 +128,7 @@ async function load() {
     if (isAdmin.value) {
       const [compRes, auditRes, usersRes, docsRes, trashRes, projRes2] = await Promise.all([
         useGetCompanies().catch(() => []),
-        useGetAuditLogs({ limit: 20 }).catch(() => []),
+        useGetAuditLogs({ page: 0, size: 20 }).catch(() => ({ content: [] })),
         useGetUsers().catch(() => []),
         // Full, unpaginated lists (admin scope = every company) → true counts.
         useGetDocuments().catch(() => []),
@@ -138,7 +138,8 @@ async function load() {
         useGetProjects({ size: 10000 }).catch(() => []),
       ])
       companies.value = (Array.isArray(compRes) ? compRes : []).map((c: any) => ({ id: c.id, name: c.name }))
-      auditLogs.value = Array.isArray(auditRes) ? auditRes : []
+      // Audit endpoint now returns a paged envelope { content, total, page, size }.
+      auditLogs.value = (auditRes as any)?.content ?? []
       const userList = Array.isArray(usersRes) ? usersRes : []
       allUsers.value = userList.map((u: any) => ({ id: u.id, role: u.role, isActive: !!u.isActive }))
       const userMap: Record<number, string> = {}

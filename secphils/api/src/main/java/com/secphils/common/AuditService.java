@@ -93,36 +93,69 @@ public class AuditService {
         notificationRepository.save(n);
     }
 
-    /** Filtered, newest-first audit log query for the admin console.
-     *  `search` is a substring match over action, entity type, user name, and
-     *  the details payload (details is JSONB — cast to text; a plain
-     *  comparison errors with "invalid input syntax for type json"). */
-    @Transactional(readOnly = true)
-    public List<AuditLog> query(String action, Long userId, int limit, String search) {
-        StringBuilder jpql = new StringBuilder(
-                "from AuditLog a where 1=1");
-        java.util.Map<String, Object> args = new java.util.LinkedHashMap<>();
+    /**
+     * Shared WHERE builder for the audit-log query and its row count, so both
+     * always apply the same filter (action, user, substring search). The
+     * search matches action, entity type, user first/last name, and the
+     * details payload (details is JSONB — cast to text; a plain comparison
+     * errors with "invalid input syntax for type json"). Leading space so it
+     * can be prepended to a "select count(a)" for the total.
+     */
+    private String baseWhere(java.util.Map<String, Object> args,
+                             String action, Long userId, String search) {
+        // LEFT JOIN the author: audit rows with a NULL user (e.g. login events
+        // recorded before a session exists — 1,087 of ~1,881 rows) must NOT be
+        // dropped. Referencing a.user.firstName directly would make Hibernate
+        // emit an INNER join and silently filter those rows out (search "login"
+        // returned 0 even though the DB has 1,029 USER_LOGIN rows).
+        StringBuilder jpql = new StringBuilder(" from AuditLog a left join a.user u where 1=1");
         if (action != null && !action.isBlank()) {
             jpql.append(" and a.action = :action");
             args.put("action", action);
         }
         if (userId != null) {
-            jpql.append(" and a.user.id = :userId");
+            jpql.append(" and u.id = :userId");
             args.put("userId", userId);
         }
         if (search != null && !search.isBlank()) {
             jpql.append(" and (lower(a.action) like :q or lower(a.entityType) like :q"
-                    + " or lower(a.user.firstName) like :q or lower(a.user.lastName) like :q"
+                    + " or lower(u.firstName) like :q or lower(u.lastName) like :q"
                     + " or lower(cast(a.details as string)) like :q)");
             args.put("q", "%" + search.trim().toLowerCase() + "%");
         }
-        int size = Math.max(1, Math.min(limit, 500));
-        TypedQuery<AuditLog> q = em.createQuery(jpql.toString(), AuditLog.class)
-                .setMaxResults(size);
+        return jpql.toString();
+    }
+
+    /**
+     * Total audit logs matching the filter — the "of Z" in the admin
+     * pagination footer (shows the real count, e.g. 1,881, not the page cap).
+     */
+    @Transactional(readOnly = true)
+    public long count(String action, Long userId, String search) {
+        java.util.Map<String, Object> args = new java.util.LinkedHashMap<>();
+        TypedQuery<Long> q = em.createQuery(
+                "select count(a)" + baseWhere(args, action, userId, search), Long.class);
         for (var entry : args.entrySet()) q.setParameter(entry.getKey(), entry.getValue());
-        return q.getResultList().stream()
-                .sorted(Comparator.comparing(AuditLog::getCreatedAt,
-                        Comparator.nullsLast(Comparator.reverseOrder())))
-                .toList();
+        return q.getSingleResult();
+    }
+
+    /**
+     * Filtered, newest-first, SERVER-SIDE-paginated audit log query for the
+     * admin console. `page` is 0-based, `size` clamped to [1, 500]. The ORDER
+     * BY is in the query (not a client sort) so paging is stable and the DB
+     * does the work.
+     */
+    @Transactional(readOnly = true)
+    public List<AuditLog> query(String action, Long userId, int page, int size, String search) {
+        java.util.Map<String, Object> args = new java.util.LinkedHashMap<>();
+        String jpql = baseWhere(args, action, userId, search)
+                + " order by a.createdAt desc, a.id desc";
+        int safeSize = Math.max(1, Math.min(size, 500));
+        int safePage = Math.max(0, page);
+        TypedQuery<AuditLog> q = em.createQuery(jpql, AuditLog.class)
+                .setFirstResult(safePage * safeSize)
+                .setMaxResults(safeSize);
+        for (var entry : args.entrySet()) q.setParameter(entry.getKey(), entry.getValue());
+        return q.getResultList();
     }
 }

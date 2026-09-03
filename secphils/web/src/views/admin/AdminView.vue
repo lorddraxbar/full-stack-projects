@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
+import Pagination from '../../components/Pagination.vue'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 
 const authStore = useAuthStore()
@@ -41,21 +42,28 @@ interface AuditLogRow {
 const auditLogs = ref<AuditLogRow[]>([])
 const auditLoading = ref(false)
 const auditSearch = ref('')
+const auditPage = ref(1)
+const auditTotal = ref(0)
+const auditPageSize = 20
 let auditSearchTimer: ReturnType<typeof setTimeout> | null = null
 onBeforeUnmount(() => {
   if (auditSearchTimer) clearTimeout(auditSearchTimer)
 })
-// Server-side search over the FULL audit log (the endpoint's limit only caps
-// how many of the matched rows are returned — the default 100 would still
-// silently drop older rows). The search box below is debounced.
+// Server-side search + pagination: the endpoint returns one page of the
+// matched audit rows plus the total count, so the footer shows the true
+// "of 1,881" and older rows stay reachable (a capped full-fetch would not).
+// Search is debounced and resets to page 1.
 const loadAuditLogs = async () => {
   auditLoading.value = true
   try {
-    const raw = await useGetAuditLogs({
-      limit: 500,
+    const res: any = await useGetAuditLogs({
+      page: auditPage.value - 1,
+      size: auditPageSize,
       search: auditSearch.value.trim() || undefined,
-    }) as any[]
-    auditLogs.value = (raw || []).map((l) => ({
+    })
+    const content: any[] = res?.content ?? []
+    auditTotal.value = Number(res?.total ?? 0)
+    auditLogs.value = content.map((l) => ({
       id: Number(l.id),
       timestamp: String(l.createdAt ?? ''),
       user: l.userName || l.userId || '—',
@@ -66,25 +74,23 @@ const loadAuditLogs = async () => {
     }))
   } catch {
     auditLogs.value = []
+    auditTotal.value = 0
   } finally {
     auditLoading.value = false
   }
 }
-// Keep the local list in sync as the user types (no need to re-run the full
-// row list on every keystroke — the server does the filtering).
+// As the user types, debounce the re-query and jump back to the first page.
 watch(auditSearch, () => {
+  auditPage.value = 1
   if (auditSearchTimer) clearTimeout(auditSearchTimer)
   auditSearchTimer = setTimeout(() => loadAuditLogs(), 300)
 })
+// Flip to another page.
+watch(auditPage, () => loadAuditLogs())
 
-const filteredAuditLogs = computed(() => {
-  const q = auditSearch.value.trim().toLowerCase()
-  if (!q) return auditLogs.value
-  return auditLogs.value.filter((l) =>
-    [l.action, l.entity, l.user, l.details, l.ipAddress]
-      .some((f) => String(f).toLowerCase().includes(q))
-  )
-})
+// The server already applies the search, so the page content IS the filtered
+// set — this passthrough keeps the existing template references working.
+const filteredAuditLogs = computed(() => auditLogs.value)
 
 // ---------- User Management (real API) ----------
 interface PortalUser {
@@ -1579,6 +1585,23 @@ const tabItems = [
   { id: 'system', label: 'System' },
   { id: 'audit', label: 'Audit Logs' },
 ]
+// ---------- List pagination (shared across the admin tables) ----------
+// Every admin table shares one page cursor + page size. Filters and tab
+// switches reset to page 1 so a stale "page 4 of the previous filter" never
+// lands the user on an empty view.
+const page = ref(1)
+const pageSize = 20
+watch([userFilter, roleFilter, serviceSearchQuery], () => { page.value = 1 })
+watch(activeTab, () => { page.value = 1 })
+const pagedUsers = computed(() =>
+  filteredUsers.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+const pagedRoles = computed(() =>
+  filteredRoles.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+const pagedServices = computed(() =>
+  filteredServices.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+const pagedCategories = computed(() =>
+  serviceCategories.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+
 const isActiveTab = (tab: string) => activeTab.value === tab
 </script>
 
@@ -1674,7 +1697,7 @@ const isActiveTab = (tab: string) => activeTab.value === tab
               <tr v-else-if="filteredUsers.length === 0">
                 <td colspan="8" class="px-6 py-8 text-center text-sm text-gray-500">No users match your filter.</td>
               </tr>
-              <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-gray-50">
+              <tr v-for="user in pagedUsers" :key="user.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-sm font-medium">
@@ -1709,6 +1732,7 @@ const isActiveTab = (tab: string) => activeTab.value === tab
               </tr>
             </tbody>
           </table>
+          <Pagination v-if="!usersLoading && filteredUsers.length > 0" v-model:page="page" :total="filteredUsers.length" :page-size="pageSize" />
         </div>
       </div>
     </div>
@@ -1877,7 +1901,7 @@ const isActiveTab = (tab: string) => activeTab.value === tab
               <tr v-else-if="filteredRoles.length === 0">
                 <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">No roles match your filter.</td>
               </tr>
-              <tr v-for="role in filteredRoles" :key="role.id" class="hover:bg-gray-50 align-top">
+              <tr v-for="role in pagedRoles" :key="role.id" class="hover:bg-gray-50 align-top">
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-2">
                     <span class="font-medium text-gray-900">{{ role.name }}</span>
@@ -1922,6 +1946,7 @@ const isActiveTab = (tab: string) => activeTab.value === tab
               </tr>
             </tbody>
           </table>
+          <Pagination v-if="!rolesLoading && filteredRoles.length > 0" v-model:page="page" :total="filteredRoles.length" :page-size="pageSize" />
         </div>
       </div>
 
@@ -2054,7 +2079,7 @@ const isActiveTab = (tab: string) => activeTab.value === tab
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
-              <tr v-for="service in filteredServices" :key="service.id" class="hover:bg-gray-50">
+              <tr v-for="service in pagedServices" :key="service.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-2.5 font-medium text-gray-900">
                     <i v-if="service.icon" :class="service.icon" class="w-4 text-center text-gray-400"></i>
@@ -2086,6 +2111,7 @@ const isActiveTab = (tab: string) => activeTab.value === tab
               </tr>
             </tbody>
           </table>
+          <Pagination v-if="serviceListLoaded && filteredServices.length > 0" v-model:page="page" :total="filteredServices.length" :page-size="pageSize" />
         </div>
       </div>
 
@@ -2186,7 +2212,7 @@ const isActiveTab = (tab: string) => activeTab.value === tab
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
-              <tr v-for="cat in serviceCategories" :key="cat.id" class="hover:bg-gray-50">
+              <tr v-for="cat in pagedCategories" :key="cat.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4">
                   <div class="font-medium text-gray-900">{{ cat.name }}</div>
                   <p class="text-xs text-gray-500">Tab: "Our Services → {{ cat.name }}"</p>
@@ -2210,6 +2236,7 @@ const isActiveTab = (tab: string) => activeTab.value === tab
               </tr>
             </tbody>
           </table>
+          <Pagination v-if="serviceCategories.length > 0" v-model:page="page" :total="serviceCategories.length" :page-size="pageSize" />
         </div>
       </div>
     </div>
@@ -3131,6 +3158,13 @@ const isActiveTab = (tab: string) => activeTab.value === tab
             </tr>
           </tbody>
         </table>
+        <Pagination
+          v-if="!auditLoading && auditTotal > 0"
+          v-model:page="auditPage"
+          :total="auditTotal"
+          :page-size="auditPageSize"
+          label="Showing"
+        />
       </div>
     </div>
 

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRole } from '@/composables/useRole'
 import {
   useGetAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement, useGetProjects,
 } from '@/services/api'
+import Pagination from '@/components/Pagination.vue'
 import {
   ANNOUNCEMENT_CATEGORY_LABELS, ANNOUNCEMENT_CATEGORY_COLORS,
   ANNOUNCEMENT_AUDIENCE_LABELS,
@@ -39,6 +40,9 @@ const announcements = ref<Announcement[]>([])
 const loading = ref(true)
 const error = ref('')
 const searchQuery = ref('')
+const page = ref(1)
+const pageSize = 20
+watch(searchQuery, () => { page.value = 1 })
 
 const projects = ref<{ id: number; name: string }[]>([])
 
@@ -87,6 +91,10 @@ const visibleAnnouncements = computed(() => {
   }
   return out
 })
+
+const paginatedAnnouncements = computed(() =>
+  visibleAnnouncements.value.slice((page.value - 1) * pageSize, page.value * pageSize),
+)
 
 const isCustomer = computed(() => isClient.value)
 
@@ -355,7 +363,7 @@ function categoryColor(c: string) {
     <!-- Announcements List -->
     <div class="space-y-6">
       <div
-        v-for="announcement in visibleAnnouncements"
+        v-for="announcement in paginatedAnnouncements"
         :key="announcement.id"
         :class="['bg-white rounded-lg shadow p-6 transition-all',
           !announcement.isPublished ? 'opacity-80 border border-dashed border-gray-300' : '']"
@@ -416,6 +424,9 @@ function categoryColor(c: string) {
           </div>
         </div>
       </div>
+    </div>
+    <div v-if="!loading && visibleAnnouncements.length > 0" class="bg-white rounded-lg shadow">
+      <Pagination v-model:page="page" :total="visibleAnnouncements.length" :page-size="pageSize" />
     </div>
 
     <div v-if="!loading && visibleAnnouncements.length === 0" class="bg-white rounded-lg shadow p-12 text-center">

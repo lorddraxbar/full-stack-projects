@@ -298,13 +298,15 @@ public class AdminController {
 
     @GetMapping("/audit-logs")
     @Transactional(readOnly = true)
-    public ResponseEntity<List<Map<String, Object>>> auditLogs(
+    public ResponseEntity<Map<String, Object>> auditLogs(
             @RequestParam(required = false) String action,
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "100") int limit) {
-        List<com.secphils.entity.AuditLog> logs = auditService.query(action, userId, limit, search);
-        return ResponseEntity.ok(logs.stream().map(l -> Map.<String, Object>of(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        long total = auditService.count(action, userId, search);
+        List<com.secphils.entity.AuditLog> logs = auditService.query(action, userId, page, size, search);
+        List<Map<String, Object>> content = logs.stream().map(l -> Map.<String, Object>of(
                 "id", l.getId(),
                 "userId", l.getUser() != null ? l.getUser().getId() : "",
                 "userName", l.getUser() != null ? l.getUser().getFullName() : "",
@@ -314,6 +316,12 @@ public class AdminController {
                 "details", l.getDetails() != null ? l.getDetails() : "",
                 "ipAddress", l.getIpAddress() != null ? l.getIpAddress() : "",
                 "createdAt", l.getCreatedAt() != null ? l.getCreatedAt().toString() : ""
-        )).toList());
+        )).toList();
+        return ResponseEntity.ok(Map.of(
+                "content", content,
+                "total", total,
+                "page", page,
+                "size", size
+        ));
     }
 }

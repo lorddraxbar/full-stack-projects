@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import {
   useGetMe, useGetProjects, useGetMessages, useSendMessage,
   useUploadMessage, useDownloadMessage,
 } from '@/services/api'
 import { useRole } from '@/composables/useRole'
+import Pagination from '@/components/Pagination.vue'
 import { formatDateTime, timeAgo, formatFileSize } from '@/lib/labels'
 
 interface Conversation {
@@ -28,6 +29,9 @@ const loading = ref(true)
 const loadError = ref('')
 const searchQuery = ref('')
 const newMessage = ref('')
+const page = ref(1)
+const pageSize = 20
+watch(searchQuery, () => { page.value = 1 })
 const sending = ref(false)
 const sendError = ref('')
 // Safe by default: staff start staff-only. Flip `visibleToClient` to share
@@ -69,6 +73,10 @@ const filteredConversations = computed(() => {
     return terms.every(t => haystack.includes(t))
   })
 })
+
+const paginatedConversations = computed(() =>
+  filteredConversations.value.slice((page.value - 1) * pageSize, page.value * pageSize),
+)
 
 function initials(name: string): string {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
@@ -262,7 +270,7 @@ onMounted(loadConversations)
             No conversations match "{{ searchQuery }}".
           </div>
           <div
-            v-for="conv in filteredConversations"
+            v-for="conv in paginatedConversations"
             :key="conv.id"
             @click="selectConversation(conv.id)"
             :class="[
@@ -287,6 +295,7 @@ onMounted(loadConversations)
             </div>
           </div>
         </div>
+        <Pagination v-model:page="page" :total="filteredConversations.length" :page-size="pageSize" />
       </div>
 
       <!-- Messages Area -->

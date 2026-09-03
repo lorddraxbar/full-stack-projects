@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import NewProjectWizard from '@/components/NewProjectWizard.vue'
 import type { WizardData } from '@/components/NewProjectWizard.vue'
+import Pagination from '@/components/Pagination.vue'
 import { useRole } from '@/composables/useRole'
 import { useGetMe, useGetProjects, useCreateProject, useUpdateProject, useCreateCompany, useUpdateCompany, useUploadDocument } from '@/services/api'
 import { projectStatusLabel, PROJECT_STATUS_COLORS, formatPhp, formatDate, formatDateTime, timeAgo } from '@/lib/labels'
@@ -19,6 +20,11 @@ const showWizard = ref(false)
 const loading = ref(false)
 const loadError = ref('')
 const notice = ref('')
+
+// Client-side pagination over the full fetch (preserves the multi-field search).
+const page = ref(1)
+const pageSize = 20
+watch([searchQuery, selectedStatus], () => { page.value = 1 })
 
 // Backend ProjectResponse -> display shape (only fields the API actually returns)
 interface ProjectRow {
@@ -144,6 +150,10 @@ const filteredProjects = computed(() => {
 
   return result
 })
+
+const paginatedProjects = computed(() =>
+  filteredProjects.value.slice((page.value - 1) * pageSize, page.value * pageSize),
+)
 
 const goToProject = (id: number) => {
   router.push(`/projects/${id}`)
@@ -328,7 +338,7 @@ onMounted(init)
              content, pill + dates drop to a second row. -->
         <div v-else class="p-4 sm:p-5 flex flex-col gap-3">
           <div
-            v-for="project in filteredProjects"
+            v-for="project in paginatedProjects"
             :key="project.id"
             @click="goToProject(project.id)"
             class="grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1fr_auto] items-center gap-3 sm:gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 transition-all hover:border-primary hover:shadow-[0_4px_14px_rgba(41,202,142,0.10)] cursor-pointer"
@@ -374,6 +384,7 @@ onMounted(init)
             </div>
           </div>
         </div>
+        <Pagination v-if="!loading && !noCompany" v-model:page="page" :total="filteredProjects.length" :page-size="pageSize" />
       </CardContent>
     </Card>
 
