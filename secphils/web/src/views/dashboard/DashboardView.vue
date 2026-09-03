@@ -47,6 +47,9 @@ const users = ref<Record<number, string>>({})
 const allUsers = ref<{ id: number; role: string; isActive: boolean }[]>([])
 const allDocs = ref<{ fileSize: number | null }[]>([])
 const trashedDocs = ref<{ id: number }[]>([])
+// Full (unpaginated) project list for the admin Projects card — the default
+// /projects call is page-capped, so this fetches enough to count every row.
+const allProjects = ref<ProjectRow[]>([])
 const loading = ref(true)
 const loadError = ref('')
 // System Health (admin + staff dashboards)
@@ -123,13 +126,16 @@ async function load() {
     messages.value = allMessages
 
     if (isAdmin.value) {
-      const [compRes, auditRes, usersRes, docsRes, trashRes] = await Promise.all([
+      const [compRes, auditRes, usersRes, docsRes, trashRes, projRes2] = await Promise.all([
         useGetCompanies().catch(() => []),
         useGetAuditLogs({ limit: 20 }).catch(() => []),
         useGetUsers().catch(() => []),
         // Full, unpaginated lists (admin scope = every company) → true counts.
         useGetDocuments().catch(() => []),
         useGetTrashDocuments().catch(() => []),
+        // A large explicit size so the Projects card counts every project, not
+        // just the first default page (20) the dashboard feed above fetched.
+        useGetProjects({ size: 10000 }).catch(() => []),
       ])
       companies.value = (Array.isArray(compRes) ? compRes : []).map((c: any) => ({ id: c.id, name: c.name }))
       auditLogs.value = Array.isArray(auditRes) ? auditRes : []
@@ -140,6 +146,8 @@ async function load() {
       users.value = userMap
       allDocs.value = (Array.isArray(docsRes) ? docsRes : []).map((d: any) => ({ fileSize: d.fileSize ?? null }))
       trashedDocs.value = (Array.isArray(trashRes) ? trashRes : []).map((d: any) => ({ id: d.id }))
+      const projContent2 = Array.isArray(projRes2) ? projRes2 : (projRes2 as any)?.content ?? []
+      allProjects.value = projContent2.map(mapProject)
     }
   } catch (err: any) {
     loadError.value = err?.response?.data?.message || err?.message || 'Failed to load dashboard data'
@@ -196,11 +204,21 @@ const activeProjects = computed(() =>
 const projectUpdates = computed(() => messages.value.slice(0, 3))
 
 // ---------- Admin ----------
+// totalClients is the only stat still shown as its own top-row tile; the
+// project metrics now live in the Projects card (projectStats).
 const adminStats = computed(() => ({
   totalClients: companies.value.length,
-  activeProjects: projects.value.filter(p => p.status === 'IN_PROGRESS').length,
 }))
 const recentActivity = computed(() => auditLogs.value.slice(0, 8))
+
+// Projects statistics — counted over the full (unpaginated) admin project
+// list fetched with a large size, so these are exact totals, not the first
+// page's length.
+const projectStats = computed(() => ({
+  total: allProjects.value.length,
+  inProgress: allProjects.value.filter(p => p.status === 'IN_PROGRESS').length,
+  completed: allProjects.value.filter(p => p.status === 'COMPLETED').length,
+}))
 
 // Documents & Users statistics — derived from the full (unpaginated) admin
 // lists, so the numbers are exact, not capped by any list size.
@@ -437,25 +455,26 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
             </div>
           </div>
         </div>
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-600">Active Projects</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ adminStats.activeProjects }}</p>
-            </div>
-            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-folder-open text-green-600 text-xl"></i>
-            </div>
+
+        <!-- Projects card: total / in-progress / completed, counted over the
+             full unpaginated project list (not the first page's length). -->
+        <div class="bg-white rounded-lg shadow p-6 sm:col-span-2">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Projects</h2>
+            <RouterLink to="/projects" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View</RouterLink>
           </div>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-600">Total Contracts</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ projects.length }}</p>
+          <div class="grid grid-cols-3 divide-x divide-gray-100 text-center">
+            <div class="p-4">
+              <p class="text-2xl font-bold text-gray-900">{{ projectStats.total }}</p>
+              <p class="text-xs text-gray-500 mt-1">Total projects</p>
             </div>
-            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-file-contract text-purple-600 text-xl"></i>
+            <div class="p-4">
+              <p class="text-2xl font-bold text-green-600">{{ projectStats.inProgress }}</p>
+              <p class="text-xs text-gray-500 mt-1">In progress</p>
+            </div>
+            <div class="p-4">
+              <p class="text-2xl font-bold text-gray-900">{{ projectStats.completed }}</p>
+              <p class="text-xs text-gray-500 mt-1">Completed</p>
             </div>
           </div>
         </div>

@@ -207,7 +207,7 @@ export async function useHardDeleteUser(id: number, password: string) {
 }
 
 // ---------- Projects ----------
-export async function useGetProjects(params?: { companyId?: number; status?: string; search?: string }) {
+export async function useGetProjects(params?: { companyId?: number; status?: string; search?: string; size?: number }) {
   const response = await api.get('/projects', { params })
   return response.data
 }
