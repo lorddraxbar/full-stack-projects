@@ -217,8 +217,35 @@ const recentActivity = computed(() => auditLogs.value.slice(0, 8))
 const projectStats = computed(() => ({
   total: allProjects.value.length,
   inProgress: allProjects.value.filter(p => p.status === 'IN_PROGRESS').length,
+  notStarted: allProjects.value.filter(p => p.status === 'NOT_STARTED').length,
   completed: allProjects.value.filter(p => p.status === 'COMPLETED').length,
+  archived: allProjects.value.filter(p => p.status === 'ARCHIVED').length,
 }))
+// Projects-card donut (plain SVG, no chart library): each segment is a
+// stroke-dasharray slice of the circle's circumference.
+const RING_R = 45
+const RING_C = 2 * Math.PI * RING_R
+const projectRing = computed(() => {
+  const defs = [
+    { key: 'inProgress' as const, label: 'In progress', color: '#059669' },
+    { key: 'notStarted' as const, label: 'Not started', color: '#d1d5db' },
+    { key: 'completed' as const, label: 'Completed', color: '#5eead4' },
+    { key: 'archived' as const, label: 'Archived', color: '#f43f5e' },
+  ]
+  const total = projectStats.value.total || 1
+  let acc = 0
+  return defs.map(d => {
+    const value = projectStats.value[d.key]
+    const frac = value / total
+    const seg = {
+      label: d.label, color: d.color, value,
+      dash: `${frac * RING_C} ${RING_C - frac * RING_C}`,
+      offset: `${-acc * RING_C}`,
+    }
+    acc += frac
+    return seg
+  })
+})
 
 // Documents & Users statistics — derived from the full (unpaginated) admin
 // lists, so the numbers are exact, not capped by any list size.
@@ -242,21 +269,104 @@ const userStatsAdmin = computed(() => {
   }
 })
 
+// "Good afternoon, Jayson" — hour-based, first name only.
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  const time = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening'
+  return `Good ${time}, ${(me.value?.fullName ?? '').split(' ')[0] || 'there'}`
+})
+
+// Recent Activity timeline helpers: turn a raw audit action (e.g.
+// "PROJECT_ARCHIVE") into a human verb + a colored icon chip. The entity
+// prefix drives the icon/color; a verb override gives the common ones nicer
+// phrasing; anything unmapped falls back to a prettified raw action so new
+// actions still render cleanly instead of as a blank chip.
+const ACTIVITY_ENTITY_ICONS: Record<string, { icon: string; chip: string }> = {
+  PROJECT: { icon: 'fa-solid fa-folder', chip: 'bg-sky-100 text-sky-700' },
+  DOCUMENT: { icon: 'fa-solid fa-file-lines', chip: 'bg-indigo-100 text-indigo-700' },
+  COMPANY: { icon: 'fa-solid fa-building', chip: 'bg-emerald-100 text-emerald-700' },
+  USER: { icon: 'fa-solid fa-user', chip: 'bg-amber-100 text-amber-700' },
+  SERVICE: { icon: 'fa-solid fa-tag', chip: 'bg-violet-100 text-violet-700' },
+  ROLE: { icon: 'fa-solid fa-shield-halved', chip: 'bg-cyan-100 text-cyan-700' },
+  TASK: { icon: 'fa-solid fa-list-check', chip: 'bg-lime-100 text-lime-700' },
+  MESSAGE: { icon: 'fa-regular fa-message', chip: 'bg-gray-100 text-gray-600' },
+  ANNOUNCEMENT: { icon: 'fa-solid fa-bullhorn', chip: 'bg-orange-100 text-orange-700' },
+  REVIEW: { icon: 'fa-regular fa-star', chip: 'bg-yellow-100 text-yellow-700' },
+  SETTINGS: { icon: 'fa-solid fa-sliders', chip: 'bg-amber-100 text-amber-700' },
+  NOTIFICATION: { icon: 'fa-regular fa-bell', chip: 'bg-gray-100 text-gray-600' },
+  DROPDOWN: { icon: 'fa-solid fa-list', chip: 'bg-gray-100 text-gray-600' },
+  STORAGE: { icon: 'fa-solid fa-database', chip: 'bg-gray-100 text-gray-600' },
+}
+const ACTIVITY_VERBS: Record<string, string> = {
+  PROJECT_CREATE: 'created a project', PROJECT_UPDATE: 'updated a project',
+  PROJECT_ARCHIVE: 'archived a project', PROJECT_RESTORE: 'restored a project',
+  PROJECT_HARD_DELETE: 'permanently deleted a project',
+  DOCUMENT_CREATE: 'created a document', DOCUMENT_UPLOAD: 'uploaded a document',
+  DOCUMENT_UPDATE: 'updated a document', DOCUMENT_DELETE: 'deleted a document',
+  DOCUMENT_TRASH: 'trashed a document', DOCUMENT_RESTORE: 'restored a document',
+  DOCUMENT_PERMANENT_DELETE: 'purged a document', DOCUMENT_TRASH_PURGED: 'purged a trashed document',
+  DOCUMENT_TRASH_EMPTY: 'emptied the document trash',
+  COMPANY_CREATE: 'created a company', COMPANY_UPDATE: 'updated a company',
+  COMPANY_TEAM_INVITE: 'invited a company team member',
+  COMPANY_CUSTOMER_REP_INVITE: 'invited a company representative',
+  USER_CREATE: 'created a user', USER_UPDATE: 'updated a user',
+  USER_ACTIVATE: 'activated a user', USER_DEACTIVATE: 'deactivated a user',
+  USER_HARD_DELETE: 'permanently deleted a user', USER_LOGIN: 'logged in',
+  USER_LOGIN_2FA: 'logged in (2FA)', USER_INVITE_SENT: 'sent a user invite',
+  USER_SET_PASSWORD: 'set a user password',
+  SERVICE_CREATE: 'created a service', SERVICE_UPDATE: 'updated a service',
+  SERVICE_ACTIVATE: 'activated a service', SERVICE_DEACTIVATE: 'deactivated a service',
+  SERVICE_HARD_DELETE: 'permanently deleted a service',
+  ROLE_CREATE: 'created a role', ROLE_UPDATE: 'updated a role', ROLE_DELETE: 'deleted a role',
+  TASK_CREATE: 'created a task', TASK_UPDATE: 'updated a task',
+  TASK_DELETE: 'deleted a task', TASK_STATUS_CHANGE: 'changed a task status',
+  SETTINGS_UPDATE: 'updated system settings',
+  ANNOUNCEMENT_CREATE: 'created an announcement', ANNOUNCEMENT_UPDATE: 'updated an announcement',
+  ANNOUNCEMENT_PUBLISH: 'published an announcement', ANNOUNCEMENT_DELETE: 'deleted an announcement',
+  MESSAGE_SEND: 'sent a message', REVIEW_CREATE: 'added a review',
+  REVIEW_STATUS_CHANGE: 'updated a review status',
+}
+function prettifyAction(action: string): string {
+  return (action || 'event').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+}
+function activityMeta(action: string) {
+  const entity = (action || '').split('_')[0]
+  const ico = ACTIVITY_ENTITY_ICONS[entity] ?? { icon: 'fa-solid fa-circle-info', chip: 'bg-gray-100 text-gray-600' }
+  return { verb: ACTIVITY_VERBS[action] ?? prettifyAction(action), icon: ico.icon, chip: ico.chip }
+}
+function activityDetail(log: { details?: string }): string {
+  const raw = log.details || ''
+  if (!raw) return ''
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object' && 'message' in parsed && parsed.message) return String(parsed.message)
+  } catch {
+    // not JSON — use as-is
+  }
+  return raw
+}
+// Page header pill — green when the API is up and maintenance is off.
+const statusPill = computed(() => {
+  if (apiHealth.value === 'DOWN') return { text: 'API down — investigate', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' }
+  if (maintenanceMode.value) return { text: 'Maintenance mode is ON', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' }
+  if (apiHealth.value === 'UP') return { text: 'All systems operational', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' }
+  return { text: 'Checking system health…', cls: 'bg-gray-100 text-gray-600 border-gray-200', dot: 'bg-gray-400' }
+})
+
 const goToProject = (id: number) => router.push(`/projects/${id}`)
 </script>
 
 <template>
   <div>
-    <div class="mb-6">
+    <!-- Generic page header (admin has its own greeting + status-pill header) -->
+    <div v-if="!isAdmin" class="mb-6">
       <h1 class="text-2xl font-bold text-gray-900">
-        {{ isClient ? 'Client Dashboard' : isUser ? 'User Dashboard' : 'Admin Dashboard' }}
+        {{ isClient ? 'Client Dashboard' : 'User Dashboard' }}
       </h1>
       <p class="text-gray-600 mt-1">
         {{ isClient
           ? 'Your projects and latest updates from your consultants.'
-          : isUser
-            ? 'Your active projects and recent messages.'
-            : 'System overview, key metrics, and recent activity.' }}
+          : 'Your active projects and recent messages.' }}
       </p>
     </div>
 
@@ -444,38 +554,56 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
 
     <!-- ================= ADMIN DASHBOARD ================= -->
     <template v-else>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow p-6">
+      <div class="flex items-start justify-between mb-6">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">{{ greeting }}</h1>
+          <p class="text-gray-600 mt-1">System overview, key metrics, and recent activity.</p>
+        </div>
+        <span class="mt-1 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold" :class="statusPill.cls">
+          <span class="h-2 w-2 rounded-full" :class="statusPill.dot"></span>
+          {{ statusPill.text }}
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="bg-white rounded-lg shadow p-5 flex flex-col">
           <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-600">Client Companies</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ adminStats.totalCompanies }}</p>
-            </div>
-            <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-building text-emerald-600 text-xl"></i>
+            <p class="text-sm font-semibold text-gray-600">Client Companies</p>
+            <div class="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <i class="fas fa-building text-emerald-600"></i>
             </div>
           </div>
+          <p class="text-3xl font-extrabold text-gray-900 mt-2">{{ adminStats.totalCompanies }}</p>
+          <p class="text-xs text-gray-500 mt-1">
+            client companies served &middot; {{ userStatsAdmin.total }} accounts ({{ userStatsAdmin.active }} active)
+          </p>
         </div>
 
-        <!-- Projects card: total / in-progress / completed, counted over the
-             full unpaginated project list (not the first page's length). -->
-        <div class="bg-white rounded-lg shadow p-6 sm:col-span-2">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-900">Projects</h2>
-            <RouterLink to="/projects" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View</RouterLink>
+        <!-- Projects card: donut over the full unpaginated project list, so
+             the chart reflects every project, not the first page's length. -->
+        <div class="bg-white rounded-lg shadow p-5 sm:col-span-2">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-semibold text-gray-900">Projects</h2>
+            <RouterLink to="/projects" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View all</RouterLink>
           </div>
-          <div class="grid grid-cols-3 divide-x divide-gray-100 text-center">
-            <div class="p-4">
-              <p class="text-2xl font-bold text-gray-900">{{ projectStats.total }}</p>
-              <p class="text-xs text-gray-500 mt-1">Total projects</p>
+          <div class="flex items-center gap-6 mt-3">
+            <div class="relative flex-none">
+              <svg viewBox="0 0 100 100" class="w-28 h-28 -rotate-90">
+                <circle cx="50" cy="50" :r="RING_R" fill="none" stroke="#f1f5f9" stroke-width="11"></circle>
+                <circle v-for="(seg, i) in projectRing" :key="i" cx="50" cy="50" :r="RING_R" fill="none"
+                  :stroke="seg.color" stroke-width="11" :stroke-dasharray="seg.dash" :stroke-dashoffset="seg.offset"></circle>
+              </svg>
+              <div class="absolute inset-0 flex flex-col items-center justify-center">
+                <span class="text-2xl font-extrabold text-gray-900 leading-none">{{ projectStats.total }}</span>
+                <span class="text-[10px] text-gray-500 mt-0.5">projects</span>
+              </div>
             </div>
-            <div class="p-4">
-              <p class="text-2xl font-bold text-green-600">{{ projectStats.inProgress }}</p>
-              <p class="text-xs text-gray-500 mt-1">In progress</p>
-            </div>
-            <div class="p-4">
-              <p class="text-2xl font-bold text-gray-900">{{ projectStats.completed }}</p>
-              <p class="text-xs text-gray-500 mt-1">Completed</p>
+            <div class="flex-1 space-y-2.5">
+              <div v-for="seg in projectRing" :key="seg.label" class="flex items-center gap-2.5 text-sm">
+                <span class="h-2.5 w-2.5 rounded-sm" :style="{ backgroundColor: seg.color }"></span>
+                <span class="text-gray-600">{{ seg.label }}</span>
+                <span class="ml-auto font-semibold text-gray-900">{{ seg.value }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -484,22 +612,37 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
       <!-- Documents & Users statistics -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div class="bg-white rounded-lg shadow">
-          <div class="p-6 border-b border-gray-200 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-900">Documents</h2>
+          <div class="p-5 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-gray-900">Documents</h2>
             <RouterLink to="/documents" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View</RouterLink>
           </div>
-          <div class="grid grid-cols-3 divide-x divide-gray-100 text-center">
-            <div class="p-5">
-              <p class="text-2xl font-bold text-gray-900">{{ documentStats.total }}</p>
-              <p class="text-xs text-gray-500 mt-1">Total files</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-5">
+            <div class="flex items-center gap-3 rounded-xl border border-gray-200 p-4">
+              <div class="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-[11px] bg-indigo-100 text-lg text-indigo-600">
+                <i class="fa-solid fa-file-lines"></i>
+              </div>
+              <div>
+                <p class="text-[22px] font-extrabold leading-none text-gray-900">{{ documentStats.total }}</p>
+                <p class="mt-1 text-xs font-medium text-gray-500">Total files</p>
+              </div>
             </div>
-            <div class="p-5">
-              <p class="text-2xl font-bold text-gray-900">{{ documentStats.trashed }}</p>
-              <p class="text-xs text-gray-500 mt-1">In trash</p>
+            <div class="flex items-center gap-3 rounded-xl border border-gray-200 p-4">
+              <div class="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-[11px] bg-amber-100 text-lg text-amber-600">
+                <i class="fa-solid fa-trash-can"></i>
+              </div>
+              <div>
+                <p class="text-[22px] font-extrabold leading-none text-gray-900">{{ documentStats.trashed }}</p>
+                <p class="mt-1 text-xs font-medium text-gray-500">In trash</p>
+              </div>
             </div>
-            <div class="p-5">
-              <p class="text-2xl font-bold text-gray-900">{{ documentStats.storage }}</p>
-              <p class="text-xs text-gray-500 mt-1">Storage used</p>
+            <div class="flex items-center gap-3 rounded-xl border border-gray-200 p-4">
+              <div class="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-[11px] bg-sky-100 text-lg text-sky-600">
+                <i class="fa-solid fa-database"></i>
+              </div>
+              <div>
+                <p class="text-[22px] font-extrabold leading-none text-gray-900">{{ documentStats.storage }}</p>
+                <p class="mt-1 text-xs font-medium text-gray-500">Storage used</p>
+              </div>
             </div>
           </div>
         </div>
@@ -579,21 +722,24 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
         </div>
 
         <div class="bg-white rounded-lg shadow">
-          <div class="p-6 border-b border-gray-200 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-900">Recent Activity</h2>
+          <div class="p-5 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-gray-900">Recent Activity</h2>
             <RouterLink to="/admin" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">Audit logs</RouterLink>
           </div>
-          <div class="divide-y divide-gray-200">
-            <div v-if="recentActivity.length === 0" class="p-4 text-sm text-gray-500">No activity recorded yet.</div>
-            <div v-for="log in recentActivity" :key="log.id" class="p-4 hover:bg-gray-50 transition-colors">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-medium rounded">{{ log.action }}</span>
-                  <span class="text-sm font-medium text-gray-900">{{ log.entityType }}</span>
-                </div>
-                <span class="text-xs text-gray-500">{{ formatDateTime(log.createdAt) }}</span>
+          <div class="divide-y divide-gray-100">
+            <div v-if="recentActivity.length === 0" class="p-5 text-sm text-gray-500">No activity recorded yet.</div>
+            <div v-for="log in recentActivity" :key="log.id" class="px-5 py-3 flex items-center gap-3">
+              <div class="flex h-9 w-9 flex-none items-center justify-center rounded-[10px]" :class="activityMeta(log.action).chip">
+                <i :class="activityMeta(log.action).icon" class="text-sm"></i>
               </div>
-              <p class="text-xs text-gray-600 mt-1">{{ users[log.userId as number] || `User #${log.userId}` }} &mdash; {{ log.details }}</p>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm text-gray-800 leading-snug">
+                  <span class="font-semibold text-gray-900">{{ users[log.userId as number] || `User #${log.userId}` }}</span>
+                  {{ activityMeta(log.action).verb }}
+                </p>
+                <p v-if="activityDetail(log)" class="text-xs text-gray-500 truncate mt-0.5">{{ activityDetail(log) }}</p>
+              </div>
+              <span class="flex-none text-xs text-gray-400 whitespace-nowrap">{{ relativeTime(log.createdAt) }}</span>
             </div>
           </div>
         </div>
