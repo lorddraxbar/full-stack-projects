@@ -154,7 +154,7 @@ async function restoreProject() {
 
 async function hardDeleteProject() {
   if (!confirm('Permanently delete this project? All data and files will be permanently removed. This cannot be undone.')) return
-  // Admins must supply their password when the 7-day grace window hasn't elapsed.
+  // Admins must supply their password when the retention window hasn't elapsed.
   const password = window.prompt('Enter your password to permanently delete this project:')
   if (password === null) return
   lifecycleBusy.value = true

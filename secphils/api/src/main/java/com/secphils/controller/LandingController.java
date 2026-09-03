@@ -10,6 +10,7 @@ import com.secphils.repository.ReviewRepository;
 import com.secphils.repository.ServiceRepository;
 import com.secphils.repository.SystemSettingsRepository;
 import com.secphils.repository.UserRepository;
+import com.secphils.policy.RetentionPolicy;
 import com.secphils.service.MailService;
 import com.secphils.service.EmailTemplateService;
 import jakarta.validation.Valid;
@@ -72,6 +73,9 @@ public class LandingController {
         payload.put("portalName", settings.getPortalName() != null ? settings.getPortalName() : "SECPhils");
         payload.put("tagline", "Engineering excellence, delivered.");
         payload.put("maintenanceMode", Boolean.TRUE.equals(settings.getMaintenanceMode()));
+        payload.put("retentionWindowDays", settings.getRetentionWindowDays() != null
+                ? settings.getRetentionWindowDays()
+                : RetentionPolicy.DEFAULT_DAYS);
         payload.put("company", companyProfile());
         payload.put("reviews", approvedReviews());
         payload.put("services", activeServices());

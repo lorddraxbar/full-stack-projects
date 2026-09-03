@@ -7,6 +7,7 @@ import com.secphils.dto.GoogleSsoConfig;
 import com.secphils.entity.AuditLog;
 import com.secphils.entity.SystemSettings;
 import com.secphils.policy.DisplayNamePolicy;
+import com.secphils.policy.RetentionPolicy;
 import com.secphils.repository.CompanyRepository;
 import com.secphils.repository.ProjectRepository;
 import com.secphils.repository.ReviewRepository;
@@ -44,12 +45,14 @@ public class AdminController {
     private final DataSource dataSource;
     private final S3StorageService storageService;
     private final DisplayNamePolicy displayNamePolicy;
+    private final RetentionPolicy retentionPolicy;
 
     public AdminController(SystemSettingsRepository settingsRepository, AuditService auditService,
                            UserRepository userRepository, CompanyRepository companyRepository,
                            ProjectRepository projectRepository, ReviewRepository reviewRepository,
                            DataSource dataSource, S3StorageService storageService,
-                           DisplayNamePolicy displayNamePolicy) {
+                           DisplayNamePolicy displayNamePolicy,
+                           RetentionPolicy retentionPolicy) {
         this.settingsRepository = settingsRepository;
         this.auditService = auditService;
         this.userRepository = userRepository;
@@ -59,6 +62,7 @@ public class AdminController {
         this.dataSource = dataSource;
         this.storageService = storageService;
         this.displayNamePolicy = displayNamePolicy;
+        this.retentionPolicy = retentionPolicy;
     }
 
     /**
@@ -153,11 +157,30 @@ public class AdminController {
             String bn = body.get("brandName") == null ? null : String.valueOf(body.get("brandName")).trim();
             settings.setBrandName(bn == null ? null : (bn.isEmpty() ? null : bn));
         }
+        if (body.containsKey("retentionWindowDays")) {
+            Object rw = body.get("retentionWindowDays");
+            if (rw == null || String.valueOf(rw).isBlank()) {
+                settings.setRetentionWindowDays(null); // blank -> back to the 7-day default
+            } else {
+                int days;
+                try {
+                    days = Integer.parseInt(String.valueOf(rw).trim());
+                } catch (NumberFormatException e) {
+                    throw ApiException.badRequest("Retention window must be a whole number of days");
+                }
+                if (days < RetentionPolicy.MIN_DAYS || days > RetentionPolicy.MAX_DAYS) {
+                    throw ApiException.badRequest("Retention window must be between "
+                            + RetentionPolicy.MIN_DAYS + " and " + RetentionPolicy.MAX_DAYS + " days");
+                }
+                settings.setRetentionWindowDays(days);
+            }
+        }
         settings.setUpdatedAt(LocalDateTime.now());
         settings = settingsRepository.save(settings);
-        // Push the new brand to the display-name policy so client-visible
+        // Push the new values to the live policies so client-visible
         // surfaces reflect the change without a restart.
         displayNamePolicy.refresh();
+        retentionPolicy.refresh();
         auditService.audit(actor, "SETTINGS_UPDATE", "SystemSettings", settings.getId(), null, http);
         return ResponseEntity.ok(maskStorage(maskSso(settings)));
     }

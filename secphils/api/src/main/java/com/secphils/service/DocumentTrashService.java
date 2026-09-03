@@ -10,6 +10,7 @@ import com.secphils.repository.DocumentRepository;
 import com.secphils.repository.MessageRepository;
 import com.secphils.repository.ProjectRepository;
 import com.secphils.repository.UserRepository;
+import com.secphils.policy.RetentionPolicy;
 import com.secphils.security.AuthUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,14 +48,15 @@ import java.util.List;
  *              acting user must re-authenticate with their own account
  *              password. Non-admins purge only their own company's trash.
  *
- *  purgeExpired: 7-day sweep (DocumentAutoPurger, hourly). No password — the
- *              window is what bounds it. Same shared-object guard.
+ *  purgeExpired: sweep (DocumentAutoPurger, hourly) of trashed documents
+ *              older than the admin-configurable retention window. No
+ *              password — the window is what bounds it. Same shared-object
+ *              guard.
  */
 @Service
 public class DocumentTrashService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentTrashService.class);
-    private static final int TRASH_WINDOW_DAYS = 7;
 
     private final DocumentRepository documents;
     private final DocumentCommentRepository comments;
@@ -64,6 +66,7 @@ public class DocumentTrashService {
     private final S3StorageService s3;
     private final AuditService auditService;
     private final PasswordEncoder passwordEncoder;
+    private final RetentionPolicy retention;
 
     public DocumentTrashService(DocumentRepository documents,
                                 DocumentCommentRepository comments,
@@ -72,7 +75,8 @@ public class DocumentTrashService {
                                 UserRepository users,
                                 S3StorageService s3,
                                 AuditService auditService,
-                                PasswordEncoder passwordEncoder) {
+                                PasswordEncoder passwordEncoder,
+                                RetentionPolicy retention) {
         this.documents = documents;
         this.comments = comments;
         this.messages = messages;
@@ -81,6 +85,7 @@ public class DocumentTrashService {
         this.s3 = s3;
         this.auditService = auditService;
         this.passwordEncoder = passwordEncoder;
+        this.retention = retention;
     }
 
     // --------------------------------------------------------------- delete
@@ -157,7 +162,7 @@ public class DocumentTrashService {
     // -------------------------------------------------------------- purger
 
     public int purgeExpired() {
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(TRASH_WINDOW_DAYS);
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(retention.getDays());
         List<Document> expired = documents.findByDeletedAtBefore(cutoff);
         if (expired.isEmpty()) return 0;
         int purged = 0;

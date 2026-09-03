@@ -8,6 +8,7 @@ import com.secphils.dto.ServiceResponse;
 import com.secphils.entity.Service;
 import com.secphils.entity.ServiceCategory;
 import com.secphils.entity.User;
+import com.secphils.policy.RetentionPolicy;
 import com.secphils.repository.ServiceCategoryRepository;
 import com.secphils.repository.ServiceRepository;
 import com.secphils.repository.UserRepository;
@@ -35,17 +36,20 @@ public class ServiceController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final RetentionPolicy retention;
 
     public ServiceController(ServiceRepository serviceRepository,
                              ServiceCategoryRepository categoryRepository,
                              UserRepository userRepository,
                              PasswordEncoder passwordEncoder,
-                             AuditService auditService) {
+                             AuditService auditService,
+                             RetentionPolicy retention) {
         this.serviceRepository = serviceRepository;
         this.categoryRepository = categoryRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
+        this.retention = retention;
     }
 
     private AuthUser requireActor() {
@@ -164,7 +168,7 @@ public class ServiceController {
                 .orElseThrow(() -> ApiException.notFound("Service"));
 
         boolean eligible = service.getDeactivatedAt() != null
-                && service.getDeactivatedAt().plusDays(7).isBefore(LocalDateTime.now());
+                && service.getDeactivatedAt().plusDays(retention.getDays()).isBefore(LocalDateTime.now());
         if (!eligible) {
             // Immediate delete (active service, or deactivated < 7 days) requires the acting admin's own password
             User actorRow = userRepository.findById(actor.id())

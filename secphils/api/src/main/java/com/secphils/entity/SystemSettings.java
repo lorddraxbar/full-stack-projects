@@ -54,6 +54,10 @@ public class SystemSettings {
     @Column(name = "brand_name", length = 255)
     private String brandName;
 
+    /** Days a deactivated entity stays recoverable before passwordless hard delete (default 7). */
+    @Column(name = "retention_window_days")
+    private Integer retentionWindowDays;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 

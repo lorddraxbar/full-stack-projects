@@ -246,7 +246,8 @@ export async function useRestoreProject(id: number) {
 
 /**
  * Permanently delete an archived project (admin only).
- * Pass the admin's password when the 7-day grace window hasn't elapsed.
+ * Pass the admin's password when the retention window (admin-configurable,
+ * default 7 days) hasn't elapsed.
  */
 export async function useHardDeleteProject(id: number, password?: string) {
   const response = await api.delete(`/projects/${id}/hard`, password ? { data: { password } } : {})
@@ -432,7 +433,7 @@ export async function useDeleteDocument(id: number) {
 
 // ---------- Documents: trash ----------
 
-/** Staff-only: the trash bin (documents deleted in the last 7 days). */
+/** Staff-only: the trash bin (documents deleted inside the retention window). */
 export async function useGetTrashDocuments() {
   const response = await api.get('/documents/trash')
   return response.data
@@ -670,6 +671,7 @@ export interface LandingPayload {
   portalName: string
   tagline: string
   maintenanceMode: boolean
+  retentionWindowDays?: number
   company?: LandingCompany
   reviews?: LandingReview[]
   services?: LandingService[]

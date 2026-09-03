@@ -8,6 +8,7 @@ import com.secphils.entity.NotificationPreference;
 import com.secphils.entity.Project;
 import com.secphils.entity.User;
 import com.secphils.policy.DisplayNamePolicy;
+import com.secphils.policy.RetentionPolicy;
 import com.secphils.repository.MessageRepository;
 import com.secphils.repository.NotificationPreferenceRepository;
 import com.secphils.repository.NotificationRepository;
@@ -31,8 +32,8 @@ import java.util.Map;
  * Project archive lifecycle.
  *
  *  archive:    soft delete. Marks the project ARCHIVED (remembering its
- *              previous status), stamps archived_at and delete_at (7 days
- *              out), relocates all S3 objects under
+ *              previous status), stamps archived_at and delete_at (the
+ *              admin-configurable retention window out), relocates all S3 objects under
  *              archive/projects/{id}/{timestamp}/, posts a system message in
  *              the project thread, and notifies the project's company
  *              members (in-app + email, honoring each one's
@@ -53,7 +54,6 @@ public class ProjectArchiveService {
     private static final Logger log = LoggerFactory.getLogger(ProjectArchiveService.class);
     private static final String ARCHIVED = "ARCHIVED";
     private static final String PREF_KEY = "projectStatusChanged";
-    private static final int HARD_DELETE_WINDOW_DAYS = 7;
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
     private final ProjectRepository projects;
@@ -65,6 +65,7 @@ public class ProjectArchiveService {
     private final MailService mail;
     private final EmailTemplateService templateService;
     private final PasswordEncoder passwordEncoder;
+    private final RetentionPolicy retention;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String portalBaseUrl;
 
@@ -74,6 +75,7 @@ public class ProjectArchiveService {
                                  S3StorageService s3, MailService mail,
                                  EmailTemplateService templateService,
                                  PasswordEncoder passwordEncoder,
+                                 RetentionPolicy retention,
                                  @Value("${app.invite.base-url:http://localhost:3000}") String portalBaseUrl) {
         this.projects = projects;
         this.messages = messages;
@@ -84,6 +86,7 @@ public class ProjectArchiveService {
         this.mail = mail;
         this.templateService = templateService;
         this.passwordEncoder = passwordEncoder;
+        this.retention = retention;
         this.portalBaseUrl = portalBaseUrl;
     }
 
@@ -100,7 +103,7 @@ public class ProjectArchiveService {
         p.setPreviousStatus(p.getStatus());
         p.setStatus(ARCHIVED);
         p.setArchivedAt(now);
-        p.setDeleteAt(now.plusDays(HARD_DELETE_WINDOW_DAYS));
+        p.setDeleteAt(now.plusDays(retention.getDays()));
         relocateToArchive(p);
         projects.save(p);
 
@@ -161,16 +164,17 @@ public class ProjectArchiveService {
         if (!windowPassed) {
             // Force-delete before the window: re-authenticate with the
             // admin's account password.
+            int windowDays = retention.getDays();
             User actorUser = users.findById(actor.id())
                     .orElseThrow(() -> ApiException.notFound("User"));
             String hash = actorUser.getPasswordHash();
             if (hash == null || hash.isBlank()) {
-                throw ApiException.forbidden("The " + HARD_DELETE_WINDOW_DAYS
+                throw ApiException.forbidden("The " + windowDays
                         + "-day archive window hasn't elapsed and this account has no password on file, "
                         + "so it cannot force an early deletion.");
             }
             if (password == null || password.isBlank() || !passwordEncoder.matches(password, hash)) {
-                throw ApiException.forbidden("The " + HARD_DELETE_WINDOW_DAYS
+                throw ApiException.forbidden("The " + windowDays
                         + "-day archive window hasn't elapsed. Provide your account password to delete immediately.");
             }
         }

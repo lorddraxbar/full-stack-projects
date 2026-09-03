@@ -2,10 +2,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAdminStats, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
+import { useRetention } from '../../composables/useRetention'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 import { formatPhpCompact } from '../../lib/labels'
 
 const authStore = useAuthStore()
+// Live retention window (admin-configurable, default 7) — drives the
+// eligibility hints in the user/service hard-delete modals.
+const { retentionDays } = useRetention()
 const currentUserId = computed(() => {
   const stored = localStorage.getItem('userId')
   if (stored) return Number(stored)
@@ -246,7 +250,7 @@ const daysDeactivated = (user: PortalUser) => {
 }
 
 const isEligibleForHardDelete = (user: PortalUser) =>
-  !user.isActive && daysDeactivated(user) >= 7
+  !user.isActive && daysDeactivated(user) >= retentionDays.value
 
 const openHardDelete = (user: PortalUser) => {
   hardDeleteTarget.value = user
@@ -768,7 +772,7 @@ const daysSinceDeactivated = (s: ServiceItem) => {
   if (!s.deactivatedAt) return 0
   return Math.floor((Date.now() - new Date(s.deactivatedAt).getTime()) / 86400000)
 }
-const isServiceEligibleForHardDelete = (s: ServiceItem) => s.deactivatedAt != null && daysSinceDeactivated(s) >= 7
+const isServiceEligibleForHardDelete = (s: ServiceItem) => s.deactivatedAt != null && daysSinceDeactivated(s) >= retentionDays.value
 const openServiceHardDelete = (s: ServiceItem) => {
   serviceHardDeleteTarget.value = s
   serviceHardDeletePassword.value = ''
@@ -1149,6 +1153,7 @@ const systemSettings = ref({
   brandName: 'SECPhils',
   maintenanceMode: false,
   inviteBaseUrl: '',
+  retentionWindowDays: 7,
   securityPolicies: {
     passwordMinLength: 12,
     require2fa: false,
@@ -1310,6 +1315,9 @@ const loadSystemSettings = async () => {
     systemSettings.value.brandName = data.brandName || 'SECPhils'
     systemSettings.value.maintenanceMode = !!data.maintenanceMode
     systemSettings.value.inviteBaseUrl = data.inviteBaseUrl ?? ''
+    systemSettings.value.retentionWindowDays = Number(data.retentionWindowDays) > 0
+      ? Number(data.retentionWindowDays)
+      : 7
     systemSettings.value.landingContactEmail = data.landingContactEmail ?? ''
     systemSettings.value.securityPolicies = parseJson<any>(data.securityPolicies, systemSettings.value.securityPolicies)
     // Stored templates win per-field; anything the admin hasn't saved yet
@@ -1352,6 +1360,9 @@ const saveGeneralSettings = async () => {
       brandName: systemSettings.value.brandName.trim() || 'SECPhils',
       maintenanceMode: systemSettings.value.maintenanceMode,
       inviteBaseUrl: systemSettings.value.inviteBaseUrl.trim(),
+      retentionWindowDays: Number.isFinite(Number(systemSettings.value.retentionWindowDays))
+        ? Number(systemSettings.value.retentionWindowDays)
+        : null,
       securityPolicies: JSON.stringify(systemSettings.value.securityPolicies),
     })
     systemSettingsMessage.value = { ok: true, text: 'System settings saved.' }
@@ -1489,7 +1500,7 @@ const EMAIL_TEMPLATE_DEFAULTS = [
   {
     name: 'projectArchived',
     title: 'Project archived',
-    hint: 'Sent to the project\u2019s company members when a project is archived (7-day grace before permanent deletion).',
+    hint: 'Sent to the project\u2019s company members when a project is archived (the retention window, admin-configurable, before permanent deletion).',
     subject: 'Project archived: {{project}}',
     kicker: 'SecPhils · Project update',
     heading: 'Project archived: {{project}}',
@@ -2360,10 +2371,10 @@ const timeOfDay = (ts: string) => {
           This removes the service from the database and the landing page. This action cannot be undone.
         </p>
         <div v-if="serviceHardDeleteTarget.isActive" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-          This service is still <strong>active</strong> — no 7-day deactivation period applies. Enter your admin password to delete immediately.
+          This service is still <strong>active</strong> — the retention window does not apply yet. Enter your admin password to delete immediately.
         </div>
         <div v-else-if="!isServiceEligibleForHardDelete(serviceHardDeleteTarget)" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-          Deactivated only {{ daysSinceDeactivated(serviceHardDeleteTarget) }} day(s) ago — the 7-day window has not elapsed. Enter your admin password to delete immediately.
+          Deactivated only {{ daysSinceDeactivated(serviceHardDeleteTarget) }} day(s) ago — the {{ retentionDays }}-day window has not elapsed. Enter your admin password to delete immediately.
         </div>
         <div v-else class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
           Deactivated {{ daysSinceDeactivated(serviceHardDeleteTarget) }} days ago — eligible for permanent deletion.
@@ -2741,6 +2752,20 @@ const timeOfDay = (ts: string) => {
             />
             <p class="text-xs text-gray-500 mt-1">
               The host used in the "Set your password" link sent to invited users. Leave blank to use the URL the admin is currently on (dynamic).
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Retention Window (days)</label>
+            <input
+              v-model.number="systemSettings.retentionWindowDays"
+              type="number"
+              min="1"
+              max="365"
+              class="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+            <p class="text-xs text-gray-500 mt-1">
+              How long an archived project, a deactivated user or service, and a trashed document stay recoverable. After the window the hard delete no longer needs a password, and trashed documents are auto-purged. 1–365 days; leave blank to use the default of 7.
             </p>
           </div>
 
@@ -3214,10 +3239,10 @@ const timeOfDay = (ts: string) => {
           This removes <strong>{{ hardDeleteTarget.email }}</strong> from the database. This action cannot be undone.
         </p>
         <div v-if="hardDeleteTarget.isActive" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-          This user is still <strong>active</strong> — no 7-day deactivation period applies. Enter your admin password to delete immediately.
+          This user is still <strong>active</strong> — the retention window does not apply yet. Enter your admin password to delete immediately.
         </div>
         <div v-else-if="!isEligibleForHardDelete(hardDeleteTarget)" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-          Deactivated only {{ daysDeactivated(hardDeleteTarget) }} day(s) ago — the 7-day window has not elapsed. Enter your admin password to delete immediately.
+          Deactivated only {{ daysDeactivated(hardDeleteTarget) }} day(s) ago — the {{ retentionDays }}-day window has not elapsed. Enter your admin password to delete immediately.
         </div>
         <div v-else class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
           Deactivated {{ daysDeactivated(hardDeleteTarget) }} days ago — eligible for permanent deletion.

@@ -9,6 +9,7 @@ import com.secphils.dto.UserResponse;
 import com.secphils.entity.Company;
 import com.secphils.entity.SystemSettings;
 import com.secphils.entity.User;
+import com.secphils.policy.RetentionPolicy;
 import com.secphils.repository.CompanyRepository;
 import com.secphils.repository.SystemSettingsRepository;
 import com.secphils.repository.UserRepository;
@@ -40,6 +41,7 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
     private final MailService mailService;
+    private final RetentionPolicy retention;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
     private final String inviteBaseUrl;
     private final Duration inviteTtl;
@@ -47,6 +49,7 @@ public class UserController {
     public UserController(UserRepository userRepository, CompanyRepository companyRepository,
                           SystemSettingsRepository settingsRepository, PasswordEncoder passwordEncoder,
                           AuditService auditService, MailService mailService,
+                          RetentionPolicy retention,
                           @Value("${app.invite.base-url}") String inviteBaseUrl,
                           @Value("${app.invite.token-ttl:24h}") Duration inviteTtl) {
         this.userRepository = userRepository;
@@ -55,6 +58,7 @@ public class UserController {
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
         this.mailService = mailService;
+        this.retention = retention;
         this.inviteBaseUrl = inviteBaseUrl;
         this.inviteTtl = inviteTtl;
     }
@@ -388,7 +392,7 @@ public class UserController {
         }
         User user = userRepository.findById(id).orElseThrow(() -> ApiException.notFound("User"));
         boolean eligible = user.getDeactivatedAt() != null
-                && user.getDeactivatedAt().plusDays(7).isBefore(java.time.LocalDateTime.now());
+                && user.getDeactivatedAt().plusDays(retention.getDays()).isBefore(java.time.LocalDateTime.now());
         if (!eligible) {
             // Immediate delete (active user, or deactivated < 7 days) requires the acting admin's own password
             User actorRow = userRepository.findById(actor.id())

@@ -5,12 +5,14 @@ import {
   useGetDocuments, useDeleteDocument, useUploadDocument, useDownloadDocument, useGetProjects,
   useGetTrashDocuments, useRestoreDocument, useDeleteDocumentPermanently, useEmptyTrash,
 } from '@/services/api'
+import { useRetention } from '@/composables/useRetention'
 import {
   fileTypeLabel, FILE_TYPE_LABELS, FILE_TYPE_COLORS,
   formatDate, formatFileSize,
 } from '@/lib/labels'
 
 const { isClient } = useRole()
+const { retentionDays } = useRetention()
 
 // 'documents' (live) or 'trash' — staff/admin only.
 const view = ref<'documents' | 'trash'>('documents')
@@ -186,7 +188,7 @@ async function downloadDocument(doc: DocRow) {
 }
 
 async function removeDocument(doc: DocRow) {
-  if (!confirm(`Move "${doc.title}" to the trash? It will be permanently deleted after 7 days unless restored earlier.`)) return
+  if (!confirm(`Move "${doc.title}" to the trash? It will be permanently deleted after ${retentionDays.value} days unless restored earlier.`)) return
   try {
     await useDeleteDocument(doc.id)
     await loadDocuments()
@@ -423,7 +425,7 @@ onMounted(async () => {
         <div>
           <h2 class="text-lg font-semibold text-gray-900"><i class="fas fa-trash-can text-gray-400 mr-2" />Trash</h2>
           <p class="text-sm text-gray-500 mt-1">
-            Documents here are permanently deleted after <strong>7 days</strong> unless restored.
+            Documents here are permanently deleted after <strong>{{ retentionDays }} days</strong> unless restored.
           </p>
         </div>
         <button
@@ -442,7 +444,7 @@ onMounted(async () => {
         <div v-if="trashDocs.length === 0" class="p-12 text-center">
           <i class="fas fa-trash-can text-3xl text-gray-300 mb-3" />
           <p class="text-gray-600">The trash is empty.</p>
-          <p class="text-sm text-gray-400 mt-1">Deleted documents appear here for 7 days.</p>
+          <p class="text-sm text-gray-400 mt-1">Deleted documents appear here for {{ retentionDays }} days.</p>
         </div>
         <div class="divide-y divide-gray-200">
           <div
