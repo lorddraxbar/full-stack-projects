@@ -72,6 +72,8 @@ const routes: RouteRecordRaw[] = [
         path: 'tasks',
         name: 'Tasks',
         component: () => import('@/views/tasks/TasksView.vue'),
+        // Staff-only: keep in sync with the Tasks entry in MainLayout nav.
+        meta: { roles: ['USER', 'ADMIN'] },
       },
       {
         path: 'documents',
@@ -92,6 +94,9 @@ const routes: RouteRecordRaw[] = [
         path: 'reviews',
         name: 'Reviews',
         component: () => import('@/views/reviews/ReviewsView.vue'),
+        // Staff-only (clients submit reviews, they don't moderate): mirror
+        // the Reviews entry in MainLayout nav.
+        meta: { roles: ['USER', 'ADMIN'] },
       },
       {
         path: 'settings',
@@ -128,6 +133,10 @@ router.beforeEach((to, _from, next) => {
   } else if (to.meta.guest && token) {
     next({ name: 'Dashboard' })
   } else if (to.meta.requiresAdmin && userRole !== 'ADMIN') {
+    next({ name: 'Dashboard' })
+  } else if (to.meta.roles && (!userRole || !to.meta.roles.includes(userRole))) {
+    // Staff-only pages (Tasks, Reviews): a missing or non-matching role
+    // lands on the dashboard rather than on a page it shouldn't see.
     next({ name: 'Dashboard' })
   } else {
     next()
