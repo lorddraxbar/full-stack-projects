@@ -204,10 +204,10 @@ const activeProjects = computed(() =>
 const projectUpdates = computed(() => messages.value.slice(0, 3))
 
 // ---------- Admin ----------
-// totalClients is the only stat still shown as its own top-row tile; the
-// project metrics now live in the Projects card (projectStats).
+// totalCompanies is the top-row tile; it counts the `companies` table (client
+// companies SECPhils serves) — distinct from client *user* accounts (Users card).
 const adminStats = computed(() => ({
-  totalClients: companies.value.length,
+  totalCompanies: companies.value.length,
 }))
 const recentActivity = computed(() => auditLogs.value.slice(0, 8))
 
@@ -230,13 +230,14 @@ const documentStats = computed(() => {
     storage: formatFileSize(totalSize),
   }
 })
+// Users card — Total / Active / Inactive, counted over the full (unpaginated)
+// user list. (Staff/Client split intentionally not surfaced here — the Users
+// card shows roster status, not role mix.)
 const userStatsAdmin = computed(() => {
   const active = allUsers.value.filter(u => u.isActive)
   return {
     total: allUsers.value.length,
     active: active.length,
-    staff: active.filter(u => u.role !== 'CLIENT').length,
-    clients: active.filter(u => u.role === 'CLIENT').length,
     inactive: allUsers.value.length - active.length,
   }
 })
@@ -447,8 +448,8 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-gray-600">Total Clients</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ adminStats.totalClients }}</p>
+              <p class="text-sm text-gray-600">Client Companies</p>
+              <p class="text-2xl font-bold text-gray-900 mt-1">{{ adminStats.totalCompanies }}</p>
             </div>
             <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
               <i class="fas fa-building text-emerald-600 text-xl"></i>
@@ -508,22 +509,33 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
             <h2 class="text-lg font-semibold text-gray-900">Users</h2>
             <RouterLink to="/admin" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View</RouterLink>
           </div>
-          <div class="grid grid-cols-4 divide-x divide-gray-100 text-center">
-            <div class="p-5">
-              <p class="text-2xl font-bold text-gray-900">{{ userStatsAdmin.total }}</p>
-              <p class="text-xs text-gray-500 mt-1">Total</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-5">
+            <div class="flex items-center gap-3 rounded-xl border border-gray-200 p-4">
+              <div class="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-[11px] bg-gray-100 text-lg text-gray-600">
+                <i class="fa-solid fa-users"></i>
+              </div>
+              <div>
+                <p class="text-[26px] font-extrabold leading-none text-gray-900">{{ userStatsAdmin.total }}</p>
+                <p class="mt-1 text-xs font-medium text-gray-500">Total</p>
+              </div>
             </div>
-            <div class="p-5">
-              <p class="text-2xl font-bold text-emerald-600">{{ userStatsAdmin.active }}</p>
-              <p class="text-xs text-gray-500 mt-1">Active</p>
+            <div class="flex items-center gap-3 rounded-xl border border-gray-200 p-4">
+              <div class="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-[11px] bg-emerald-100 text-lg text-emerald-600">
+                <i class="fa-solid fa-user-check"></i>
+              </div>
+              <div>
+                <p class="text-[26px] font-extrabold leading-none text-emerald-600">{{ userStatsAdmin.active }}</p>
+                <p class="mt-1 text-xs font-medium text-gray-500">Active</p>
+              </div>
             </div>
-            <div class="p-5">
-              <p class="text-2xl font-bold text-gray-900">{{ userStatsAdmin.staff }}</p>
-              <p class="text-xs text-gray-500 mt-1">Staff</p>
-            </div>
-            <div class="p-5">
-              <p class="text-2xl font-bold text-gray-900">{{ userStatsAdmin.clients }}</p>
-              <p class="text-xs text-gray-500 mt-1">Clients</p>
+            <div class="flex items-center gap-3 rounded-xl border border-gray-200 p-4">
+              <div class="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-[11px] bg-gray-100 text-lg text-gray-400">
+                <i class="fa-solid fa-user-slash"></i>
+              </div>
+              <div>
+                <p class="text-[26px] font-extrabold leading-none text-gray-600">{{ userStatsAdmin.inactive }}</p>
+                <p class="mt-1 text-xs font-medium text-gray-500">Inactive</p>
+              </div>
             </div>
           </div>
         </div>
