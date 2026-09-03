@@ -5,8 +5,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const notifications = ref([
     { id: 1, type: 'PROJECT_CREATED', message: 'New project "Energy Audit" assigned to you', read: false, timestamp: '2026-08-15 10:30:00' },
     { id: 2, type: 'NEW_MESSAGE', message: 'New message in "Manufacturing Process Optimization"', read: false, timestamp: '2026-08-15 10:25:00' },
-    { id: 3, type: 'TASK_ASSIGNED', message: 'Task "Review process flow diagrams" assigned to you', read: true, timestamp: '2026-08-15 10:20:00' },
-    { id: 4, type: 'DOCUMENT_UPLOADED', message: 'New document uploaded to "Supply Chain Feasibility Study"', read: true, timestamp: '2026-08-15 10:15:00' },
+    { id: 3, type: 'DOCUMENT_UPLOADED', message: 'New document uploaded to "Supply Chain Feasibility Study"', read: true, timestamp: '2026-08-15 10:15:00' },
   ])
 
   const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)

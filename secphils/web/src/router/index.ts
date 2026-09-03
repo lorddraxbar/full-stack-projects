@@ -128,7 +128,7 @@ router.beforeEach((to, _from, next) => {
   } else if (to.meta.requiresAdmin && userRole !== 'ADMIN') {
     next({ name: 'Dashboard' })
   } else if (to.meta.roles && (!userRole || !to.meta.roles.includes(userRole))) {
-    // Staff-only pages (Tasks, Reviews): a missing or non-matching role
+    // Staff-only pages (Reviews): a missing or non-matching role
     // lands on the dashboard rather than on a page it shouldn't see.
     next({ name: 'Dashboard' })
   } else {
