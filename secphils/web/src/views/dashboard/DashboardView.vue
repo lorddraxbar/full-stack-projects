@@ -5,11 +5,12 @@ import { useRole } from '@/composables/useRole'
 import {
   useGetMe, useGetProjects, useGetMessages,
   useGetAuditLogs, useGetCompanies, useGetUsers, useGetApiHealth, useGetLanding,
+  useGetDocuments, useGetTrashDocuments,
 } from '@/services/api'
 import {
   projectStatusLabel,
   PROJECT_STATUS_COLORS,
-  formatDate, formatDateTime,
+  formatDate, formatDateTime, formatFileSize,
 } from '@/lib/labels'
 
 const { isClient, isAdmin } = useRole()
@@ -41,6 +42,11 @@ const messages = ref<MessageRow[]>([])
 const companies = ref<{ id: number; name: string }[]>([])
 const auditLogs = ref<{ id: number; userId: number | string; action: string; entityType: string; details: string; createdAt: string }[]>([])
 const users = ref<Record<number, string>>({})
+// Full, unpaginated lists (admin scope = all companies) — used to compute
+// true Documents/Users statistics on the admin dashboard.
+const allUsers = ref<{ id: number; role: string; isActive: boolean }[]>([])
+const allDocs = ref<{ fileSize: number | null }[]>([])
+const trashedDocs = ref<{ id: number }[]>([])
 const loading = ref(true)
 const loadError = ref('')
 // System Health (admin + staff dashboards)
@@ -117,16 +123,23 @@ async function load() {
     messages.value = allMessages
 
     if (isAdmin.value) {
-      const [compRes, auditRes, usersRes] = await Promise.all([
+      const [compRes, auditRes, usersRes, docsRes, trashRes] = await Promise.all([
         useGetCompanies().catch(() => []),
         useGetAuditLogs({ limit: 20 }).catch(() => []),
         useGetUsers().catch(() => []),
+        // Full, unpaginated lists (admin scope = every company) → true counts.
+        useGetDocuments().catch(() => []),
+        useGetTrashDocuments().catch(() => []),
       ])
       companies.value = (Array.isArray(compRes) ? compRes : []).map((c: any) => ({ id: c.id, name: c.name }))
       auditLogs.value = Array.isArray(auditRes) ? auditRes : []
+      const userList = Array.isArray(usersRes) ? usersRes : []
+      allUsers.value = userList.map((u: any) => ({ id: u.id, role: u.role, isActive: !!u.isActive }))
       const userMap: Record<number, string> = {}
-      for (const u of (Array.isArray(usersRes) ? usersRes : [])) userMap[u.id] = u.fullName
+      for (const u of userList) userMap[u.id] = u.fullName
       users.value = userMap
+      allDocs.value = (Array.isArray(docsRes) ? docsRes : []).map((d: any) => ({ fileSize: d.fileSize ?? null }))
+      trashedDocs.value = (Array.isArray(trashRes) ? trashRes : []).map((d: any) => ({ id: d.id }))
     }
   } catch (err: any) {
     loadError.value = err?.response?.data?.message || err?.message || 'Failed to load dashboard data'
@@ -188,6 +201,27 @@ const adminStats = computed(() => ({
   activeProjects: projects.value.filter(p => p.status === 'IN_PROGRESS').length,
 }))
 const recentActivity = computed(() => auditLogs.value.slice(0, 8))
+
+// Documents & Users statistics — derived from the full (unpaginated) admin
+// lists, so the numbers are exact, not capped by any list size.
+const documentStats = computed(() => {
+  const totalSize = allDocs.value.reduce((sum, d) => sum + (d.fileSize ?? 0), 0)
+  return {
+    total: allDocs.value.length,
+    trashed: trashedDocs.value.length,
+    storage: formatFileSize(totalSize),
+  }
+})
+const userStatsAdmin = computed(() => {
+  const active = allUsers.value.filter(u => u.isActive)
+  return {
+    total: allUsers.value.length,
+    active: active.length,
+    staff: active.filter(u => u.role !== 'CLIENT').length,
+    clients: active.filter(u => u.role === 'CLIENT').length,
+    inactive: allUsers.value.length - active.length,
+  }
+})
 
 const goToProject = (id: number) => router.push(`/projects/${id}`)
 </script>
@@ -422,6 +456,55 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
             </div>
             <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
               <i class="fas fa-file-contract text-purple-600 text-xl"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documents & Users statistics -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Documents</h2>
+            <RouterLink to="/documents" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View</RouterLink>
+          </div>
+          <div class="grid grid-cols-3 divide-x divide-gray-100 text-center">
+            <div class="p-5">
+              <p class="text-2xl font-bold text-gray-900">{{ documentStats.total }}</p>
+              <p class="text-xs text-gray-500 mt-1">Total files</p>
+            </div>
+            <div class="p-5">
+              <p class="text-2xl font-bold text-gray-900">{{ documentStats.trashed }}</p>
+              <p class="text-xs text-gray-500 mt-1">In trash</p>
+            </div>
+            <div class="p-5">
+              <p class="text-2xl font-bold text-gray-900">{{ documentStats.storage }}</p>
+              <p class="text-xs text-gray-500 mt-1">Storage used</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Users</h2>
+            <RouterLink to="/admin" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View</RouterLink>
+          </div>
+          <div class="grid grid-cols-4 divide-x divide-gray-100 text-center">
+            <div class="p-5">
+              <p class="text-2xl font-bold text-gray-900">{{ userStatsAdmin.total }}</p>
+              <p class="text-xs text-gray-500 mt-1">Total</p>
+            </div>
+            <div class="p-5">
+              <p class="text-2xl font-bold text-emerald-600">{{ userStatsAdmin.active }}</p>
+              <p class="text-xs text-gray-500 mt-1">Active</p>
+            </div>
+            <div class="p-5">
+              <p class="text-2xl font-bold text-gray-900">{{ userStatsAdmin.staff }}</p>
+              <p class="text-xs text-gray-500 mt-1">Staff</p>
+            </div>
+            <div class="p-5">
+              <p class="text-2xl font-bold text-gray-900">{{ userStatsAdmin.clients }}</p>
+              <p class="text-xs text-gray-500 mt-1">Clients</p>
             </div>
           </div>
         </div>

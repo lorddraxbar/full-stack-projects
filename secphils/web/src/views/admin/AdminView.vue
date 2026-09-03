@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAdminStats, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
-import { formatPhpCompact } from '../../lib/labels'
 
 const authStore = useAuthStore()
 // Live retention window (admin-configurable, default 7) — drives the
@@ -28,36 +27,7 @@ const loadProviderCompany = async () => {
   }
 }
 
-const activeTab = ref('dashboard')
-
-// ---------- Dashboard ----------
-const dashboardStats = ref({
-  totalClients: 0,
-  activeProjects: 0,
-  completedProjects: 0,
-  totalRevenue: 0,
-  pendingReviews: 0,
-  backendStatus: 'UNKNOWN',
-  databaseStatus: 'UNKNOWN',
-  lastBackup: '—',
-})
-const loadDashboard = async () => {
-  try {
-    const s = await useGetAdminStats()
-    dashboardStats.value = {
-      totalClients: s.totalClients ?? 0,
-      activeProjects: s.activeProjects ?? 0,
-      completedProjects: s.completedProjects ?? 0,
-      totalRevenue: s.totalRevenue ?? 0,
-      pendingReviews: s.pendingReviews ?? 0,
-      backendStatus: s.backendStatus || 'UNKNOWN',
-      databaseStatus: s.database?.status || 'UNKNOWN',
-      lastBackup: s.lastSettingsUpdate || '—',
-    }
-  } catch {
-    // leave defaults on error; health is already UNKNOWN
-  }
-}
+const activeTab = ref('users')
 
 interface AuditLogRow {
   id: number
@@ -352,7 +322,6 @@ onMounted(async () => {
   loadRoles()
   loadServices()
   loadServiceCategories()
-  loadDashboard()
   loadAuditLogs()
   loadAnnouncements()
   loadProjects()
@@ -1587,7 +1556,6 @@ const toggleIntegration = async (i: (typeof integrations.value)[0]) => {
 
 // ---------- Tabs ----------
 const tabItems = [
-  { id: 'dashboard', label: 'Dashboard' },
   { id: 'users', label: 'Users' },
   { id: 'company', label: 'Company Settings' },
   { id: 'services', label: 'Service Catalog' },
@@ -1597,21 +1565,6 @@ const tabItems = [
   { id: 'audit', label: 'Audit Logs' },
 ]
 const isActiveTab = (tab: string) => activeTab.value === tab
-
-// Health badge color by status value.
-const healthBadge = (status: string) => {
-  const s = (status || '').toUpperCase()
-  if (s === 'HEALTHY' || s === 'OK' || s === 'UP') return 'bg-green-100 text-green-800'
-  if (s === 'DEGRADED' || s === 'WARNING') return 'bg-amber-100 text-amber-800'
-  if (s === 'UNKNOWN') return 'bg-gray-100 text-gray-600'
-  return 'bg-red-100 text-red-800'
-}
-// Safe time-of-day extract (handles "2026-08-15 10:30" or ISO "2026-08-15T10:30").
-const timeOfDay = (ts: string) => {
-  if (!ts) return ''
-  const idx = ts.indexOf(' ') >= 0 ? ts.indexOf(' ') : ts.indexOf('T')
-  return idx >= 0 ? ts.slice(idx + 1) : ts
-}
 </script>
 
 <template>
@@ -1638,70 +1591,6 @@ const timeOfDay = (ts: string) => {
           {{ tab.label }}
         </button>
       </nav>
-    </div>
-
-    <!-- ================= DASHBOARD ================= -->
-    <div v-if="isActiveTab('dashboard')" class="space-y-6">
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white rounded-lg shadow p-6">
-          <p class="text-sm text-gray-600">Total Clients</p>
-          <p class="text-3xl font-bold text-gray-900 mt-2">{{ dashboardStats.totalClients }}</p>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6">
-          <p class="text-sm text-gray-600">Active Projects</p>
-          <p class="text-3xl font-bold text-gray-900 mt-2">{{ dashboardStats.activeProjects }}</p>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6">
-          <p class="text-sm text-gray-600">Total Revenue</p>
-          <p class="text-3xl font-bold text-gray-900 mt-2">{{ formatPhpCompact(dashboardStats.totalRevenue) }}</p>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6">
-          <p class="text-sm text-gray-600">Pending Reviews</p>
-          <p class="text-3xl font-bold text-gray-900 mt-2">{{ dashboardStats.pendingReviews }}</p>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">System Health</h2>
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <span class="text-gray-700">Backend</span>
-              <span :class="['px-2 py-1 text-xs font-medium rounded-full', healthBadge(dashboardStats.backendStatus)]">
-                {{ dashboardStats.backendStatus }}
-              </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-gray-700">Database</span>
-              <span :class="['px-2 py-1 text-xs font-medium rounded-full', healthBadge(dashboardStats.databaseStatus)]">
-                {{ dashboardStats.databaseStatus }}
-              </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-gray-700">Last Settings Update</span>
-              <span class="text-sm text-gray-600">{{ dashboardStats.lastBackup }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
-          <div class="space-y-3">
-            <p v-if="auditLogs.length === 0" class="text-sm text-gray-500">No recent activity recorded.</p>
-            <div
-              v-for="log in auditLogs.slice(0, 3)"
-              :key="log.id"
-              class="flex items-start justify-between py-2 border-b border-gray-100 last:border-0"
-            >
-              <div>
-                <p class="text-sm font-medium text-gray-900">{{ log.action }} {{ log.entity }}</p>
-                <p class="text-xs text-gray-600">{{ log.details }}</p>
-              </div>
-              <span class="text-xs text-gray-500">{{ timeOfDay(log.timestamp) }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- ================= USERS ================= -->
