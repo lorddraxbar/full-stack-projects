@@ -430,6 +430,31 @@ export async function useDeleteDocument(id: number) {
   return response.data
 }
 
+// ---------- Documents: trash ----------
+
+/** Staff-only: the trash bin (documents deleted in the last 7 days). */
+export async function useGetTrashDocuments() {
+  const response = await api.get('/documents/trash')
+  return response.data
+}
+
+export async function useRestoreDocument(id: number) {
+  const response = await api.post(`/documents/${id}/restore`)
+  return response.data
+}
+
+/** Permanently delete ONE trashed document. Password required. */
+export async function useDeleteDocumentPermanently(id: number, password: string) {
+  const response = await api.delete(`/documents/${id}/permanent`, { data: { password } })
+  return response.data
+}
+
+/** Empty the whole trash. Any provider role; password required. */
+export async function useEmptyTrash(password: string) {
+  const response = await api.post('/documents/trash/empty', { password })
+  return response.data
+}
+
 // ---------- Messages (backend: /api/v1/messages?projectId=) ----------
 
 /**

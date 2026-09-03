@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRole } from '@/composables/useRole'
 import {
   useGetDocuments, useDeleteDocument, useUploadDocument, useDownloadDocument, useGetProjects,
+  useGetTrashDocuments, useRestoreDocument, useDeleteDocumentPermanently, useEmptyTrash,
 } from '@/services/api'
 import {
   fileTypeLabel, FILE_TYPE_LABELS, FILE_TYPE_COLORS,
@@ -10,6 +11,20 @@ import {
 } from '@/lib/labels'
 
 const { isClient } = useRole()
+
+// 'documents' (live) or 'trash' — staff/admin only.
+const view = ref<'documents' | 'trash'>('documents')
+
+// Trash state
+const trashDocs = ref<any[]>([])
+const trashLoading = ref(false)
+const trashError = ref('')
+// Password confirmation (shared by "delete permanently" and "empty trash").
+const passwordModal = ref<{ open: boolean; purpose: 'one' | 'all'; docId: number | null }>(
+  { open: false, purpose: 'all', docId: null })
+const passwordInput = ref('')
+const passwordBusy = ref(false)
+const passwordError = ref('')
 
 interface DocRow {
   id: number
@@ -171,18 +186,96 @@ async function downloadDocument(doc: DocRow) {
 }
 
 async function removeDocument(doc: DocRow) {
-  if (!confirm(`Delete "${doc.title}"? This cannot be undone.`)) return
+  if (!confirm(`Move "${doc.title}" to the trash? It will be permanently deleted after 7 days unless restored earlier.`)) return
   try {
     await useDeleteDocument(doc.id)
     await loadDocuments()
+    await loadTrash()
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to delete document')
+    alert(e?.response?.data?.message || 'Failed to move document to the trash')
+  }
+}
+
+// ---------- Trash ----------
+
+async function loadTrash() {
+  if (isClient.value) return
+  trashLoading.value = true
+  trashError.value = ''
+  try {
+    const data = await useGetTrashDocuments()
+    trashDocs.value = Array.isArray(data) ? data : []
+  } catch (e: any) {
+    trashError.value = e?.response?.data?.message || 'Failed to load the trash'
+    trashDocs.value = []
+  } finally {
+    trashLoading.value = false
+  }
+}
+
+function openPassword(purpose: 'one' | 'all', docId: number | null) {
+  passwordInput.value = ''
+  passwordError.value = ''
+  passwordModal.value = { open: true, purpose, docId }
+}
+
+async function confirmPassword() {
+  if (!passwordInput.value) {
+    passwordError.value = 'Enter your password to continue'
+    return
+  }
+  passwordBusy.value = true
+  passwordError.value = ''
+  const purpose = passwordModal.value.purpose
+  const docId = passwordModal.value.docId
+  try {
+    if (purpose === 'one' && docId != null) {
+      await useDeleteDocumentPermanently(docId, passwordInput.value)
+    } else {
+      const res: any = await useEmptyTrash(passwordInput.value)
+      alert(`Trash emptied — ${res?.purged ?? 0} document(s) permanently deleted.`)
+    }
+    passwordModal.value.open = false
+    await loadTrash()
+    await loadDocuments()
+  } catch (e: any) {
+    passwordError.value = e?.response?.data?.message || 'Operation failed'
+  } finally {
+    passwordBusy.value = false
+  }
+}
+
+async function restoreDoc(doc: any) {
+  if (!confirm(`Restore "${doc.title}"?`)) return
+  try {
+    await useRestoreDocument(doc.id)
+    await loadTrash()
+    await loadDocuments()
+  } catch (e: any) {
+    alert(e?.response?.data?.message || 'Failed to restore document')
+  }
+}
+
+async function downloadTrashDoc(doc: any) {
+  try {
+    const blob = await useDownloadDocument(doc.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = doc.fileName || doc.title || 'document'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    alert(e?.response?.data?.message || 'Failed to download document')
   }
 }
 
 onMounted(async () => {
   await loadProjects()
   await loadDocuments()
+  await loadTrash()
 })
 </script>
 
@@ -194,6 +287,7 @@ onMounted(async () => {
         <p class="text-gray-600 mt-1">View, upload, and manage project documents</p>
       </div>
       <button
+        v-if="view === 'documents'"
         class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
         @click="showUploadModal = true"
       >
@@ -201,8 +295,26 @@ onMounted(async () => {
       </button>
     </div>
 
+    <!-- Tabs (staff + admin only) -->
+    <div v-if="!isClient" class="flex gap-1 mb-6 border-b border-gray-200">
+      <button
+        @click="view = 'documents'"
+        :class="['pb-2 px-1 -mb-px text-sm font-medium border-b-2 transition-colors',
+          view === 'documents' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700']"
+      >
+        Documents ({{ documents.length }})
+      </button>
+      <button
+        @click="view = 'trash'"
+        :class="['pb-2 px-1 -mb-px text-sm font-medium border-b-2 transition-colors',
+          view === 'trash' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700']"
+      >
+        Trash ({{ trashDocs.length }})
+      </button>
+    </div>
+
     <!-- Filters -->
-    <div class="bg-white rounded-lg shadow p-4 mb-6">
+    <div v-if="view === 'documents'" class="bg-white rounded-lg shadow p-4 mb-6">
       <div class="flex flex-col sm:flex-row gap-4">
         <div class="flex-1 relative">
           <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none" />
@@ -239,15 +351,15 @@ onMounted(async () => {
     </div>
 
     <!-- Error / loading -->
-    <div v-if="loadError" class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6 text-sm">
+    <div v-if="view === 'documents' && loadError" class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6 text-sm">
       {{ loadError }}
     </div>
-    <div v-if="loading" class="bg-white rounded-lg shadow p-12 text-center text-gray-500">
+    <div v-if="view === 'documents' && loading" class="bg-white rounded-lg shadow p-12 text-center text-gray-500">
       Loading documents...
     </div>
 
     <!-- Documents List -->
-    <div v-else class="bg-white rounded-lg shadow overflow-hidden">
+    <div v-else-if="view === 'documents'" class="bg-white rounded-lg shadow overflow-hidden">
       <div class="divide-y divide-gray-200">
         <div
           v-for="doc in filteredDocuments"
@@ -302,6 +414,126 @@ onMounted(async () => {
         <p class="text-gray-600">
           {{ documents.length === 0 ? 'No documents yet. Upload the first one.' : 'No documents found matching your criteria.' }}
         </p>
+      </div>
+    </div>
+
+    <!-- Trash panel (staff + admin only) -->
+    <div v-else-if="view === 'trash'" class="bg-white rounded-lg shadow overflow-hidden">
+      <div class="p-6 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900"><i class="fas fa-trash-can text-gray-400 mr-2" />Trash</h2>
+          <p class="text-sm text-gray-500 mt-1">
+            Documents here are permanently deleted after <strong>7 days</strong> unless restored.
+          </p>
+        </div>
+        <button
+          v-if="trashDocs.length > 0"
+          class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium text-sm"
+          @click="openPassword('all', null)"
+        >
+          Empty trash
+        </button>
+      </div>
+
+      <div v-if="trashError" class="bg-red-50 border-b border-red-200 text-red-700 p-4 text-sm">{{ trashError }}</div>
+      <div v-if="trashLoading" class="p-12 text-center text-gray-500">Loading trash...</div>
+
+      <template v-else>
+        <div v-if="trashDocs.length === 0" class="p-12 text-center">
+          <i class="fas fa-trash-can text-3xl text-gray-300 mb-3" />
+          <p class="text-gray-600">The trash is empty.</p>
+          <p class="text-sm text-gray-400 mt-1">Deleted documents appear here for 7 days.</p>
+        </div>
+        <div class="divide-y divide-gray-200">
+          <div
+            v-for="doc in [...trashDocs].sort((a, b) => String(b.deletedAt).localeCompare(String(a.deletedAt)))"
+            :key="doc.id"
+            class="p-6 hover:bg-gray-50 transition-colors"
+          >
+            <div class="flex items-start justify-between gap-4 mb-2">
+              <div class="min-w-0">
+                <h3 class="font-medium text-gray-900 truncate">{{ doc.title }}</h3>
+                <p class="text-sm text-gray-600 truncate">
+                  Project: {{ doc.projectName || doc.id }}
+                </p>
+              </div>
+              <span class="px-2 py-1 text-xs font-medium rounded-full bg-amber-100 text-amber-800 flex-shrink-0">
+                <i class="fas fa-clock mr-1" />{{ formatDate(doc.deletedAt) }}
+              </span>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+              <span>Deleted by: {{ doc.deletedByName || 'unknown' }}</span>
+              <span v-if="doc.fileSize">· {{ formatFileSize(doc.fileSize) }}</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-4 mt-3">
+              <button
+                class="text-emerald-600 hover:text-emerald-700 font-medium text-sm"
+                @click="restoreDoc(doc)"
+              >
+                <i class="fas fa-rotate-left mr-1" />Restore
+              </button>
+              <button
+                v-if="doc.fileUrl"
+                class="text-gray-600 hover:text-gray-800 font-medium text-sm"
+                @click="downloadTrashDoc(doc)"
+              >
+                <i class="fas fa-download mr-1" />Download
+              </button>
+              <button
+                class="text-red-600 hover:text-red-700 font-medium text-sm"
+                @click="openPassword('one', doc.id)"
+              >
+                <i class="fas fa-trash mr-1" />Delete permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Password confirmation modal (shared by permanent-delete + empty-trash) -->
+    <div v-if="passwordModal.open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/30" @click="passwordModal.open = false" />
+      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">
+          <i class="fas fa-lock text-red-600 mr-2" />
+          {{ passwordModal.purpose === 'one' ? 'Delete permanently' : 'Empty the trash' }}
+        </h2>
+        <p class="text-sm text-gray-600 mb-4">
+          <template v-if="passwordModal.purpose === 'one'">
+            This permanently deletes the document and its file. This cannot be undone.
+          </template>
+          <template v-else>
+            This permanently deletes every document in the trash and their files. This cannot be undone.
+          </template>
+          Enter your account password to confirm.
+        </p>
+        <input
+          v-model="passwordInput"
+          type="password"
+          :disabled="passwordBusy"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+          placeholder="Your password"
+          @keyup.enter="confirmPassword"
+          ref="passwordField"
+        />
+        <p v-if="passwordError" class="text-sm text-red-600 mt-2">{{ passwordError }}</p>
+        <div class="mt-6 flex justify-end gap-3">
+          <button
+            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium"
+            :disabled="passwordBusy"
+            @click="passwordModal.open = false"
+          >
+            Cancel
+          </button>
+          <button
+            class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
+            :disabled="passwordBusy || !passwordInput"
+            @click="confirmPassword"
+          >
+            {{ passwordBusy ? 'Working…' : (passwordModal.purpose === 'one' ? 'Delete permanently' : 'Empty trash') }}
+          </button>
+        </div>
       </div>
     </div>
 

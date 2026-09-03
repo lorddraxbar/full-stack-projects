@@ -15,6 +15,10 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     List<Message> findBySenderId(Long senderId);
 
+    /** Messages still referencing the given object URLs (attachments share their
+      * S3 object with the auto-created document row). */
+    List<Message> findByAttachmentUrlIn(Iterable<String> urls);
+
     /**
      * Latest message (by id — IDENTITY means max id is newest) for each of the
      * given projects, newest first per project. Used by the projects list page

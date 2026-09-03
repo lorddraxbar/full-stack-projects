@@ -15,6 +15,7 @@ import com.secphils.repository.DocumentRepository;
 import com.secphils.repository.ProjectRepository;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
+import com.secphils.service.DocumentTrashService;
 import com.secphils.service.S3StorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -61,17 +62,20 @@ public class DocumentController {
     private final AuditService auditService;
     private final UserRepository userRepository;
     private final S3StorageService storageService;
+    private final DocumentTrashService trashService;
 
     public DocumentController(DocumentRepository documentRepository,
                               DocumentCommentRepository commentRepository,
                               ProjectRepository projectRepository, UserRepository userRepository,
-                              AuditService auditService, S3StorageService storageService) {
+                              AuditService auditService, S3StorageService storageService,
+                              DocumentTrashService trashService) {
         this.documentRepository = documentRepository;
         this.commentRepository = commentRepository;
         this.projectRepository = projectRepository;
-        this.auditService = auditService;
         this.userRepository = userRepository;
+        this.auditService = auditService;
         this.storageService = storageService;
+        this.trashService = trashService;
     }
 
     // ---------- reads (role-scoped) ----------
@@ -118,7 +122,10 @@ public class DocumentController {
         if (allowed != null) {
             docs = docs.stream().filter(d -> d.getProject() != null && allowed.contains(d.getProject().getId())).toList();
         }
-        return ResponseEntity.ok(docs.stream().map(DocumentResponse::from).toList());
+        // The live list never shows trashed documents.
+        return ResponseEntity.ok(docs.stream()
+                .filter(d -> d.getDeletedAt() == null)
+                .map(DocumentResponse::from).toList());
     }
 
     @GetMapping("/{id}")
@@ -127,6 +134,10 @@ public class DocumentController {
         AuthUser actor = CurrentUser.require();
         Document doc = documentRepository.findById(id).orElseThrow(() -> ApiException.notFound("Document"));
         requireVisibleTo(actor, doc.getProject().getCompany().getId());
+        // Clients see no trash: a trashed document is as good as gone to them.
+        if (actor.isClient() && doc.getDeletedAt() != null) {
+            throw ApiException.notFound("Document");
+        }
         return ResponseEntity.ok(DocumentResponse.from(doc));
     }
 
@@ -140,6 +151,11 @@ public class DocumentController {
         AuthUser actor = CurrentUser.require();
         Document doc = documentRepository.findById(id).orElseThrow(() -> ApiException.notFound("Document"));
         requireVisibleTo(actor, doc.getProject().getCompany().getId());
+        // Trashed documents are downloadable by staff (trash UI) but hidden
+        // from clients — same rule as the single-document GET.
+        if (actor.isClient() && doc.getDeletedAt() != null) {
+            throw ApiException.notFound("Document");
+        }
         String url = doc.getFileUrl();
         if (url == null || url.isBlank()) {
             throw ApiException.badRequest("This document has no file attached");
@@ -235,6 +251,9 @@ public class DocumentController {
         AuthUser actor = CurrentUser.require();
         requireStaff(actor);
         Document doc = documentRepository.findById(id).orElseThrow(() -> ApiException.notFound("Document"));
+        if (doc.getDeletedAt() != null) {
+            throw ApiException.conflict("Document is in the trash — restore it before editing");
+        }
         Project target = projectRepository.findById(req.projectId())
                 .orElseThrow(() -> ApiException.notFound("Project"));
         if (!actor.isAdmin() && !target.getCompany().getId().equals(actor.getCompanyId())) {
@@ -253,18 +272,91 @@ public class DocumentController {
         return ResponseEntity.ok(DocumentResponse.from(doc));
     }
 
+    /**
+     * Trash listing (staff + admin; clients get 404). Company-scoped like
+     * the live list; trashed docs stay downloadable/visible from here.
+     */
+    @GetMapping("/trash")
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<DocumentResponse>> listTrash() {
+        AuthUser actor = CurrentUser.require();
+        requireStaff(actor);
+        List<Document> docs;
+        if (actor.isAdmin()) {
+            docs = documentRepository.findByDeletedAtIsNotNull();
+        } else {
+            if (actor.getCompanyId() == null) return ResponseEntity.ok(List.of());
+            Set<Long> projectIds = projectRepository.findByCompanyId(actor.getCompanyId()).stream()
+                    .map(Project::getId).collect(java.util.stream.Collectors.toSet());
+            docs = projectIds.isEmpty()
+                    ? List.of()
+                    : documentRepository.findByDeletedAtIsNotNullAndProjectIdIn(projectIds);
+        }
+        return ResponseEntity.ok(docs.stream().map(DocumentResponse::from).toList());
+    }
+
+    /**
+     * Trash a live document (soft delete: 7-day window, restorable).
+     * Staff + admin.
+     */
     @DeleteMapping("/{id}")
     @Transactional
     public ResponseEntity<Void> delete(@PathVariable Long id, HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
+        trashService.delete(actor, id); // service writes the DOCUMENT_DELETE audit (REQUIRES_NEW)
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Restore a trashed document to its original location. Staff + admin. */
+    @PostMapping("/{id}/restore")
+    @Transactional
+    public ResponseEntity<DocumentResponse> restore(@PathVariable Long id) {
+        AuthUser actor = CurrentUser.require();
+        Document doc = trashService.restore(actor, id); // service writes DOCUMENT_RESTORE
+        return ResponseEntity.ok(DocumentResponse.from(doc));
+    }
+
+    /**
+     * Perpetually delete one trashed document (row + comments + S3 object).
+     * The acting provider role must re-authenticate with their own account
+     * password. An object shared with a live message attachment is kept.
+     */
+    @DeleteMapping("/{id}/permanent")
+    @Transactional
+    public ResponseEntity<Void> deletePermanent(@PathVariable Long id,
+                                                @Valid @RequestBody com.secphils.dto.HardDeleteUserRequest req,
+                                                HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
         requireStaff(actor);
         Document doc = documentRepository.findById(id).orElseThrow(() -> ApiException.notFound("Document"));
-        requireVisibleTo(actor, doc.getProject().getCompany().getId());
-        commentRepository.deleteAll(commentRepository.findByDocumentIdOrderByCreatedAtAsc(id));
-        documentRepository.delete(doc);
-        storageService.deleteQuietly(doc.getFileUrl()); // best-effort S3 cleanup
-        auditService.audit(actor, "DOCUMENT_DELETE", "Document", id, "Title: " + doc.getTitle(), http);
+        if (doc.getDeletedAt() == null) {
+            throw ApiException.badRequest("Document is not in the trash");
+        }
+        Long companyId = doc.getProject() != null && doc.getProject().getCompany() != null
+                ? doc.getProject().getCompany().getId() : null;
+        if (!actor.isAdmin() && (companyId == null || !companyId.equals(actor.getCompanyId()))) {
+            throw ApiException.notFound("Document");
+        }
+        trashService.hardDeleteOnePublic(actor, doc, req.password()); // service writes the per-doc audit
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Empty the trash: hard-delete every trashed document of this company.
+     * Any provider role (USER or ADMIN) — the acting user must re-authenticate
+     * with their own account password.
+     */
+    @PostMapping("/trash/empty")
+    @Transactional
+    public ResponseEntity<java.util.Map<String, Object>> emptyTrash(
+            @Valid @RequestBody com.secphils.dto.HardDeleteUserRequest req,
+            HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        requireStaff(actor);
+        int purged = trashService.hardDeleteAll(actor, req.password());
+        auditService.audit(actor, "DOCUMENT_TRASH_EMPTY", "Document", null,
+                "Purged: " + purged, http);
+        return ResponseEntity.ok(java.util.Map.of("purged", purged));
     }
 
     // ---------- comments ----------
@@ -275,6 +367,9 @@ public class DocumentController {
         AuthUser actor = CurrentUser.require();
         Document doc = documentRepository.findById(id).orElseThrow(() -> ApiException.notFound("Document"));
         requireVisibleTo(actor, doc.getProject().getCompany().getId());
+        if (actor.isClient() && doc.getDeletedAt() != null) {
+            throw ApiException.notFound("Document");
+        }
         return ResponseEntity.ok(
                 commentRepository.findByDocumentIdOrderByCreatedAtAsc(id).stream()
                         .map(DocumentCommentResponse::from).toList());
@@ -286,8 +381,12 @@ public class DocumentController {
                                                               @Valid @RequestBody DocumentCommentRequest req,
                                                               HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
+        requireStaff(actor);
         Document doc = documentRepository.findById(id).orElseThrow(() -> ApiException.notFound("Document"));
         requireVisibleTo(actor, doc.getProject().getCompany().getId());
+        if (doc.getDeletedAt() != null) {
+            throw ApiException.conflict("Document is in the trash — restore it before commenting");
+        }
         DocumentComment comment = new DocumentComment();
         comment.setDocument(doc);
         comment.setUser(userRepository.findById(actor.id())

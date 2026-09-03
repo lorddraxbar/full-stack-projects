@@ -55,6 +55,15 @@ public class Document {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Trash: set when the document is "deleted"; null = live. */
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    /** Who moved the document to the trash. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deleted_by_id")
+    private User deletedBy;
+
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<DocumentComment> comments = new ArrayList<>();
 

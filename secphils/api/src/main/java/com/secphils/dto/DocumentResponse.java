@@ -18,7 +18,9 @@ public record DocumentResponse(
         Long fileSize,
         Integer version,
         Boolean isLatest,
-        LocalDateTime uploadedAt
+        LocalDateTime uploadedAt,
+        LocalDateTime deletedAt,
+        String deletedByName
 ) {
     public static DocumentResponse from(Document d) {
         return new DocumentResponse(d.getId(),
@@ -26,6 +28,8 @@ public record DocumentResponse(
                 d.getUploader() != null ? d.getUploader().getId() : null,
                 DisplayNamePolicy.nameFor(d.getUploader()),
                 d.getTitle(), d.getDescription(), d.fileType(), d.fileName(), d.getFileUrl(),
-                d.getFileSize(), d.getVersion(), d.getIsLatest(), d.getUploadedAt());
+                d.getFileSize(), d.getVersion(), d.getIsLatest(), d.getUploadedAt(),
+                d.getDeletedAt(),
+                d.getDeletedBy() != null ? DisplayNamePolicy.nameFor(d.getDeletedBy()) : null);
     }
 }
