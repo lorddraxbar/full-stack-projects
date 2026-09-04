@@ -5,6 +5,12 @@ import {
   useGetAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement, useGetProjects,
 } from '@/services/api'
 import Pagination from '@/components/Pagination.vue'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   ANNOUNCEMENT_CATEGORY_LABELS, ANNOUNCEMENT_CATEGORY_COLORS,
   ANNOUNCEMENT_AUDIENCE_LABELS,
@@ -98,6 +104,12 @@ const paginatedAnnouncements = computed(() =>
 
 const isCustomer = computed(() => isClient.value)
 
+/** reka-ui Select items are string-typed; bridge the boolean isPublished flag. */
+const formPublished = computed({
+  get: () => (form.value.isPublished ? 'true' : 'false'),
+  set: (v: string) => { form.value.isPublished = v === 'true' },
+})
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -117,7 +129,7 @@ async function load() {
 
 onMounted(load)
 
-// --- Create / edit form (staff only) ---
+// --- Create / edit form (staff only, modal dialog) ---
 const showForm = ref(false)
 const editingId = ref<number | null>(null)
 const form = ref({
@@ -125,14 +137,16 @@ const form = ref({
   body: '',
   category: 'PROJECT_UPDATE',
   audience: 'COMPANY',
-  projectId: null as number | null,
+  projectId: '' as string,
   isPublished: true,
 })
 const saving = ref(false)
 const saveError = ref('')
 
+const isEditing = computed(() => editingId.value != null)
+
 function openForm() {
-  form.value = { title: '', body: '', category: 'PROJECT_UPDATE', audience: 'COMPANY', projectId: null, isPublished: true }
+  form.value = { title: '', body: '', category: 'PROJECT_UPDATE', audience: 'COMPANY', projectId: '', isPublished: true }
   editingId.value = null
   saveError.value = ''
   showForm.value = true
@@ -144,13 +158,12 @@ function openEdit(a: Announcement) {
     body: a.body,
     category: a.category || 'PROJECT_UPDATE',
     audience: a.audience || 'COMPANY',
-    projectId: a.audience === 'PROJECT' ? a.projectId : null,
+    projectId: a.audience === 'PROJECT' && a.projectId != null ? String(a.projectId) : '',
     isPublished: a.isPublished,
   }
   editingId.value = a.id
   saveError.value = ''
   showForm.value = true
-  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 const currentUserId = computed(() => Number(localStorage.getItem('userId') || 0))
@@ -171,7 +184,7 @@ async function submit() {
     body: form.value.body.trim(),
     category: form.value.category,
     audience: form.value.audience,
-    projectId: form.value.audience === 'PROJECT' ? form.value.projectId : null,
+    projectId: form.value.audience === 'PROJECT' ? Number(form.value.projectId) : null,
     isPublished: form.value.isPublished,
   }
   try {
@@ -235,13 +248,9 @@ function categoryColor(c: string) {
         <h1 class="text-2xl font-bold text-gray-900">Announcements</h1>
         <p class="text-gray-600 mt-1">Project and company-wide announcements</p>
       </div>
-      <button
-        v-if="isUser"
-        @click="openForm"
-        class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
-      >
+      <Button v-if="isUser" @click="openForm">
         + New Announcement
-      </button>
+      </Button>
     </div>
 
     <!-- Search -->
@@ -262,99 +271,6 @@ function categoryColor(c: string) {
         >
           <i class="fas fa-xmark text-sm" />
         </button>
-      </div>
-    </div>
-
-    <!-- Create / edit form -->
-    <div v-if="showForm" class="bg-white rounded-lg shadow p-6 mb-6">
-      <h3 class="font-semibold text-gray-900 mb-4">
-        {{ editingId == null ? 'New Announcement' : 'Edit Announcement' }}
-      </h3>
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
-          <input
-            v-model="form.title"
-            type="text"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="Announcement title"
-          />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Body</label>
-          <textarea
-            v-model="form.body"
-            rows="3"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="Announcement details"
-          />
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <select
-              v-model="form.category"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="PROJECT_UPDATE">Project Update</option>
-              <option value="COMPANY_NEWS">Company News</option>
-              <option value="MAINTENANCE">Maintenance</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Audience</label>
-            <select
-              v-model="form.audience"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="COMPANY">Company-wide</option>
-              <option value="PROJECT">Project</option>
-            </select>
-          </div>
-          <div v-if="form.audience === 'PROJECT'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Project</label>
-            <select
-              v-model="form.projectId"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option :value="null" disabled>Select project…</option>
-              <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
-            <select
-              v-model="form.isPublished"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option :value="true">Published — notify company</option>
-              <option :value="false">Draft — only staff see it</option>
-            </select>
-          </div>
-        </div>
-        <p
-          v-if="form.isPublished"
-          class="text-xs text-gray-500"
-        >
-          Publishing (or re-publishing) sends an in-app notification and email to every active
-          member of the company who has announcement notifications enabled.
-        </p>
-        <p v-if="saveError" class="text-sm text-red-600">{{ saveError }}</p>
-        <div class="flex gap-3">
-          <button
-            @click="submit"
-            :disabled="saving"
-            class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
-          >
-            {{ saving ? 'Saving…' : (form.isPublished ? 'Publish' : editingId == null ? 'Save Draft' : 'Save Changes') }}
-          </button>
-          <button
-            @click="showForm = false"
-            class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-        </div>
       </div>
     </div>
 
@@ -439,5 +355,119 @@ function categoryColor(c: string) {
     <div v-if="loading" class="bg-white rounded-lg shadow p-12 text-center">
       <p class="text-gray-500">Loading announcements…</p>
     </div>
+
+    <!-- Create / edit announcement dialog -->
+    <Dialog v-model:open="showForm">
+      <DialogContent class="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{{ isEditing ? 'Edit Announcement' : 'New Announcement' }}</DialogTitle>
+          <DialogDescription>Project and company-wide announcements</DialogDescription>
+        </DialogHeader>
+
+        <div class="flex-1 overflow-y-auto space-y-4">
+          <div class="space-y-2">
+            <Label for="annTitle">Title</Label>
+            <Input
+              id="annTitle"
+              v-model="form.title"
+              type="text"
+              placeholder="Announcement title"
+            />
+          </div>
+
+          <div class="space-y-2">
+            <Label for="annBody">Body</Label>
+            <Textarea
+              id="annBody"
+              v-model="form.body"
+              rows="3"
+              placeholder="Announcement details"
+            />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <Label for="annCategory">Category</Label>
+              <Select v-model="form.category">
+                <SelectTrigger id="annCategory">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="PROJECT_UPDATE">Project Update</SelectItem>
+                    <SelectItem value="COMPANY_NEWS">Company News</SelectItem>
+                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="space-y-2">
+              <Label for="annAudience">Audience</Label>
+              <Select v-model="form.audience">
+                <SelectTrigger id="annAudience">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="COMPANY">Company-wide</SelectItem>
+                    <SelectItem value="PROJECT">Project</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div v-if="form.audience === 'PROJECT'" class="space-y-2">
+              <Label for="annProject">Project</Label>
+              <Select v-model="form.projectId">
+                <SelectTrigger id="annProject">
+                  <SelectValue placeholder="Select project…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem
+                      v-for="p in projects"
+                      :key="p.id"
+                      :value="String(p.id)"
+                    >
+                      {{ p.name }}
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="space-y-2">
+              <Label for="annVisibility">Visibility</Label>
+              <Select v-model="formPublished">
+                <SelectTrigger id="annVisibility">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="true">Published — notify company</SelectItem>
+                    <SelectItem value="false">Draft — only staff see it</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <p v-if="form.isPublished" class="text-xs text-gray-500">
+            Publishing (or re-publishing) sends an in-app notification and email to every active
+            member of the company who has announcement notifications enabled.
+          </p>
+        </div>
+
+        <p v-if="saveError" class="text-sm text-red-600">{{ saveError }}</p>
+
+        <DialogFooter>
+          <Button variant="outline" @click="showForm = false">Cancel</Button>
+          <Button @click="submit" :disabled="saving">
+            {{ saving ? 'Saving…' : (form.isPublished ? 'Publish' : isEditing ? 'Save Changes' : 'Save Draft') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
