@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
+import { applyBrandTheme } from '../../composables/useBrandTheme'
 import Pagination from '../../components/Pagination.vue'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 
@@ -463,6 +464,9 @@ const saveCompanyProfile = async () => {
       await useUpdateMe({ companyId: c.id })
     }
     await loadProviderCompanyProfile()
+    // Re-theme the whole shell immediately when the brand scheme changes —
+    // no reload needed (runtime :root token override, see useBrandTheme).
+    applyBrandTheme(companyProfile.value.brandPrimary, companyProfile.value.brandSecondary)
   } catch (e: any) {
     companyProfileError.value = e?.response?.data?.message || 'Failed to save company profile.'
   } finally {

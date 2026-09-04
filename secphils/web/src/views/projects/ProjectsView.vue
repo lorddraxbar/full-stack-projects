@@ -363,7 +363,7 @@ onMounted(init)
               </div>
               <div class="mt-2 truncate text-[13px]" :title="project.latestUpdate ?? ''">
                 <template v-if="project.latestUpdate">
-                  <span class="text-[#536976]">“{{ project.latestUpdate }}”</span>
+                  <span class="text-[color:var(--chart-3)]">“{{ project.latestUpdate }}”</span>
                   <span class="text-gray-400"> · {{ timeAgo(project.latestUpdatedAt) || formatDateTime(project.latestUpdatedAt) }}</span>
                 </template>
                 <span v-else class="text-gray-400">No updates yet</span>

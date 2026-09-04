@@ -259,7 +259,7 @@ onMounted(async () => {
   min-height: 100vh;
   min-height: 100svh;
   background: #f9f9f9;
-  color: #1f2937;
+  color: var(--foreground);
   font-family: 'Raleway', 'Open Sans', ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -293,7 +293,7 @@ onMounted(async () => {
   font-size: 18px;
   font-weight: 500;
   letter-spacing: -0.01em;
-  color: #252525;
+  color: var(--foreground);
   white-space: nowrap;
 }
 
@@ -314,7 +314,7 @@ onMounted(async () => {
   border: 1px solid #ececec;
   border-radius: 16px;
   padding: 48px 56px;
-  box-shadow: 0 6px 24px rgba(17, 24, 39, 0.04);
+  box-shadow: 0 6px 24px rgba(32, 32, 32, 0.05);
 }
 
 .legal-eyebrow {
@@ -343,7 +343,7 @@ onMounted(async () => {
 }
 
 .legal-meta {
-  color: #8a8a8a;
+  color: var(--muted-foreground);
   font-size: 13.5px;
   margin: 0 0 28px;
   padding-bottom: 22px;
@@ -355,17 +355,17 @@ onMounted(async () => {
 .legal-body p {
   font-size: 15.5px;
   line-height: 1.8;
-  color: #4b5563;
+  color: #575757;
   margin: 0 0 18px;
 }
 
 .legal-body .legal-intro {
   font-size: 16px;
-  color: #374151;
+  color: #353535;
 }
 
 .legal-body strong {
-  color: #1f2937;
+  color: var(--foreground);
   font-weight: 700;
 }
 
@@ -399,7 +399,7 @@ onMounted(async () => {
 .legal-body ul li {
   font-size: 15.5px;
   line-height: 1.75;
-  color: #4b5563;
+  color: #575757;
   margin: 0 0 12px;
   padding: 0 0 12px 22px;
   position: relative;
@@ -434,7 +434,7 @@ onMounted(async () => {
   margin: 44px 0 0;
   padding-top: 20px;
   border-top: 1px solid #ececec;
-  color: #9ca3af;
+  color: var(--muted-foreground);
   font-size: 13px;
 }
 
