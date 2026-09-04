@@ -16,6 +16,7 @@ import com.secphils.repository.ProjectRepository;
 import com.secphils.repository.ServiceRepository;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
+import com.secphils.policy.DisplayNamePolicy;
 import com.secphils.service.ProjectArchiveService;
 import com.secphils.service.ProjectNotificationService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -110,13 +111,52 @@ public class ProjectController {
                         : messageRepository.findLatestPerProject(pageIds)).stream()
                         .collect(Collectors.toMap(
                                 m -> m.getProject().getId(), m -> m, (a, b) -> a));
+        // Per-project message count for the Messages inbox badge — one query,
+        // internal-excluding for clients so a staff-only thread never inflates a
+        // client's count (same privacy rule as the latest-message preview).
+        Map<Long, Long> countByProject = pageIds.isEmpty()
+                ? Map.of()
+                : (actor.isClient()
+                        ? messageRepository.countNonInternalPerProject(pageIds)
+                        : messageRepository.countPerProject(pageIds)).stream()
+                        .collect(Collectors.toMap(
+                                row -> toLong(row.get("projectId")),
+                                row -> toLong(row.get("cnt")), (a, b) -> a));
         Page<ProjectResponse> mapped = projects.map(p -> {
             Message latest = latestByProject.get(p.getId());
+            // Sender name mirrors MessageController: internal messages surface the
+            // real colleague's name (they never reach a client); everything else
+            // stays brand-masked for provider senders.
+            String sender = null;
+            String visibility = null;
+            boolean hasFile = false;
+            if (latest != null) {
+                visibility = latest.getVisibility() == null ? "CLIENT" : latest.getVisibility();
+                hasFile = latest.getAttachmentFileName() != null && !latest.getAttachmentFileName().isBlank();
+                if ("INTERNAL".equalsIgnoreCase(visibility) && latest.getSender() != null) {
+                    String real = latest.getSender().getFullName();
+                    if (real == null || real.isBlank()) real = latest.getSender().getEmail();
+                    sender = (real == null || real.isBlank()) ? null : real;
+                } else {
+                    sender = DisplayNamePolicy.nameFor(latest.getSender());
+                }
+            }
+            Long cnt = countByProject.get(p.getId());
             return ProjectResponse.from(p,
                     latest != null ? latest.getBody() : null,
-                    latest != null ? latest.getCreatedAt() : null);
+                    latest != null ? latest.getCreatedAt() : null,
+                    sender,
+                    visibility,
+                    latest != null ? hasFile : null,
+                    cnt != null ? cnt.intValue() : 0);
         });
         return ResponseEntity.ok(mapped);
+    }
+
+    private static long toLong(Object o) {
+        if (o == null) return 0L;
+        if (o instanceof Number n) return n.longValue();
+        return Long.parseLong(o.toString());
     }
 
     @PostMapping

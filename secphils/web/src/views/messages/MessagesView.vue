@@ -118,6 +118,22 @@ async function downloadAttachment(msg: any) {
   }
 }
 
+// Project row enriched by GET /projects with the per-project message preview
+// (latest message body/sender/visibility/file + total count) — see
+// ProjectController.list. Lets the inbox build from ONE call instead of one
+// /messages?projectId= round-trip per project (the old N+1 was the page's
+// main source of slowness).
+interface ProjectPreview {
+  id: number
+  name: string
+  latestUpdateBody?: string | null
+  latestUpdateAt?: string | null
+  latestUpdateSender?: string | null
+  latestUpdateVisibility?: string | null
+  latestHasFile?: boolean | null
+  messageCount?: number | null
+}
+
 async function loadConversations() {
   loading.value = true
   loadError.value = ''
@@ -129,42 +145,28 @@ async function loadConversations() {
     // Staff/admin see every project — the inbox mirrors the dashboard's
     // cross-company read access. Full list: a page-capped fetch would hide
     // a client's older conversations (the 20 newest by created_at only).
+    // The response is already enriched with each project's latest message +
+    // message count (batched server-side), so no per-project fetch is needed.
     const isClientRole = (meRes as any)?.role === 'CLIENT'
     const page = await useGetProjects({
       companyId: isClientRole ? (me.value?.companyId ?? undefined) : undefined,
       size: 10000,
     })
-    const projects = Array.isArray(page) ? page : (page?.content ?? [])
+    const projects = (Array.isArray(page) ? page : (page?.content ?? [])) as ProjectPreview[]
 
-    const convs: Conversation[] = []
-    for (const p of projects) {
-      try {
-        const msgs = await useGetMessages(p.id)
-        const list = Array.isArray(msgs) ? msgs : []
-        const last = list[list.length - 1]
-        convs.push({
-          id: p.id,
-          project: p.name,
-          lastMessage: last ? last.body : 'No messages yet',
-          lastMessageBy: last ? (last.senderName || '—') : '',
-          lastMessageTime: last ? timeAgo(last.createdAt) : '',
-          messageCount: list.length,
-          lastHasFile: !!(last && last.attachmentFileName),
-          lastMessageInternal: !!(last && isInternal(last)),
-        })
-      } catch {
-        convs.push({
-          id: p.id,
-          project: p.name,
-          lastMessage: 'No messages yet',
-          lastMessageBy: '',
-          lastMessageTime: '',
-          messageCount: 0,
-          lastHasFile: false,
-          lastMessageInternal: false,
-        })
+    const convs: Conversation[] = projects.map(p => {
+      const lastBody = p.latestUpdateBody
+      return {
+        id: p.id,
+        project: p.name,
+        lastMessage: lastBody || 'No messages yet',
+        lastMessageBy: p.latestUpdateSender || '',
+        lastMessageTime: p.latestUpdateAt ? timeAgo(p.latestUpdateAt) : '',
+        messageCount: p.messageCount ?? 0,
+        lastHasFile: !!p.latestHasFile,
+        lastMessageInternal: p.latestUpdateVisibility === 'INTERNAL',
       }
-    }
+    })
     conversations.value = convs
     if (convs.length > 0 && selectedId.value == null) {
       await selectConversation(convs[0].id)

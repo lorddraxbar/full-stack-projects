@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRole } from '@/composables/useRole'
 import {
-  useGetMe, useGetProjects, useGetMessages,
+  useGetMe, useGetProjects,
   useGetAuditLogs, useGetCompanies, useGetUsers, useGetApiHealth, useGetLanding,
   useGetDocuments, useGetTrashDocuments,
 } from '@/services/api'
@@ -57,11 +57,6 @@ const apiHealth = ref<'UP' | 'DOWN' | 'UNKNOWN'>('UNKNOWN')
 const apiHealthChecked = ref<Date | null>(null)
 const maintenanceMode = ref(false)
 
-function projectName(id: number | null): string {
-  if (id == null) return '—'
-  return projects.value.find(p => p.id === id)?.name ?? `Project #${id}`
-}
-
 // Local clock with seconds for the "health checked" row.
 function formatTime(iso: string): string {
   const d = new Date(iso)
@@ -94,17 +89,6 @@ function mapProject(p: any): ProjectRow {
   }
 }
 
-function mapMessage(m: any): MessageRow {
-  return {
-    id: m.id,
-    projectId: m.projectId,
-    projectName: projectName(m.projectId),
-    senderName: m.senderName ?? null,
-    body: m.body,
-    createdAt: m.createdAt,
-  }
-}
-
 async function load() {
   loading.value = true
   loadError.value = ''
@@ -117,13 +101,26 @@ async function load() {
     const projContent = Array.isArray(projRes) ? projRes : projRes?.content ?? []
     projects.value = projContent.map(mapProject)
 
-    // Messages live per project — fetch for each project in parallel.
-    const msgResults = await Promise.all(
-      projects.value.map(p => useGetMessages(p.id).catch(() => []))
-    )
-    const allMessages = msgResults.flat().map(mapMessage)
-    allMessages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    messages.value = allMessages
+    // The "Latest Updates" feed needs only each project's newest message —
+    // which /projects already carries batched (latestUpdate*), so build it from
+    // that instead of one /messages?projectId= round-trip per project (the old
+    // N+1 that made the dashboard feel slow on login).
+    const feedRows: MessageRow[] = []
+    for (const p of projects.value) {
+      const src = projContent.find((x: any) => x.id === p.id)
+      if (src && src.latestUpdateAt) {
+        feedRows.push({
+          id: p.id,
+          projectId: p.id,
+          projectName: p.name,
+          senderName: src.latestUpdateSender ?? null,
+          body: src.latestUpdateBody ?? '',
+          createdAt: src.latestUpdateAt,
+        })
+      }
+    }
+    feedRows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    messages.value = feedRows
 
     // Provider staff (USER) mirror the admin dashboard — same tiles, same data:
     // staff have cross-company READ access (projects/documents/messages/audit),
