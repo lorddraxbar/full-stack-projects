@@ -93,8 +93,8 @@ public class DocumentController {
                 projectIds = projectRepository.findByCompanyId(companyId).stream()
                         .map(Project::getId).collect(java.util.stream.Collectors.toSet());
             }
-        } else {
-            // staff and clients are locked to their own company
+        } else if (actor.isClient()) {
+            // clients are locked to their own company
             if (companyId != null && !companyId.equals(actor.getCompanyId())) {
                 throw ApiException.forbidden("You can only view documents of your own company");
             }
@@ -104,6 +104,8 @@ public class DocumentController {
             projectIds = projectRepository.findByCompanyId(actor.getCompanyId()).stream()
                     .map(Project::getId).collect(java.util.stream.Collectors.toSet());
         }
+        // staff (USER) read every document — the staff dashboard mirrors the
+        // admin one (trash management itself stays own-company in the service).
 
         List<Document> docs;
         if (projectId != null) {
@@ -282,16 +284,13 @@ public class DocumentController {
         AuthUser actor = CurrentUser.require();
         requireStaff(actor);
         List<Document> docs;
-        if (actor.isAdmin()) {
-            docs = documentRepository.findByDeletedAtIsNotNull();
-        } else {
-            if (actor.getCompanyId() == null) return ResponseEntity.ok(List.of());
-            Set<Long> projectIds = projectRepository.findByCompanyId(actor.getCompanyId()).stream()
-                    .map(Project::getId).collect(java.util.stream.Collectors.toSet());
-            docs = projectIds.isEmpty()
-                    ? List.of()
-                    : documentRepository.findByDeletedAtIsNotNullAndProjectIdIn(projectIds);
+        if (actor.isClient()) {
+            // clients never see the trash
+            return ResponseEntity.ok(List.of());
         }
+        // staff + admin read the full trash (write/restore/permanent still
+        // stay own-company inside DocumentTrashService)
+        docs = documentRepository.findByDeletedAtIsNotNull();
         return ResponseEntity.ok(docs.stream().map(DocumentResponse::from).toList());
     }
 

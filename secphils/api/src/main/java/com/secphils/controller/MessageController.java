@@ -116,7 +116,7 @@ public class MessageController {
         AuthUser actor = CurrentUser.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> ApiException.notFound("Project"));
-        requireVisibleTo(actor, project.getCompany().getId());
+        requireReadableBy(actor, project.getCompany().getId());
         List<Message> rows = messageRepository.findByProjectIdOrderByCreatedAtAsc(projectId);
         // Internal messages are invisible to CLIENT-role users — filtered
         // server-side so the client neither sees nor can infer them.
@@ -133,7 +133,10 @@ public class MessageController {
         AuthUser actor = CurrentUser.require();
         Project project = projectRepository.findById(req.projectId())
                 .orElseThrow(() -> ApiException.notFound("Project"));
-        requireVisibleTo(actor, project.getCompany().getId());
+        // Send = same audience as read: staff/admin may message any project
+        // they can view (the inbox lists every project for them); clients
+        // stay locked to their own company's projects.
+        requireReadableBy(actor, project.getCompany().getId());
         Message message = new Message();
         message.setProject(project);
         User sender = userRepository.findById(actor.id())
@@ -174,7 +177,9 @@ public class MessageController {
 
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> ApiException.notFound("Project"));
-        requireVisibleTo(actor, project.getCompany().getId());
+        // Same audience rule as send(): staff/admin may attach to any project
+        // they can view; clients stay locked to their own company.
+        requireReadableBy(actor, project.getCompany().getId());
 
         S3StorageService.StorageConfig cfg = storageService.currentConfig();
         if (!cfg.isConfigured()) {
@@ -234,7 +239,7 @@ public class MessageController {
         AuthUser actor = CurrentUser.require();
         Message m = messageRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Message"));
-        requireVisibleTo(actor, m.getProject().getCompany().getId());
+        requireReadableBy(actor, m.getProject().getCompany().getId());
         // Internal attachments are not downloadable by client-role users — 404,
         // same as an unknown id (don't reveal the message exists).
         if (actor.isClient() && isInternal(m)) {
@@ -403,10 +408,14 @@ public class MessageController {
         return "INTERNAL".equalsIgnoreCase(raw.trim()) ? "INTERNAL" : "CLIENT";
     }
 
-    /** Clients/staff may only touch messages of their own company; admin is unrestricted. */
-    private void requireVisibleTo(AuthUser actor, Long companyId) {
-        if (!actor.isAdmin() && !companyId.equals(actor.getCompanyId())) {
-            throw ApiException.notFound("Project"); // 404, not 403 — don't reveal other companies' data
+    /** READ-level gate: admin + staff (USER) can read every conversation (the
+     *  staff dashboard mirrors the admin one); clients stay locked to their
+     *  own company's projects. Send/upload use the same audience rule. */
+    private void requireReadableBy(AuthUser actor, Long companyId) {
+        if (actor.isAdmin() || actor.isUserOrAdmin()) {
+            return; // staff & admin: cross-company reads
         }
+        if (companyId.equals(actor.getCompanyId())) return;
+        throw ApiException.notFound("Project"); // 404, not 403 — don't reveal other companies' data
     }
 }

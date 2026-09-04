@@ -125,7 +125,10 @@ async function load() {
     allMessages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     messages.value = allMessages
 
-    if (isAdmin.value) {
+    // Provider staff (USER) mirror the admin dashboard — same tiles, same data:
+    // staff have cross-company READ access (projects/documents/messages/audit),
+    // so every number below resolves for them exactly as it does for ADMIN.
+    if (isAdmin.value || isUser.value) {
       const [compRes, auditRes, usersRes, docsRes, trashRes, projRes2] = await Promise.all([
         useGetCompanies().catch(() => []),
         useGetAuditLogs({ page: 0, size: 20 }).catch(() => ({ content: [] })),
@@ -194,17 +197,7 @@ const clientProjects = computed(() =>
 )
 const latestUpdates = computed(() => messages.value.slice(0, 3))
 
-// ---------- user ----------
-const userStats = computed(() => ({
-  activeProjects: projects.value.filter(p => p.status === 'IN_PROGRESS').length,
-}))
-const recentMessages = computed(() => messages.value.slice(0, 3))
-const activeProjects = computed(() =>
-  projects.value.filter(p => p.status === 'IN_PROGRESS' || p.status === 'NOT_STARTED').slice(0, 5)
-)
-const projectUpdates = computed(() => messages.value.slice(0, 3))
-
-// ---------- Admin ----------
+// ---------- Staff + Admin ----------
 // totalCompanies is the top-row tile; it counts the `companies` table (client
 // companies SECPhils serves) — distinct from client *user* accounts (Users card).
 const adminStats = computed(() => ({
@@ -346,6 +339,21 @@ function activityDetail(log: { details?: string }): string {
   }
   return raw
 }
+// Who did it: prefer the user map; login events have a NULL user row, so fall
+// back to the email captured in the JSONB details, else "System".
+function activityActor(log: { userId?: number | string; details?: string }, users: Record<number, string>): string {
+  if (log.userId != null && log.userId !== '' && users[log.userId as number]) return users[log.userId as number]
+  const m = (log.details || '').match(/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/)
+  return m ? m[1] : 'System'
+}
+// Sub-line: suppress details that only restate the actor (login rows show the
+// same email twice otherwise).
+function activitySubLine(log: { userId?: number | string; details?: string }, users: Record<number, string>): string {
+  const d = activityDetail(log)
+  const em = d.match(/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/)
+  if (em && em[1] === activityActor(log, users)) return ''
+  return d
+}
 // Page header pill — green when the API is up and maintenance is off.
 const statusPill = computed(() => {
   if (apiHealth.value === 'DOWN') return { text: 'API down — investigate', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' }
@@ -359,16 +367,11 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
 
 <template>
   <div>
-    <!-- Generic page header (admin has its own greeting + status-pill header) -->
-    <div v-if="!isAdmin" class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">
-        {{ isClient ? 'Client Dashboard' : 'User Dashboard' }}
-      </h1>
-      <p class="text-gray-600 mt-1">
-        {{ isClient
-          ? 'Your projects and latest updates from your consultants.'
-          : 'Your active projects and recent messages.' }}
-      </p>
+    <!-- Generic page header (clients keep theirs; staff + admin share the
+         greeting + status-pill header in their shared dashboard below) -->
+    <div v-if="isClient" class="mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Client Dashboard</h1>
+      <p class="text-gray-600 mt-1">Your projects and latest updates from your consultants.</p>
     </div>
 
     <div v-if="loading" class="flex items-center justify-center py-20">
@@ -471,89 +474,9 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
       </div>
     </template>
 
-    <!-- ================= user DASHBOARD ================= -->
-    <template v-else-if="isUser">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-600">Active Projects</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ userStats.activeProjects }}</p>
-            </div>
-            <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-folder-open text-emerald-600 text-xl"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div class="bg-white rounded-lg shadow">
-          <div class="p-6 border-b border-gray-200 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-900">Recent Messages</h2>
-            <RouterLink to="/messages" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">Open inbox</RouterLink>
-          </div>
-          <div class="divide-y divide-gray-200">
-            <div v-if="recentMessages.length === 0" class="p-6 text-sm text-gray-500">No messages yet.</div>
-            <div v-for="msg in recentMessages" :key="msg.id" class="p-6 hover:bg-gray-50 transition-colors">
-              <div class="flex items-center justify-between mb-1">
-                <h3 class="font-medium text-gray-900 text-sm">{{ msg.projectName }}</h3>
-                <span class="text-xs text-gray-500">{{ relativeTime(msg.createdAt) }}</span>
-              </div>
-              <p class="text-sm text-gray-700">{{ msg.senderName || '—' }}: {{ msg.body }}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white rounded-lg shadow">
-          <div class="p-6 border-b border-gray-200 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-900">Projects</h2>
-            <RouterLink to="/projects" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View all</RouterLink>
-          </div>
-          <div class="divide-y divide-gray-200">
-            <div v-if="activeProjects.length === 0" class="p-6 text-sm text-gray-500">No active projects.</div>
-            <div
-              v-for="project in activeProjects"
-              :key="project.id"
-              @click="goToProject(project.id)"
-              class="p-6 hover:bg-gray-50 transition-colors cursor-pointer"
-            >
-              <div class="flex items-center justify-between mb-2">
-                <h3 class="font-medium text-gray-900">{{ project.name }}</h3>
-                <span :class="['px-2 py-1 text-xs font-medium rounded-full', PROJECT_STATUS_COLORS[project.statusLabel]]">
-                  {{ project.statusLabel }}
-                </span>
-              </div>
-              <div class="flex items-center justify-between text-sm text-gray-600">
-                <span>{{ project.companyName || '—' }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow">
-          <div class="p-6 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Project Updates</h2>
-          </div>
-          <div class="p-6">
-            <div v-if="projectUpdates.length === 0" class="text-sm text-gray-500">No updates yet.</div>
-            <div v-else class="relative">
-              <div class="absolute left-3 top-1 bottom-1 w-px bg-gray-200" />
-              <div v-for="update in projectUpdates" :key="update.id" class="relative pl-10 pb-6 last:pb-0">
-                <span class="absolute left-1.5 top-1 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-100" />
-                <p class="text-xs text-gray-500">{{ formatDateTime(update.createdAt) }} &middot; {{ update.senderName || '—' }}</p>
-                <p class="text-sm font-medium text-gray-900 mt-0.5">{{ update.projectName }}</p>
-                <p class="text-sm text-gray-600 mt-1">{{ update.body }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </template>
-
-    <!-- ================= ADMIN DASHBOARD ================= -->
+    <!-- ================= STAFF + ADMIN DASHBOARD ================= -->
+    <!-- USER (provider staff) is intentionally identical to ADMIN: same tiles,
+         same feeds, same numbers — backed by staff cross-company READ access. -->
     <template v-else>
       <div class="flex items-start justify-between mb-6">
         <div>
@@ -651,7 +574,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
         <div class="bg-white rounded-lg shadow">
           <div class="p-6 border-b border-gray-200 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900">Users</h2>
-            <RouterLink to="/admin" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View</RouterLink>
+            <RouterLink v-if="isAdmin" to="/admin" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View</RouterLink>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-5">
             <div class="flex items-center gap-3 rounded-xl border border-gray-200 p-4">
@@ -725,7 +648,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
         <div class="bg-white rounded-lg shadow">
           <div class="p-5 border-b border-gray-200 flex items-center justify-between">
             <h2 class="text-base font-semibold text-gray-900">Recent Activity</h2>
-            <RouterLink to="/admin" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">Audit logs</RouterLink>
+            <RouterLink v-if="isAdmin" to="/admin" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">Audit logs</RouterLink>
           </div>
           <div class="divide-y divide-gray-100">
             <div v-if="recentActivity.length === 0" class="p-5 text-sm text-gray-500">No activity recorded yet.</div>
@@ -735,10 +658,10 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
               </div>
               <div class="min-w-0 flex-1">
                 <p class="text-sm text-gray-800 leading-snug">
-                  <span class="font-semibold text-gray-900">{{ users[log.userId as number] || `User #${log.userId}` }}</span>
+                  <span class="font-semibold text-gray-900">{{ activityActor(log, users) }}</span>
                   {{ activityMeta(log.action).verb }}
                 </p>
-                <p v-if="activityDetail(log)" class="text-xs text-gray-500 truncate mt-0.5">{{ activityDetail(log) }}</p>
+                <p v-if="activitySubLine(log, users)" class="text-xs text-gray-500 truncate mt-0.5">{{ activitySubLine(log, users) }}</p>
               </div>
               <span class="flex-none text-xs text-gray-400 whitespace-nowrap">{{ relativeTime(log.createdAt) }}</span>
             </div>

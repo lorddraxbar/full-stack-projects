@@ -66,10 +66,12 @@ public class ProjectController {
             @RequestParam(required = false) String search,
             Pageable pageable) {
         AuthUser actor = CurrentUser.require();
-        // Staff and clients are locked to their own company; admin sees all
-        // (may narrow with ?companyId=) — mirrors DocumentController's role model.
+        // Clients are locked to their own company; admin AND staff (USER) see all
+        // (may narrow with ?companyId=) — the staff dashboard mirrors the admin
+        // one, and staff already had cross-company read on documents/messages/team.
+        // Write paths (create/update) keep their own stricter owner checks.
         Long effectiveCompanyId = companyId;
-        if (!actor.isAdmin()) {
+        if (actor.isClient()) {
             if (companyId != null && !companyId.equals(actor.getCompanyId())) {
                 throw ApiException.forbidden("You can only view projects of your own company");
             }
@@ -146,7 +148,7 @@ public class ProjectController {
     public ResponseEntity<ProjectResponse> get(@PathVariable Long id) {
         AuthUser actor = CurrentUser.require();
         Project project = projectRepository.findById(id).orElseThrow(() -> ApiException.notFound("Project"));
-        requireVisibleTo(actor, project.getCompany().getId());
+        requireReadableBy(actor, project.getCompany().getId());
         return ResponseEntity.ok(ProjectResponse.from(project));
     }
 
@@ -251,6 +253,20 @@ public class ProjectController {
      *  mark it complete — that's the whole point of the submission email. */
     private void requireVisibleTo(AuthUser actor, Long companyId) {
         if (actor.isAdmin()) return;
+        if (companyId.equals(actor.getCompanyId())) return;
+        Company company = companyRepository.findById(companyId).orElse(null);
+        User rep = company == null ? null : company.getAuthorizedRep();
+        if (rep != null && rep.getId().equals(actor.id())) return;
+        throw ApiException.notFound("Project"); // 404, not 403 — don't reveal other companies' data
+    }
+
+    /** READ-level gate: admin + staff (USER) can read every project (the staff
+     *  dashboard mirrors the admin one); clients stay locked to their own
+     *  company (plus their company's authorized rep, same as writes). */
+    private void requireReadableBy(AuthUser actor, Long companyId) {
+        if (actor.isAdmin() || actor.isUserOrAdmin()) {
+            return; // staff & admin: cross-company reads
+        }
         if (companyId.equals(actor.getCompanyId())) return;
         Company company = companyRepository.findById(companyId).orElse(null);
         User rep = company == null ? null : company.getAuthorizedRep();

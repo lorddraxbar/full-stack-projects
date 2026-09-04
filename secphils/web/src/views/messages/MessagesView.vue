@@ -126,10 +126,12 @@ async function loadConversations() {
     // GET /users/me returns the UserResponse body directly (no envelope)
     me.value = meRes || null
     // Clients see only their own company's projects (their conversations).
-    // Full list: a page-capped fetch would hide a client's older
-    // conversations (the 20 newest by created_at only).
+    // Staff/admin see every project — the inbox mirrors the dashboard's
+    // cross-company read access. Full list: a page-capped fetch would hide
+    // a client's older conversations (the 20 newest by created_at only).
+    const isClientRole = (meRes as any)?.role === 'CLIENT'
     const page = await useGetProjects({
-      companyId: me.value?.companyId ?? undefined,
+      companyId: isClientRole ? (me.value?.companyId ?? undefined) : undefined,
       size: 10000,
     })
     const projects = Array.isArray(page) ? page : (page?.content ?? [])

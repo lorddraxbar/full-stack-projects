@@ -42,6 +42,11 @@ public class SecurityConfig {
                 // swagger + actuator
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
+                // audit-log READS are staff+admin — the staff dashboard mirrors the
+                // admin one and needs the Recent Activity feed. MUST sit BEFORE the
+                // /api/v1/admin/** catch-all (first-match-wins) — everything else
+                // under /admin/** (writes, settings, stats, roles, …) stays admin-only.
+                .requestMatchers(HttpMethod.GET, "/api/v1/admin/audit-logs").hasAnyRole("ADMIN", "USER")
                 // admin-only
                 .requestMatchers("/api/v1/admin/**", "/api/v1/roles/**", "/api/v1/permissions/**", "/api/v1/settings/**").hasRole("ADMIN")
                 // user management is admin-only (prevents a USER from creating/escalating admins)
