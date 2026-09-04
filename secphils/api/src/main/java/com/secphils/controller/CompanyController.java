@@ -59,7 +59,7 @@ public class CompanyController {
     @GetMapping
     @Transactional(readOnly = true)
     public ResponseEntity<List<CompanyResponse>> list() {
-        return ResponseEntity.ok(companyRepository.findAll().stream().map(CompanyResponse::from).toList());
+        return ResponseEntity.ok(companyRepository.findWithRep().stream().map(CompanyResponse::from).toList());
     }
 
     @PostMapping

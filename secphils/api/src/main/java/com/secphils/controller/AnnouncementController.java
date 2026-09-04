@@ -251,7 +251,7 @@ public class AnnouncementController {
                 throw ApiException.forbidden("Your account is not associated with a company");
             }
         }
-        List<Announcement> items = new ArrayList<>(announcementRepository.findByCompanyIdOrderByCreatedAtDesc(effective));
+        List<Announcement> items = new ArrayList<>(announcementRepository.findWithRefsByCompanyId(effective));
         if (audience != null && !audience.isBlank()) {
             items.removeIf(x -> !audience.equals(x.getAudience()));
         }

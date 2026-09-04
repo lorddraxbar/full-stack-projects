@@ -109,13 +109,13 @@ public class DocumentController {
 
         List<Document> docs;
         if (projectId != null) {
-            docs = documentRepository.findByProjectId(projectId);
+            docs = documentRepository.findWithRefsByProjectId(projectId);
         } else if (projectIds != null && !projectIds.isEmpty()) {
-            docs = documentRepository.findByProjectIdIn(projectIds);
+            docs = documentRepository.findWithRefsByProjectIdIn(projectIds);
         } else if (projectIds != null) {
             return ResponseEntity.ok(List.of()); // company with no projects yet
         } else {
-            docs = documentRepository.findAll();
+            docs = documentRepository.findWithRefs();
         }
 
         // Defense in depth: even when a filter was given, never leak a document
@@ -290,7 +290,7 @@ public class DocumentController {
         }
         // staff + admin read the full trash (write/restore/permanent still
         // stay own-company inside DocumentTrashService)
-        docs = documentRepository.findByDeletedAtIsNotNull();
+        docs = documentRepository.findWithRefsDeleted();
         return ResponseEntity.ok(docs.stream().map(DocumentResponse::from).toList());
     }
 
@@ -370,7 +370,7 @@ public class DocumentController {
             throw ApiException.notFound("Document");
         }
         return ResponseEntity.ok(
-                commentRepository.findByDocumentIdOrderByCreatedAtAsc(id).stream()
+                commentRepository.findWithRefsByDocumentId(id).stream()
                         .map(DocumentCommentResponse::from).toList());
     }
 

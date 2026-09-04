@@ -117,7 +117,7 @@ public class MessageController {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> ApiException.notFound("Project"));
         requireReadableBy(actor, project.getCompany().getId());
-        List<Message> rows = messageRepository.findByProjectIdOrderByCreatedAtAsc(projectId);
+        List<Message> rows = messageRepository.findWithRefsByProjectId(projectId);
         // Internal messages are invisible to CLIENT-role users — filtered
         // server-side so the client neither sees nor can infer them.
         if (actor.isClient()) {

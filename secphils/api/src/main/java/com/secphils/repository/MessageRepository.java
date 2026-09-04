@@ -63,4 +63,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
            nativeQuery = true)
     List<java.util.Map<String, Object>> countNonInternalPerProject(@org.springframework.data.repository.query.Param("projectIds")
                                                                     Collection<Long> projectIds);
+
+    @Query("select m from Message m left join fetch m.project left join fetch m.sender where m.project.id = :projectId order by m.createdAt asc")
+    List<Message> findWithRefsByProjectId(@org.springframework.data.repository.query.Param("projectId") Long projectId);
 }

@@ -48,11 +48,11 @@ public class ReviewController {
             @RequestParam(required = false) String status) {
         List<Review> items;
         if (projectId != null) {
-            items = reviewRepository.findByProjectId(projectId).map(List::of).orElse(List.of());
+            items = reviewRepository.findWithRefsByProjectId(projectId).map(List::of).orElse(List.of());
         } else if (status != null && !status.isBlank()) {
-            items = reviewRepository.findByStatus(status);
+            items = reviewRepository.findWithRefsByStatus(status);
         } else {
-            items = reviewRepository.findAll();
+            items = reviewRepository.findWithRefsAll();
         }
         return ResponseEntity.ok(items.stream().map(ReviewResponse::from).toList());
     }

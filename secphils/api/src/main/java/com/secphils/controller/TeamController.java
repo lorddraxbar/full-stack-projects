@@ -46,7 +46,7 @@ public class TeamController {
     public ResponseEntity<List<TeamMemberResponse>> list(@PathVariable Long projectId) {
         requireProject(projectId);
         return ResponseEntity.ok(
-                teamMemberRepository.findByProjectId(projectId).stream().map(TeamMemberResponse::from).toList());
+                teamMemberRepository.findWithRefsByProjectId(projectId).stream().map(TeamMemberResponse::from).toList());
     }
 
     @PostMapping

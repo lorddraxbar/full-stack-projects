@@ -99,11 +99,17 @@ public class ProjectController {
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
         Page<Project> projects = projectRepository.findAll(spec, page);
+        // The Specification query above leaves project.company / project.service
+        // lazy. Re-fetching the same page's ids with JOIN FETCH initialises those
+        // associations in this persistence context, so ProjectResponse.from()
+        // (which reads the company + service names) no longer fires one SELECT
+        // per row — the /projects N+1.
+        List<Long> pageIds = projects.getContent().stream().map(Project::getId).toList();
+        if (!pageIds.isEmpty()) projectRepository.findByPageIds(pageIds);
         // Latest message per project (for the "latest update" column) — one
         // query scoped to the page's project ids. CLIENT viewers use the
         // internal-excluding variant so a staff-only message can never leak
         // into a client-facing preview; staff/admin see the true latest.
-        List<Long> pageIds = projects.getContent().stream().map(Project::getId).toList();
         Map<Long, Message> latestByProject = pageIds.isEmpty()
                 ? Map.of()
                 : (actor.isClient()
