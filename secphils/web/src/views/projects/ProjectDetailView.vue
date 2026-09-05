@@ -784,8 +784,9 @@ async function saveProductionEdit() {
             </button>
             <button
               @click="markCompleted"
-              :disabled="completing"
-              class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
+              :disabled="completing || !hasProductionData"
+              :title="!hasProductionData ? 'Provide the production details first' : ''"
+              class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {{ completing ? 'Marking…' : 'Mark as completed' }}
             </button>
