@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,7 +9,7 @@ import NewProjectWizard from '@/components/NewProjectWizard.vue'
 import type { WizardData } from '@/components/NewProjectWizard.vue'
 import Pagination from '@/components/Pagination.vue'
 import { useRole } from '@/composables/useRole'
-import { useGetMe, useGetProjects, useCreateProject, useUpdateProject, useCreateCompany, useUpdateCompany, useUploadDocument } from '@/services/api'
+import { useGetMe, useGetProjects, useCreateProject, useUpdateProject, useCreateCompany, useUpdateCompany, useUploadDocument, useGetApiHealth, useGetLanding } from '@/services/api'
 import { projectStatusLabel, PROJECT_STATUS_COLORS, formatPhp, formatDate, formatDateTime, timeAgo } from '@/lib/labels'
 
 const { isClient } = useRole()
@@ -20,6 +20,31 @@ const showWizard = ref(false)
 const loading = ref(false)
 const loadError = ref('')
 const notice = ref('')
+
+// Dashboard-style header (greeting + live status pill) — mirrors DashboardView.
+const meFullName = ref('')
+const apiHealth = ref<'UP' | 'DOWN' | 'UNKNOWN'>('UNKNOWN')
+const maintenanceMode = ref(false)
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  const time = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening'
+  return `Good ${time}, ${(meFullName.value || '').split(' ')[0] || 'there'}`
+})
+const statusPill = computed(() => {
+  if (apiHealth.value === 'DOWN') return { text: 'API down — investigate', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' }
+  if (maintenanceMode.value) return { text: 'Maintenance mode is ON', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' }
+  if (apiHealth.value === 'UP') return { text: 'All systems operational', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' }
+  return { text: 'Checking system health…', cls: 'bg-gray-100 text-gray-600 border-gray-200', dot: 'bg-gray-400' }
+})
+let healthTimer: ReturnType<typeof setInterval> | null = null
+async function refreshSystemHealth() {
+  apiHealth.value = await useGetApiHealth()
+    .then(r => (r?.status === 'UP' || r?.status === 'DOWN') ? r.status as 'UP' | 'DOWN' : 'UNKNOWN')
+    .catch(() => 'UNKNOWN' as const)
+  await useGetLanding()
+    .then(l => { maintenanceMode.value = !!l?.maintenanceMode })
+    .catch(() => {})
+}
 
 // Client-side pagination over the full fetch (preserves the multi-field search).
 const page = ref(1)
@@ -89,15 +114,18 @@ async function loadProjects() {
 }
 
 async function init() {
-  if (isClient.value) {
-    try {
-      // GET /users/me returns the UserResponse body directly (no envelope).
-      const me = (await useGetMe()) as any
+  try {
+    // GET /users/me returns the UserResponse body directly (no envelope).
+    // Fetched for every role — the greeting header needs the user's name,
+    // and clients additionally need their company id for server-side scoping.
+    const me = (await useGetMe()) as any
+    meFullName.value = me?.fullName || ''
+    if (isClient.value) {
       if (me?.companyId != null) meCompanyId.value = me.companyId
       else noCompany.value = true
-    } catch {
-      noCompany.value = true
     }
+  } catch {
+    if (isClient.value) noCompany.value = true
   }
   await loadProjects()
 }
@@ -113,7 +141,6 @@ const statusOptions = [
 
 const statusColors: Record<string, string> = PROJECT_STATUS_COLORS
 
-const heading = computed(() => (isClient.value ? 'My Projects' : 'All Projects'))
 const subheading = computed(() =>
   isClient.value
     ? 'Projects assigned to your company.'
@@ -260,19 +287,32 @@ const handleWizardSubmit = async (data: WizardData) => {
   }
 }
 
-onMounted(init)
+onMounted(() => {
+  init()
+  refreshSystemHealth()
+  healthTimer = setInterval(refreshSystemHealth, 5 * 60 * 1000)
+})
+onBeforeUnmount(() => {
+  if (healthTimer) clearInterval(healthTimer)
+})
 </script>
 
 <template>
   <div>
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+    <div class="flex items-start justify-between mb-6 gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">{{ heading }}</h1>
+        <h1 class="text-2xl font-bold text-gray-900">{{ greeting }}</h1>
         <p class="text-gray-600 mt-1">{{ subheading }}</p>
       </div>
-      <Button v-if="!isClient" @click="showWizard = true">
-        + New Project
-      </Button>
+      <div class="flex items-center gap-3">
+        <span class="mt-1 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold" :class="statusPill.cls">
+          <span class="h-2 w-2 rounded-full" :class="statusPill.dot"></span>
+          {{ statusPill.text }}
+        </span>
+        <Button v-if="!isClient" @click="showWizard = true">
+          + New Project
+        </Button>
+      </div>
     </div>
 
     <div v-if="loadError" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">

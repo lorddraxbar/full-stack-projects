@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
 import { useRole } from '@/composables/useRole'
 import {
   useGetMe, useGetProjects,
@@ -8,14 +7,10 @@ import {
   useGetDocuments, useGetTrashDocuments,
 } from '@/services/api'
 import {
-  projectStatusLabel,
-  PROJECT_STATUS_COLORS,
-  formatDate, formatDateTime, formatFileSize,
+  formatDate, formatFileSize,
 } from '@/lib/labels'
 
-const { isClient, isAdmin } = useRole()
-const isUser = computed(() => !isClient.value && !isAdmin.value)
-const router = useRouter()
+const { isAdmin } = useRole()
 
 interface ProjectRow {
   id: number
@@ -23,23 +18,10 @@ interface ProjectRow {
   companyName: string | null
   serviceName: string | null
   status: string
-  statusLabel: string
   progress: number
-  messageCount: number
-}
-
-interface MessageRow {
-  id: number
-  projectId: number | null
-  projectName: string
-  senderName: string | null
-  body: string
-  createdAt: string
 }
 
 const me = ref<{ id: number; fullName: string; role: string } | null>(null)
-const projects = ref<ProjectRow[]>([])
-const messages = ref<MessageRow[]>([])
 const companies = ref<{ id: number; name: string }[]>([])
 const auditLogs = ref<{ id: number; userId: number | string; action: string; entityType: string; details: string; createdAt: string }[]>([])
 const users = ref<Record<number, string>>({})
@@ -85,9 +67,7 @@ function mapProject(p: any): ProjectRow {
     companyName: p.companyName ?? null,
     serviceName: p.serviceName ?? null,
     status: p.status,
-    statusLabel: projectStatusLabel(p.status),
     progress: p.progress ?? 0,
-    messageCount: p.messageCount ?? 0,
   }
 }
 
@@ -95,66 +75,37 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    // size 10000: the /projects default page (20) would silently cap every
-    // client + staff count on this dashboard (older projects vanish) — same
-    // trap as the admin card, fixed once here for the shared first fetch.
-    const [meRes, projRes] = await Promise.all([
-      useGetMe(), useGetProjects({ size: 10000 }),
-    ])
     // GET /users/me returns the UserResponse body directly (no envelope).
-    me.value = meRes || null
-    const projContent = Array.isArray(projRes) ? projRes : projRes?.content ?? []
-    projects.value = projContent.map(mapProject)
-
-    // The "Latest Updates" feed needs only each project's newest message —
-    // which /projects already carries batched (latestUpdate*), so build it from
-    // that instead of one /messages?projectId= round-trip per project (the old
-    // N+1 that made the dashboard feel slow on login).
-    const feedRows: MessageRow[] = []
-    for (const p of projects.value) {
-      const src = projContent.find((x: any) => x.id === p.id)
-      if (src && src.latestUpdateAt) {
-        feedRows.push({
-          id: p.id,
-          projectId: p.id,
-          projectName: p.name,
-          senderName: src.latestUpdateSender ?? null,
-          body: src.latestUpdateBody ?? '',
-          createdAt: src.latestUpdateAt,
-        })
-      }
-    }
-    feedRows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    messages.value = feedRows
+    me.value = (await useGetMe()) || null
 
     // Provider staff (USER) mirror the admin dashboard — same tiles, same data:
     // staff have cross-company READ access (projects/documents/messages/audit),
     // so every number below resolves for them exactly as it does for ADMIN.
-    if (isAdmin.value || isUser.value) {
-      const [compRes, auditRes, usersRes, docsRes, trashRes, projRes2] = await Promise.all([
-        useGetCompanies().catch(() => []),
-        useGetAuditLogs({ page: 0, size: 20 }).catch(() => ({ content: [] })),
-        useGetUsers().catch(() => []),
-        // Full, unpaginated lists (admin scope = every company) → true counts.
-        useGetDocuments().catch(() => []),
-        useGetTrashDocuments().catch(() => []),
-        // A large explicit size so the Projects card counts every project, not
-        // just the first default page (20) the dashboard feed above fetched.
-        useGetProjects({ size: 10000 }).catch(() => []),
-      ])
-      companies.value = (Array.isArray(compRes) ? compRes : []).map((c: any) => ({ id: c.id, name: c.name }))
-      // Audit endpoint now returns a paged envelope { content, total, page, size }.
-      auditLogs.value = (auditRes as any)?.content ?? []
-      const userList = Array.isArray(usersRes) ? usersRes : []
-      allUsers.value = userList.map((u: any) => ({ id: u.id, role: u.role, isActive: !!u.isActive }))
-      const userMap: Record<number, string> = {}
-      for (const u of userList) userMap[u.id] = u.fullName
-      users.value = userMap
-      allDocs.value = (Array.isArray(docsRes) ? docsRes : []).map((d: any) => ({ fileSize: d.fileSize ?? null }))
-      trashedDocs.value = (Array.isArray(trashRes) ? trashRes : []).map((d: any) => ({ id: d.id }))
-      const projContent2 = Array.isArray(projRes2) ? projRes2 : (projRes2 as any)?.content ?? []
-      allProjects.value = projContent2.map(mapProject)
-    }
+    // (Clients can no longer reach this view — /dashboard is staff/admin-only
+    // since the client dashboard was removed.)
+    const [compRes, auditRes, usersRes, docsRes, trashRes, projRes] = await Promise.all([
+      useGetCompanies().catch(() => []),
+      useGetAuditLogs({ page: 0, size: 20 }).catch(() => ({ content: [] })),
+      useGetUsers().catch(() => []),
+      // Full, unpaginated lists (admin scope = every company) → true counts.
+      useGetDocuments().catch(() => []),
+      useGetTrashDocuments().catch(() => []),
+      // A large explicit size so the Projects card counts every project, not
+      // just the first default page (20).
+      useGetProjects({ size: 10000 }).catch(() => []),
+    ])
+    companies.value = (Array.isArray(compRes) ? compRes : []).map((c: any) => ({ id: c.id, name: c.name }))
+    // Audit endpoint now returns a paged envelope { content, total, page, size }.
+    auditLogs.value = (auditRes as any)?.content ?? []
+    const userList = Array.isArray(usersRes) ? usersRes : []
+    allUsers.value = userList.map((u: any) => ({ id: u.id, role: u.role, isActive: !!u.isActive }))
+    const userMap: Record<number, string> = {}
+    for (const u of userList) userMap[u.id] = u.fullName
+    users.value = userMap
+    allDocs.value = (Array.isArray(docsRes) ? docsRes : []).map((d: any) => ({ fileSize: d.fileSize ?? null }))
+    trashedDocs.value = (Array.isArray(trashRes) ? trashRes : []).map((d: any) => ({ id: d.id }))
+    const projContent = Array.isArray(projRes) ? projRes : (projRes as any)?.content ?? []
+    allProjects.value = projContent.map(mapProject)
   } catch (err: any) {
     loadError.value = err?.response?.data?.message || err?.message || 'Failed to load dashboard data'
   } finally {
@@ -188,18 +139,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (healthTimer) clearInterval(healthTimer)
 })
-
-// ---------- Client ----------
-const clientStats = computed(() => ({
-  assignedProjects: projects.value.length,
-  inProgress: projects.value.filter(p => p.status === 'IN_PROGRESS').length,
-  notStarted: projects.value.filter(p => p.status === 'NOT_STARTED').length,
-  completed: projects.value.filter(p => p.status === 'COMPLETED').length,
-}))
-const clientProjects = computed(() =>
-  [...projects.value].sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0)).slice(0, 5)
-)
-const latestUpdates = computed(() => messages.value.slice(0, 3))
 
 // ---------- Staff + Admin ----------
 // totalCompanies is the top-row tile; it counts the `companies` table (client
@@ -365,15 +304,13 @@ const statusPill = computed(() => {
   if (apiHealth.value === 'UP') return { text: 'All systems operational', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' }
   return { text: 'Checking system health…', cls: 'bg-gray-100 text-gray-600 border-gray-200', dot: 'bg-gray-400' }
 })
-
-const goToProject = (id: number) => router.push(`/projects/${id}`)
 </script>
 
 <template>
   <div>
-    <!-- The client dashboard template below carries its own header (title +
-         status pill); staff + admin share the greeting + status-pill header
-         in their shared dashboard template. No standalone generic header. -->
+    <!-- Staff + admin share the greeting + status-pill header below. The
+         client dashboard was removed (2026-09-05) — /dashboard is
+         staff/admin-only, routed via meta roles in the router. -->
     <div v-if="loading" class="flex items-center justify-center py-20">
       <svg class="animate-spin h-8 w-8 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -384,102 +321,6 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
     <div v-else-if="loadError" class="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
       {{ loadError }}
     </div>
-
-    <!-- ================= CLIENT DASHBOARD ================= -->
-    <template v-else-if="isClient">
-      <div class="flex items-start justify-between mb-6">
-        <div>
-          <h1 class="text-2xl font-bold text-gray-900">{{ greeting }}</h1>
-          <p class="text-gray-600 mt-1">Your projects and latest updates from your consultants.</p>
-        </div>
-        <span class="mt-1 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold" :class="statusPill.cls">
-          <span class="h-2 w-2 rounded-full" :class="statusPill.dot"></span>
-          {{ statusPill.text }}
-        </span>
-      </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-600">Assigned Projects</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ clientStats.assignedProjects }}</p>
-            </div>
-            <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-folder-open text-emerald-600 text-xl"></i>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-600">In Progress</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ clientStats.inProgress }}</p>
-            </div>
-            <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-spinner text-yellow-600 text-xl"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white rounded-lg shadow">
-          <div class="p-6 border-b border-gray-200 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-900">Your Projects</h2>
-            <RouterLink to="/projects" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View all</RouterLink>
-          </div>
-          <div class="divide-y divide-gray-200">
-            <div v-if="clientProjects.length === 0" class="p-6 text-sm text-gray-500">
-              No projects yet.
-            </div>
-            <div
-              v-for="project in clientProjects"
-              :key="project.id"
-              @click="goToProject(project.id)"
-              class="p-5 hover:bg-gray-50 transition-colors cursor-pointer"
-            >
-              <div class="flex items-center justify-between mb-2">
-                <div class="min-w-0 pr-3">
-                  <h3 class="font-medium text-gray-900 truncate">{{ project.name }}</h3>
-                  <p class="text-xs text-gray-500 mt-0.5">{{ project.serviceName || '—' }}</p>
-                </div>
-                <span class="shrink-0 px-2 py-1 text-xs font-medium rounded-full" :class="PROJECT_STATUS_COLORS[project.statusLabel]">
-                  {{ project.statusLabel }}
-                </span>
-              </div>
-              <div class="h-2 bg-gray-100 rounded-full overflow-hidden mt-1">
-                <div class="h-full bg-emerald-500 rounded-full" :style="{ width: Math.min(100, project.progress ?? 0) + '%' }"></div>
-              </div>
-              <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
-                <span>{{ (project.progress ?? 0) > 0 ? `${project.progress}% complete` : 'Not started yet' }}</span>
-                <span><i class="fa-regular fa-message mr-1"></i>{{ project.messageCount }} {{ project.messageCount === 1 ? 'update' : 'updates' }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow">
-          <div class="p-6 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Latest Updates</h2>
-          </div>
-          <div class="p-6">
-            <div v-if="latestUpdates.length === 0" class="text-sm text-gray-500">
-              No updates yet.
-            </div>
-            <div v-else class="relative">
-              <div class="absolute left-3 top-1 bottom-1 w-px bg-gray-200" />
-              <div v-for="update in latestUpdates" :key="update.id" class="relative pl-10 pb-6 last:pb-0">
-                <span class="absolute left-1.5 top-1 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-100" />
-                <p class="text-xs text-gray-500">{{ formatDateTime(update.createdAt) }} &middot; {{ update.senderName || 'SECPhils' }}</p>
-                <p class="text-sm font-medium text-gray-900 mt-0.5">{{ update.projectName }}</p>
-                <p class="text-sm text-gray-600 mt-1">{{ update.body }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </template>
 
     <!-- ================= STAFF + ADMIN DASHBOARD ================= -->
     <!-- USER (provider staff) is intentionally identical to ADMIN: same tiles,

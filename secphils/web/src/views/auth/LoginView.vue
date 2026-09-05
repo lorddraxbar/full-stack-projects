@@ -53,7 +53,10 @@ function storeSession(data: any) {
 }
 
 function finishLogin() {
-  const redirect = (router.currentRoute.value.query.redirect as string) || '/dashboard'
+  const role = localStorage.getItem('userRole')
+  const redirect =
+    (router.currentRoute.value.query.redirect as string) ||
+    (role === 'CLIENT' ? '/projects' : '/dashboard')
   router.push(redirect)
 }
 

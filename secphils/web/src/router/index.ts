@@ -57,6 +57,9 @@ const routes: RouteRecordRaw[] = [
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/DashboardView.vue'),
+        // Client dashboard removed (2026-09-05) — /dashboard is now staff/admin
+        // only; the roles guard below routes CLIENT to their default page.
+        meta: { roles: ['USER', 'ADMIN'] },
       },
       {
         path: 'projects',
@@ -115,22 +118,29 @@ const router = createRouter({
   routes,
 })
 
+// Clients have no dashboard anymore — their landing page is /projects.
+// Staff (USER) and ADMIN keep /dashboard. Used by every auth-guard bounce.
+function homeFor(role: string | null): string {
+  return role === 'CLIENT' ? '/projects' : '/dashboard'
+}
+
 router.beforeEach((to, _from, next) => {
   const token = localStorage.getItem('accessToken')
   const userRole = localStorage.getItem('userRole')
 
   if (to.name === 'MarketingLanding' && token) {
-    next({ name: 'Dashboard' })
+    next({ path: homeFor(userRole) })
   } else if (to.meta.requiresAuth && !token) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
   } else if (to.meta.guest && token) {
-    next({ name: 'Dashboard' })
+    next({ path: homeFor(userRole) })
   } else if (to.meta.requiresAdmin && userRole !== 'ADMIN') {
-    next({ name: 'Dashboard' })
+    next({ path: homeFor(userRole) })
   } else if (to.meta.roles && (!userRole || !to.meta.roles.includes(userRole))) {
-    // Staff-only pages (Reviews): a missing or non-matching role
-    // lands on the dashboard rather than on a page it shouldn't see.
-    next({ name: 'Dashboard' })
+    // Staff-only pages (Reviews, and now Dashboard): a missing or
+    // non-matching role lands on the role's default page rather than on
+    // a page it shouldn't see.
+    next({ path: homeFor(userRole) })
   } else {
     next()
   }

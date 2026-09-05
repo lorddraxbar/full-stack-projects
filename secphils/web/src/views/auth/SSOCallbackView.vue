@@ -55,7 +55,10 @@ onMounted(async () => {
     }
 
     storeSession(data)
-    const redirect = (router.currentRoute.value.query.redirect as string) || '/dashboard'
+    const role = localStorage.getItem('userRole')
+    const redirect =
+      (router.currentRoute.value.query.redirect as string) ||
+      (role === 'CLIENT' ? '/projects' : '/dashboard')
     router.push(redirect)
   } catch (err: any) {
     error.value = err?.response?.data?.message || err.message || 'Google sign-in failed'

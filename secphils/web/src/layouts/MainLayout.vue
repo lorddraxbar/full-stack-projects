@@ -10,7 +10,7 @@ const { brand } = useBrand()
 const router = useRouter()
 
 const allNavItems = [
-  { name: 'Dashboard', path: '/dashboard', icon: 'fas fa-chart-bar', roles: ['CLIENT', 'USER', 'ADMIN'] },
+  { name: 'Dashboard', path: '/dashboard', icon: 'fas fa-chart-bar', roles: ['USER', 'ADMIN'] },
   { name: 'Projects', path: '/projects', icon: 'fas fa-folder', roles: ['CLIENT', 'USER', 'ADMIN'] },
   { name: 'Documents', path: '/documents', icon: 'fas fa-file-alt', roles: ['CLIENT', 'USER', 'ADMIN'] },
   { name: 'Messages', path: '/messages', icon: 'fas fa-comment-dots', roles: ['CLIENT', 'USER', 'ADMIN'] },
@@ -49,7 +49,8 @@ const notifRoute = (n: Notif) => {
     case 'Announcement': return '/announcements'
     case 'Message': return '/messages'
     case 'Project': return '/projects'
-    default: return '/dashboard'
+    // Clients have no dashboard; send unknown types to their landing page.
+    default: return role.value === 'CLIENT' ? '/projects' : '/dashboard'
   }
 }
 
