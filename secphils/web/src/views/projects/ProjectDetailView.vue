@@ -414,6 +414,15 @@ function startProductionEdit() {
   productionError.value = ''
   editingProduction.value = true
 }
+
+// Review-card affordance: jump straight into the Production editor (same
+// path the /projects/{id}?edit=1 deep-link takes). This is what lets the
+// authorized rep actually complete the required project details instead of
+// being stuck with a read-only checklist next to the complete button.
+function openProductionEditFromReview() {
+  activeTab.value = 'Production'
+  startProductionEdit()
+}
 function cancelProductionEdit() {
   editingProduction.value = false
 }
@@ -753,14 +762,26 @@ async function saveProductionEdit() {
              The card + editing both live on the Administration tab. -->
 
         <!-- Authorized-rep review card: the customer's rep reviews a
-             submitted project and marks it complete (notifies the team). -->
+             submitted project and marks it complete (notifies the team). The
+             secondary action jumps into the Production editor so the rep can
+             actually complete the required project details first. -->
         <div v-if="isAuthorizedRep && project.status !== 'COMPLETED'" class="bg-emerald-50 border border-emerald-200 rounded-lg shadow p-6 mb-6">
           <h2 class="text-lg font-semibold text-gray-900 mb-1">Review &amp; complete this project</h2>
-          <p class="text-sm text-gray-600 mb-4">
+          <p class="text-sm text-gray-600 mb-1">
             You're the authorized representative for {{ company?.name || 'this customer' }}. Check the project
             details and production checklist, then mark it complete when everything looks right.
           </p>
-          <div class="flex items-center gap-3">
+          <p v-if="!hasProductionData" class="text-sm text-amber-700">
+            <i class="fas fa-circle-exclamation mr-1" />Some production details are still missing — complete them before marking the project done.
+          </p>
+          <div class="flex flex-wrap items-center gap-3 mt-4">
+            <button
+              @click="openProductionEditFromReview"
+              class="inline-flex items-center gap-2 border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+            >
+              <i class="fas fa-pencil" />
+              {{ hasProductionData ? 'Edit production details' : 'Complete the production details' }}
+            </button>
             <button
               @click="markCompleted"
               :disabled="completing"
@@ -815,11 +836,12 @@ async function saveProductionEdit() {
 
       <!-- ================= PRODUCTION (wizard checklist) ================= -->
       <div v-if="activeTab === 'Production'" class="space-y-6">
-        <!-- Header + Edit toggle (staff only; clients are read-only) -->
+        <!-- Header + Edit toggle (staff, or the authorized rep completing the
+          project's required details; other clients stay read-only) -->
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold text-gray-900">Production Details</h2>
           <button
-            v-if="!isClient && !editingProduction"
+            v-if="(!isClient || isAuthorizedRep) && !editingProduction"
             @click="startProductionEdit"
             class="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
           >
@@ -833,14 +855,16 @@ async function saveProductionEdit() {
             <p class="text-sm text-gray-500">
               No production details captured for this project yet — they can be completed later from this page.
             </p>
-            <p v-if="!isClient" class="text-sm text-gray-500 mt-2">
+            <p v-if="!isClient || isAuthorizedRep" class="text-sm text-gray-500 mt-2">
               <i class="fas fa-lightbulb mr-1" />Use the Edit button to fill them in.
             </p>
           </div>
 
           <div v-else class="space-y-6">
-            <!-- Total project cost -->
-            <div v-if="!isClient && project.totalCost != null" class="bg-white rounded-lg shadow p-6">
+            <!-- Total project cost — shown to staff and to the authorized rep (they
+              complete/verify these details; the read-only view for other
+              clients stays staff-hidden) -->
+            <div v-if="(!isClient || isAuthorizedRep) && project.totalCost != null" class="bg-white rounded-lg shadow p-6">
               <h2 class="text-sm font-medium text-gray-500 uppercase mb-1">Total Project Cost</h2>
               <p class="text-2xl font-bold text-gray-900">{{ formatPhp(project.totalCost) }}</p>
             </div>
