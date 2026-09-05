@@ -399,13 +399,9 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
 
 <template>
   <div>
-    <!-- Generic page header (clients keep theirs; staff + admin share the
-         greeting + status-pill header in their shared dashboard below) -->
-    <div v-if="isClient" class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Client Dashboard</h1>
-      <p class="text-gray-600 mt-1">Your projects and latest updates from your consultants.</p>
-    </div>
-
+    <!-- The client dashboard template below carries its own header (title +
+         status pill); staff + admin share the greeting + status-pill header
+         in their shared dashboard template. No standalone generic header. -->
     <div v-if="loading" class="flex items-center justify-center py-20">
       <svg class="animate-spin h-8 w-8 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
