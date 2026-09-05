@@ -5,7 +5,7 @@ import { useRole } from '@/composables/useRole'
 import {
   useGetMe, useGetProjects,
   useGetAuditLogs, useGetCompanies, useGetUsers, useGetApiHealth, useGetLanding,
-  useGetDocuments, useGetTrashDocuments, useGetNotifications,
+  useGetDocuments, useGetTrashDocuments,
 } from '@/services/api'
 import {
   projectStatusLabel,
@@ -40,7 +40,6 @@ interface MessageRow {
 const me = ref<{ id: number; fullName: string; role: string } | null>(null)
 const projects = ref<ProjectRow[]>([])
 const messages = ref<MessageRow[]>([])
-const notifications = ref<{ isRead: boolean; title?: string }[]>([])
 const companies = ref<{ id: number; name: string }[]>([])
 const auditLogs = ref<{ id: number; userId: number | string; action: string; entityType: string; details: string; createdAt: string }[]>([])
 const users = ref<Record<number, string>>({})
@@ -99,15 +98,13 @@ async function load() {
     // size 10000: the /projects default page (20) would silently cap every
     // client + staff count on this dashboard (older projects vanish) — same
     // trap as the admin card, fixed once here for the shared first fetch.
-    const [meRes, projRes, notifRes] = await Promise.all([
+    const [meRes, projRes] = await Promise.all([
       useGetMe(), useGetProjects({ size: 10000 }),
-      useGetNotifications().catch(() => []),
     ])
     // GET /users/me returns the UserResponse body directly (no envelope).
     me.value = meRes || null
     const projContent = Array.isArray(projRes) ? projRes : projRes?.content ?? []
     projects.value = projContent.map(mapProject)
-    notifications.value = Array.isArray(notifRes) ? notifRes : []
 
     // The "Latest Updates" feed needs only each project's newest message —
     // which /projects already carries batched (latestUpdate*), so build it from
@@ -198,7 +195,6 @@ const clientStats = computed(() => ({
   inProgress: projects.value.filter(p => p.status === 'IN_PROGRESS').length,
   notStarted: projects.value.filter(p => p.status === 'NOT_STARTED').length,
   completed: projects.value.filter(p => p.status === 'COMPLETED').length,
-  unreadUpdates: notifications.value.filter(n => !n.isRead).length,
 }))
 const clientProjects = computed(() =>
   [...projects.value].sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0)).slice(0, 5)
@@ -426,7 +422,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
         </span>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between">
             <div>
@@ -446,17 +442,6 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
             </div>
             <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
               <i class="fas fa-spinner text-yellow-600 text-xl"></i>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-600">Unread Updates</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ clientStats.unreadUpdates }}</p>
-            </div>
-            <div class="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center">
-              <i class="fa-regular fa-comment-dots text-emerald-600 text-xl"></i>
             </div>
           </div>
         </div>
