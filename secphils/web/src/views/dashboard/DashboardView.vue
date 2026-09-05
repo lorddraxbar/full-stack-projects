@@ -417,7 +417,7 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
     <template v-else-if="isClient">
       <div class="flex items-start justify-between mb-6">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Client Dashboard</h1>
+          <h1 class="text-2xl font-bold text-gray-900">{{ greeting }}</h1>
           <p class="text-gray-600 mt-1">Your projects and latest updates from your consultants.</p>
         </div>
         <span class="mt-1 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold" :class="statusPill.cls">
