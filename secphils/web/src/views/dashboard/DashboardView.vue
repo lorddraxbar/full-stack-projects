@@ -201,30 +201,6 @@ const clientProjects = computed(() =>
 )
 const latestUpdates = computed(() => messages.value.slice(0, 3))
 
-// Client project-health donut — same SVG ring math as the admin card, driven
-// by the client's own full (size 10000) project list.
-const clientRing = computed(() => {
-  const defs = [
-    { status: 'IN_PROGRESS', label: 'In progress', color: '#059669' },
-    { status: 'NOT_STARTED', label: 'Not started', color: '#d1d5db' },
-    { status: 'COMPLETED', label: 'Completed', color: '#5eead4' },
-    { status: 'ARCHIVED', label: 'Archived', color: '#f43f5e' },
-  ]
-  const total = projects.value.length || 1
-  let acc = 0
-  return defs.map(d => {
-    const value = projects.value.filter(p => p.status === d.status).length
-    const frac = value / total
-    const seg = {
-      label: d.label, color: d.color, value,
-      dash: `${frac * RING_C} ${RING_C - frac * RING_C}`,
-      offset: `${-acc * RING_C}`,
-    }
-    acc += frac
-    return seg
-  })
-})
-
 // ---------- Staff + Admin ----------
 // totalCompanies is the top-row tile; it counts the `companies` table (client
 // companies SECPhils serves) — distinct from client *user* accounts (Users card).
@@ -499,36 +475,6 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
                 <p class="text-sm font-medium text-gray-900 mt-0.5">{{ update.projectName }}</p>
                 <p class="text-sm text-gray-600 mt-1">{{ update.body }}</p>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-lg shadow mt-6">
-        <h2 class="text-lg font-semibold text-gray-900 p-6 border-b border-gray-200">Overall Project Health</h2>
-        <div class="p-6 flex items-center justify-center gap-10 flex-wrap">
-          <div class="relative w-40 h-40">
-            <svg class="-rotate-90" width="160" height="160" viewBox="0 0 160 160">
-              <circle cx="80" cy="80" r="63" fill="none" stroke="#f1f1f1" stroke-width="16" />
-              <circle
-                v-for="seg in clientRing.filter(s => s.value > 0)"
-                :key="seg.label"
-                cx="80" cy="80" r="63" fill="none"
-                :stroke="seg.color" stroke-width="16"
-                :stroke-dasharray="seg.dash"
-                :stroke-dashoffset="seg.offset"
-              />
-            </svg>
-            <div class="absolute inset-0 flex flex-col items-center justify-center">
-              <span class="text-3xl font-extrabold text-gray-900">{{ projects.length }}</span>
-              <span class="text-xs text-gray-500">projects</span>
-            </div>
-          </div>
-          <div class="flex flex-col gap-2.5">
-            <div v-for="seg in clientRing" :key="seg.label" class="flex items-center gap-2 text-sm">
-              <span class="w-3 h-3 rounded" :style="{ background: seg.color }"></span>
-              <span class="text-gray-600">{{ seg.label }}</span>
-              <span class="ml-auto font-semibold text-gray-500">{{ seg.value }}</span>
             </div>
           </div>
         </div>
