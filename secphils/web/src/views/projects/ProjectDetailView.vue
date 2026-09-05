@@ -70,6 +70,24 @@ const hasProductionData = computed(() => {
   )
 })
 
+// The authorized rep can only mark a project complete once the FULL
+// production checklist is provided — total cost plus every editable
+// section (raw materials, production output, waste management practices,
+// waste types, manufacturing procedure). The flowchart is intentionally
+// NOT part of this gate: it's an attached document (optional upload),
+// not a checklist field.
+const productionChecklistComplete = computed(() => {
+  const p = project.value
+  if (!p) return false
+  if (p.totalCost == null) return false
+  if ((p.wasteManagement || '').trim() === '') return false
+  if ((p.manufacturingProcedure || '').trim() === '') return false
+  if (!rawMaterials.value || rawMaterials.value.length === 0) return false
+  if (!productionOutput.value || productionOutput.value.length === 0) return false
+  if (!wasteMaterials.value || wasteMaterials.value.length === 0) return false
+  return true
+})
+
 function initials(name: string): string {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
 }
@@ -771,8 +789,8 @@ async function saveProductionEdit() {
             You're the authorized representative for {{ company?.name || 'this customer' }}. Check the project
             details and production checklist, then mark it complete when everything looks right.
           </p>
-          <p v-if="!hasProductionData" class="text-sm text-amber-700">
-            <i class="fas fa-circle-exclamation mr-1" />Some production details are still missing — complete them before marking the project done.
+          <p v-if="!productionChecklistComplete" class="text-sm text-amber-700">
+            <i class="fas fa-circle-exclamation mr-1" />All production details are required before this project can be completed — fill in every section first.
           </p>
           <div class="flex flex-wrap items-center gap-3 mt-4">
             <button
@@ -780,12 +798,12 @@ async function saveProductionEdit() {
               class="inline-flex items-center gap-2 border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-4 py-2 rounded-lg transition-colors text-sm font-medium"
             >
               <i class="fas fa-pencil" />
-              {{ hasProductionData ? 'Edit production details' : 'Complete the production details' }}
+              {{ productionChecklistComplete ? 'Edit production details' : 'Complete the production details' }}
             </button>
             <button
               @click="markCompleted"
-              :disabled="completing || !hasProductionData"
-              :title="!hasProductionData ? 'Provide the production details first' : ''"
+              :disabled="completing || !productionChecklistComplete"
+              :title="!productionChecklistComplete ? 'Complete all the production details first' : ''"
               class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {{ completing ? 'Marking…' : 'Mark as completed' }}
