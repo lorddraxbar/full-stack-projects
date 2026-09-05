@@ -143,7 +143,7 @@ const statusColors: Record<string, string> = PROJECT_STATUS_COLORS
 
 const subheading = computed(() =>
   isClient.value
-    ? 'Projects assigned to your company.'
+    ? 'Your company projects.'
     : 'Manage and track all your projects.'
 )
 
