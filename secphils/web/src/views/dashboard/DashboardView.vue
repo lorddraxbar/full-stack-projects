@@ -5,7 +5,7 @@ import { useRole } from '@/composables/useRole'
 import {
   useGetMe, useGetProjects,
   useGetAuditLogs, useGetCompanies, useGetUsers, useGetApiHealth, useGetLanding,
-  useGetDocuments, useGetTrashDocuments,
+  useGetDocuments, useGetTrashDocuments, useGetNotifications,
 } from '@/services/api'
 import {
   projectStatusLabel,
@@ -25,6 +25,7 @@ interface ProjectRow {
   status: string
   statusLabel: string
   progress: number
+  messageCount: number
 }
 
 interface MessageRow {
@@ -39,6 +40,7 @@ interface MessageRow {
 const me = ref<{ id: number; fullName: string; role: string } | null>(null)
 const projects = ref<ProjectRow[]>([])
 const messages = ref<MessageRow[]>([])
+const notifications = ref<{ isRead: boolean; title?: string }[]>([])
 const companies = ref<{ id: number; name: string }[]>([])
 const auditLogs = ref<{ id: number; userId: number | string; action: string; entityType: string; details: string; createdAt: string }[]>([])
 const users = ref<Record<number, string>>({})
@@ -86,6 +88,7 @@ function mapProject(p: any): ProjectRow {
     status: p.status,
     statusLabel: projectStatusLabel(p.status),
     progress: p.progress ?? 0,
+    messageCount: p.messageCount ?? 0,
   }
 }
 
@@ -93,13 +96,18 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const [meRes, projRes] = await Promise.all([
-      useGetMe(), useGetProjects(),
+    // size 10000: the /projects default page (20) would silently cap every
+    // client + staff count on this dashboard (older projects vanish) — same
+    // trap as the admin card, fixed once here for the shared first fetch.
+    const [meRes, projRes, notifRes] = await Promise.all([
+      useGetMe(), useGetProjects({ size: 10000 }),
+      useGetNotifications().catch(() => []),
     ])
     // GET /users/me returns the UserResponse body directly (no envelope).
     me.value = meRes || null
     const projContent = Array.isArray(projRes) ? projRes : projRes?.content ?? []
     projects.value = projContent.map(mapProject)
+    notifications.value = Array.isArray(notifRes) ? notifRes : []
 
     // The "Latest Updates" feed needs only each project's newest message —
     // which /projects already carries batched (latestUpdate*), so build it from
@@ -188,11 +196,38 @@ onBeforeUnmount(() => {
 const clientStats = computed(() => ({
   assignedProjects: projects.value.length,
   inProgress: projects.value.filter(p => p.status === 'IN_PROGRESS').length,
+  notStarted: projects.value.filter(p => p.status === 'NOT_STARTED').length,
+  completed: projects.value.filter(p => p.status === 'COMPLETED').length,
+  unreadUpdates: notifications.value.filter(n => !n.isRead).length,
 }))
 const clientProjects = computed(() =>
   [...projects.value].sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0)).slice(0, 5)
 )
 const latestUpdates = computed(() => messages.value.slice(0, 3))
+
+// Client project-health donut — same SVG ring math as the admin card, driven
+// by the client's own full (size 10000) project list.
+const clientRing = computed(() => {
+  const defs = [
+    { status: 'IN_PROGRESS', label: 'In progress', color: '#059669' },
+    { status: 'NOT_STARTED', label: 'Not started', color: '#d1d5db' },
+    { status: 'COMPLETED', label: 'Completed', color: '#5eead4' },
+    { status: 'ARCHIVED', label: 'Archived', color: '#f43f5e' },
+  ]
+  const total = projects.value.length || 1
+  let acc = 0
+  return defs.map(d => {
+    const value = projects.value.filter(p => p.status === d.status).length
+    const frac = value / total
+    const seg = {
+      label: d.label, color: d.color, value,
+      dash: `${frac * RING_C} ${RING_C - frac * RING_C}`,
+      offset: `${-acc * RING_C}`,
+    }
+    acc += frac
+    return seg
+  })
+})
 
 // ---------- Staff + Admin ----------
 // totalCompanies is the top-row tile; it counts the `companies` table (client
@@ -384,7 +419,18 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
 
     <!-- ================= CLIENT DASHBOARD ================= -->
     <template v-else-if="isClient">
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div class="flex items-start justify-between mb-6">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">Client Dashboard</h1>
+          <p class="text-gray-600 mt-1">Your projects and latest updates from your consultants.</p>
+        </div>
+        <span class="mt-1 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold" :class="statusPill.cls">
+          <span class="h-2 w-2 rounded-full" :class="statusPill.dot"></span>
+          {{ statusPill.text }}
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between">
             <div>
@@ -410,11 +456,11 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-gray-600">Project Updates</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ messages.length }}</p>
+              <p class="text-sm text-gray-600">Unread Updates</p>
+              <p class="text-2xl font-bold text-gray-900 mt-1">{{ clientStats.unreadUpdates }}</p>
             </div>
-            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <i class="fas fa-bolt text-purple-600 text-xl"></i>
+            <div class="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center">
+              <i class="fa-regular fa-comment-dots text-emerald-600 text-xl"></i>
             </div>
           </div>
         </div>
@@ -434,16 +480,23 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
               v-for="project in clientProjects"
               :key="project.id"
               @click="goToProject(project.id)"
-              class="p-6 hover:bg-gray-50 transition-colors cursor-pointer"
+              class="p-5 hover:bg-gray-50 transition-colors cursor-pointer"
             >
               <div class="flex items-center justify-between mb-2">
-                <h3 class="font-medium text-gray-900">{{ project.name }}</h3>
-                <span :class="['px-2 py-1 text-xs font-medium rounded-full', PROJECT_STATUS_COLORS[project.statusLabel]]">
+                <div class="min-w-0 pr-3">
+                  <h3 class="font-medium text-gray-900 truncate">{{ project.name }}</h3>
+                  <p class="text-xs text-gray-500 mt-0.5">{{ project.serviceName || '—' }}</p>
+                </div>
+                <span class="shrink-0 px-2 py-1 text-xs font-medium rounded-full" :class="PROJECT_STATUS_COLORS[project.statusLabel]">
                   {{ project.statusLabel }}
                 </span>
               </div>
-              <div class="flex items-center justify-between text-sm text-gray-600">
-                <span>{{ project.serviceName || '—' }}</span>
+              <div class="h-2 bg-gray-100 rounded-full overflow-hidden mt-1">
+                <div class="h-full bg-emerald-500 rounded-full" :style="{ width: Math.min(100, project.progress ?? 0) + '%' }"></div>
+              </div>
+              <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+                <span>{{ (project.progress ?? 0) > 0 ? `${project.progress}% complete` : 'Not started yet' }}</span>
+                <span><i class="fa-regular fa-message mr-1"></i>{{ project.messageCount }} {{ project.messageCount === 1 ? 'update' : 'updates' }}</span>
               </div>
             </div>
           </div>
@@ -461,10 +514,40 @@ const goToProject = (id: number) => router.push(`/projects/${id}`)
               <div class="absolute left-3 top-1 bottom-1 w-px bg-gray-200" />
               <div v-for="update in latestUpdates" :key="update.id" class="relative pl-10 pb-6 last:pb-0">
                 <span class="absolute left-1.5 top-1 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-100" />
-                <p class="text-xs text-gray-500">{{ formatDateTime(update.createdAt) }} &middot; {{ update.senderName || '—' }}</p>
+                <p class="text-xs text-gray-500">{{ formatDateTime(update.createdAt) }} &middot; {{ update.senderName || 'SECPhils' }}</p>
                 <p class="text-sm font-medium text-gray-900 mt-0.5">{{ update.projectName }}</p>
                 <p class="text-sm text-gray-600 mt-1">{{ update.body }}</p>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow mt-6">
+        <h2 class="text-lg font-semibold text-gray-900 p-6 border-b border-gray-200">Overall Project Health</h2>
+        <div class="p-6 flex items-center justify-center gap-10 flex-wrap">
+          <div class="relative w-40 h-40">
+            <svg class="-rotate-90" width="160" height="160" viewBox="0 0 160 160">
+              <circle cx="80" cy="80" r="63" fill="none" stroke="#f1f1f1" stroke-width="16" />
+              <circle
+                v-for="seg in clientRing.filter(s => s.value > 0)"
+                :key="seg.label"
+                cx="80" cy="80" r="63" fill="none"
+                :stroke="seg.color" stroke-width="16"
+                :stroke-dasharray="seg.dash"
+                :stroke-dashoffset="seg.offset"
+              />
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span class="text-3xl font-extrabold text-gray-900">{{ projects.length }}</span>
+              <span class="text-xs text-gray-500">projects</span>
+            </div>
+          </div>
+          <div class="flex flex-col gap-2.5">
+            <div v-for="seg in clientRing" :key="seg.label" class="flex items-center gap-2 text-sm">
+              <span class="w-3 h-3 rounded" :style="{ background: seg.color }"></span>
+              <span class="text-gray-600">{{ seg.label }}</span>
+              <span class="ml-auto font-semibold text-gray-500">{{ seg.value }}</span>
             </div>
           </div>
         </div>
