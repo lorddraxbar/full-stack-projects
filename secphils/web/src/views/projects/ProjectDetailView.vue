@@ -1440,7 +1440,7 @@ async function saveProductionEdit() {
                 :class="effectiveInternal ? 'bg-slate-700 hover:bg-slate-800' : 'bg-emerald-600 hover:bg-emerald-700'"
               >
                 <i :class="effectiveInternal ? 'fas fa-lock' : 'fas fa-paper-plane'"></i>
-                {{ sending ? 'Sending…' : (effectiveInternal ? 'Send to staff' : 'Send to client') }}
+                {{ sending ? 'Sending…' : (isClient ? 'Send message' : (effectiveInternal ? 'Send to staff' : 'Send to client')) }}
               </button>
             </div>
           </div>
