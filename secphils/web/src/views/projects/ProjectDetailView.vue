@@ -1075,7 +1075,7 @@ async function saveProductionEdit() {
             <!-- Section skip — kept separate from the primary Add action -->
             <div class="mt-3 pt-3 border-t border-gray-200">
               <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Skip this section — it doesn't apply to your company">
-                <input type="checkbox" v-model="productionNa.rawMaterials" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable — this section doesn't apply to my company
+                <input type="checkbox" v-model="productionNa.rawMaterials" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
               </label>
             </div>
           </div>
@@ -1102,7 +1102,7 @@ async function saveProductionEdit() {
             </template>
             <div class="mt-3 pt-3 border-t border-gray-200">
               <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Skip this section — it doesn't apply to your company">
-                <input type="checkbox" v-model="productionNa.productionOutput" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable — this section doesn't apply to my company
+                <input type="checkbox" v-model="productionNa.productionOutput" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
               </label>
             </div>
           </div>
@@ -1121,7 +1121,7 @@ async function saveProductionEdit() {
               ></textarea>
               <div class="mt-2 pt-2 border-t border-gray-200">
                 <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Skip this section — it doesn't apply to your company">
-                  <input type="checkbox" v-model="productionNa.wasteManagement" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable — this section doesn't apply to my company
+                  <input type="checkbox" v-model="productionNa.wasteManagement" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
                 </label>
               </div>
             </div>
@@ -1148,7 +1148,7 @@ async function saveProductionEdit() {
               </template>
               <div class="mt-3 pt-3 border-t border-gray-200">
                 <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Skip this section — it doesn't apply to your company">
-                  <input type="checkbox" v-model="productionNa.wasteMaterials" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable — this section doesn't apply to my company
+                  <input type="checkbox" v-model="productionNa.wasteMaterials" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
                 </label>
               </div>
             </div>
@@ -1168,7 +1168,7 @@ async function saveProductionEdit() {
             <p class="text-xs text-gray-500 mt-2">The production flowchart is a project document — add or replace it from the Documents tab.</p>
             <div class="mt-3 pt-3 border-t border-gray-200">
               <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Skip this section — it doesn't apply to your company">
-                <input type="checkbox" v-model="productionNa.manufacturingProcedure" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable — this section doesn't apply to my company
+                <input type="checkbox" v-model="productionNa.manufacturingProcedure" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
               </label>
             </div>
           </div>
