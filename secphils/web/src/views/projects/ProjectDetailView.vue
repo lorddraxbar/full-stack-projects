@@ -1057,12 +1057,7 @@ async function saveProductionEdit() {
           <div class="bg-white rounded-lg shadow p-6">
             <div class="flex items-center justify-between mb-3">
               <h2 class="text-lg font-semibold text-gray-900">Raw Materials</h2>
-              <div class="flex items-center gap-2">
-                <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Mark this section as not applicable to your company">
-                  <input type="checkbox" v-model="productionNa.rawMaterials" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
-                </label>
-                <button v-if="!productionNa.rawMaterials" @click="addEditRow('rawMaterials')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add material</button>
-              </div>
+              <button v-if="!productionNa.rawMaterials" @click="addEditRow('rawMaterials')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add material</button>
             </div>
             <p v-if="productionNa.rawMaterials" class="text-sm text-gray-500 italic">Marked as not applicable — your company has no raw material inputs.</p>
             <template v-else>
@@ -1077,18 +1072,19 @@ async function saveProductionEdit() {
                 <button @click="removeEditRow('rawMaterials', i)" class="col-span-1 justify-self-end text-red-500 hover:text-red-700" title="Remove"><i class="fas fa-trash" /></button>
               </div>
             </template>
+            <!-- Section skip — kept separate from the primary Add action -->
+            <div class="mt-3 pt-3 border-t border-gray-200">
+              <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Skip this section — it doesn't apply to your company">
+                <input type="checkbox" v-model="productionNa.rawMaterials" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable — this section doesn't apply to my company
+              </label>
+            </div>
           </div>
 
           <!-- Production output -->
           <div class="bg-white rounded-lg shadow p-6">
             <div class="flex items-center justify-between mb-3">
               <h2 class="text-lg font-semibold text-gray-900">Production Output</h2>
-              <div class="flex items-center gap-2">
-                <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Mark this section as not applicable to your company">
-                  <input type="checkbox" v-model="productionNa.productionOutput" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
-                </label>
-                <button v-if="!productionNa.productionOutput" @click="addEditRow('productionOutput')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add product</button>
-              </div>
+              <button v-if="!productionNa.productionOutput" @click="addEditRow('productionOutput')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add product</button>
             </div>
             <p v-if="productionNa.productionOutput" class="text-sm text-gray-500 italic">Marked as not applicable — your company produces no saleable output.</p>
             <template v-else>
@@ -1104,33 +1100,35 @@ async function saveProductionEdit() {
                 <button @click="removeEditRow('productionOutput', i)" class="col-span-1 justify-self-end text-red-500 hover:text-red-700" title="Remove"><i class="fas fa-trash" /></button>
               </div>
             </template>
+            <div class="mt-3 pt-3 border-t border-gray-200">
+              <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Skip this section — it doesn't apply to your company">
+                <input type="checkbox" v-model="productionNa.productionOutput" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable — this section doesn't apply to my company
+              </label>
+            </div>
           </div>
 
           <!-- Waste management -->
           <div class="bg-white rounded-lg shadow p-6 space-y-5">
-            <div class="flex items-center justify-between">
-              <h3 class="text-sm font-medium text-gray-700">Waste Management Practices</h3>
-              <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Mark this section as not applicable to your company">
-                <input type="checkbox" v-model="productionNa.wasteManagement" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
-              </label>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Waste Management Practices</label>
+              <p v-if="productionNa.wasteManagement" class="text-sm text-gray-500 italic mt-1">Marked as not applicable — waste management does not apply to your operations.</p>
+              <textarea
+                v-else
+                v-model="productionEdit.wasteManagement"
+                rows="3"
+                placeholder="How do you manage your wastes (recyclable and non-recyclable)?"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+              ></textarea>
+              <div class="mt-2 pt-2 border-t border-gray-200">
+                <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Skip this section — it doesn't apply to your company">
+                  <input type="checkbox" v-model="productionNa.wasteManagement" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable — this section doesn't apply to my company
+                </label>
+              </div>
             </div>
-            <p v-if="productionNa.wasteManagement" class="text-sm text-gray-500 italic">Marked as not applicable — waste management does not apply to your operations.</p>
-            <textarea
-              v-else
-              v-model="productionEdit.wasteManagement"
-              rows="3"
-              placeholder="How do you manage your wastes (recyclable and non-recyclable)?"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-            ></textarea>
             <div>
               <div class="flex items-center justify-between mb-3">
                 <h3 class="text-sm font-medium text-gray-700">Waste Types</h3>
-                <div class="flex items-center gap-2">
-                  <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Mark this section as not applicable to your company">
-                    <input type="checkbox" v-model="productionNa.wasteMaterials" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
-                  </label>
-                  <button v-if="!productionNa.wasteMaterials" @click="addEditRow('wasteMaterials')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add waste type</button>
-                </div>
+                <button v-if="!productionNa.wasteMaterials" @click="addEditRow('wasteMaterials')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add waste type</button>
               </div>
               <p v-if="productionNa.wasteMaterials" class="text-sm text-gray-500 italic">Marked as not applicable — your company generates no waste types to list.</p>
               <template v-else>
@@ -1148,18 +1146,18 @@ async function saveProductionEdit() {
                   </div>
                 </div>
               </template>
+              <div class="mt-3 pt-3 border-t border-gray-200">
+                <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Skip this section — it doesn't apply to your company">
+                  <input type="checkbox" v-model="productionNa.wasteMaterials" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable — this section doesn't apply to my company
+                </label>
+              </div>
             </div>
           </div>
 
           <!-- Manufacturing process -->
           <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between mb-1">
-              <label class="block text-sm font-medium text-gray-700">Manufacturing Procedure</label>
-              <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Mark this section as not applicable to your company">
-                <input type="checkbox" v-model="productionNa.manufacturingProcedure" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
-              </label>
-            </div>
-            <p v-if="productionNa.manufacturingProcedure" class="text-sm text-gray-500 italic">Marked as not applicable — your company does not manufacture products.</p>
+            <label class="block text-sm font-medium text-gray-700">Manufacturing Procedure</label>
+            <p v-if="productionNa.manufacturingProcedure" class="text-sm text-gray-500 italic mt-1">Marked as not applicable — your company does not manufacture products.</p>
             <textarea
               v-else
               v-model="productionEdit.manufacturingProcedure"
@@ -1168,6 +1166,11 @@ async function saveProductionEdit() {
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             ></textarea>
             <p class="text-xs text-gray-500 mt-2">The production flowchart is a project document — add or replace it from the Documents tab.</p>
+            <div class="mt-3 pt-3 border-t border-gray-200">
+              <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Skip this section — it doesn't apply to your company">
+                <input type="checkbox" v-model="productionNa.manufacturingProcedure" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable — this section doesn't apply to my company
+              </label>
+            </div>
           </div>
 
           <!-- Actions -->
