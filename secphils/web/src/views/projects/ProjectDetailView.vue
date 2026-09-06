@@ -70,22 +70,53 @@ const hasProductionData = computed(() => {
   )
 })
 
-// The authorized rep can only mark a project complete once the FULL
-// production checklist is provided — total cost plus every editable
-// section (raw materials, production output, waste management practices,
-// waste types, manufacturing procedure). The flowchart is intentionally
-// NOT part of this gate: it's an attached document (optional upload),
-// not a checklist field.
+// The authorized rep can only mark a project complete once the production
+// checklist is satisfied: total cost (never skippable) plus each editable
+// section either filled OR explicitly flagged "Not applicable" (a client
+// with no waste stream shouldn't be blocked). The flowchart is NOT part of
+// the gate — it's an optional attached document, not a checklist field.
+// Flags live server-side in projects.checklist_na (jsonb, V32).
+const CHECKLIST_SECTIONS = [
+  { key: 'rawMaterials', label: 'raw materials' },
+  { key: 'productionOutput', label: 'production output' },
+  { key: 'wasteManagement', label: 'waste management practices' },
+  { key: 'wasteMaterials', label: 'waste types' },
+  { key: 'manufacturingProcedure', label: 'the manufacturing procedure' },
+]
+const checklistNa = computed(() => {
+  try {
+    const obj = JSON.parse((project.value?.checklistNa as string) || '{}')
+    return obj && typeof obj === 'object' && !Array.isArray(obj) ? obj as Record<string, boolean> : {}
+  } catch {
+    return {}
+  }
+})
+function sectionFilled(key: string): boolean {
+  switch (key) {
+    case 'rawMaterials': return !!(rawMaterials.value && rawMaterials.value.length > 0)
+    case 'productionOutput': return !!(productionOutput.value && productionOutput.value.length > 0)
+    case 'wasteMaterials': return !!(wasteMaterials.value && wasteMaterials.value.length > 0)
+    case 'wasteManagement': return !!((project.value?.wasteManagement || '').trim())
+    case 'manufacturingProcedure': return !!((project.value?.manufacturingProcedure || '').trim())
+    default: return false
+  }
+}
 const productionChecklistComplete = computed(() => {
   const p = project.value
-  if (!p) return false
-  if (p.totalCost == null) return false
-  if ((p.wasteManagement || '').trim() === '') return false
-  if ((p.manufacturingProcedure || '').trim() === '') return false
-  if (!rawMaterials.value || rawMaterials.value.length === 0) return false
-  if (!productionOutput.value || productionOutput.value.length === 0) return false
-  if (!wasteMaterials.value || wasteMaterials.value.length === 0) return false
-  return true
+  if (!p || p.totalCost == null) return false
+  return CHECKLIST_SECTIONS.every(s => sectionFilled(s.key) || !!checklistNa.value[s.key])
+})
+const nasWithoutContent = computed(() =>
+  CHECKLIST_SECTIONS.filter(s => !sectionFilled(s.key) && !!checklistNa.value[s.key])
+)
+// Actionable nudge for the review card: tells the rep exactly what's still
+// missing (and that a missing section can be marked not applicable).
+const checklistNudge = computed(() => {
+  const p = project.value
+  const missing = CHECKLIST_SECTIONS.filter(s => !sectionFilled(s.key) && !checklistNa.value[s.key]).map(s => s.label)
+  if (missing.length > 0) return `Missing: ${missing.join(', ')}. Fill them in or mark them not applicable.`
+  if (!p || p.totalCost == null) return 'The total project cost is required before this project can be completed.'
+  return ''
 })
 
 function initials(name: string): string {
@@ -317,6 +348,7 @@ async function saveAdminChanges() {
       wasteManagement: project.value.wasteManagement ?? null,
       wasteMaterials: project.value.wasteMaterials ?? null,
       manufacturingProcedure: project.value.manufacturingProcedure ?? null,
+      checklistNa: project.value.checklistNa ?? '{}',
       productionFlowchartUrl: project.value.productionFlowchartUrl ?? null,
       // No longer editable from the UI (the progress slider was removed),
       // but apply() overwrites every field — echo the stored value back so a
@@ -366,6 +398,7 @@ async function markCompleted() {
       wasteManagement: project.value.wasteManagement ?? null,
       wasteMaterials: project.value.wasteMaterials ?? null,
       manufacturingProcedure: project.value.manufacturingProcedure ?? null,
+      checklistNa: project.value.checklistNa ?? '{}',
       productionFlowchartUrl: project.value.productionFlowchartUrl ?? null,
       progress: project.value.progress ?? 0,
     })
@@ -396,6 +429,9 @@ const productionEdit = ref({
   wasteMaterials: [] as { type: string; quantity: string; unit: string; period: 'MONTHLY' | 'YEARLY'; recyclable: boolean }[],
   manufacturingProcedure: '',
 })
+// Working copy of the per-section "Not applicable" flags while editing.
+// Saved only on Save (Cancel leaves the stored flags untouched).
+const productionNa = ref<Record<string, boolean>>({})
 
 // '' for null/0-free numbers; never .trim() a number input (Vue stores a
 // number with .number, but the editor inputs are plain v-model strings).
@@ -425,6 +461,7 @@ function initProductionEdit() {
     })),
     manufacturingProcedure: p.manufacturingProcedure || '',
   }
+  productionNa.value = { ...CHECKLIST_SECTIONS.reduce((acc, s) => { acc[s.key] = !!checklistNa.value[s.key]; return acc }, {} as Record<string, boolean>) }
 }
 
 function startProductionEdit() {
@@ -567,6 +604,7 @@ async function saveOverviewEdit() {
       wasteManagement: p.wasteManagement ?? null,
       wasteMaterials: p.wasteMaterials ?? null,
       manufacturingProcedure: p.manufacturingProcedure ?? null,
+      checklistNa: p.checklistNa ?? '{}',
       productionFlowchartUrl: p.productionFlowchartUrl ?? null,
       progress: p.progress ?? 0,
     })
@@ -631,6 +669,9 @@ async function saveProductionEdit() {
       wasteManagement: e.wasteManagement.trim() || null,
       wasteMaterials: json(e.wasteMaterials.filter(r => r.type.trim()).map(r => ({ type: r.type.trim(), quantity: numOrNull(r.quantity), unit: r.unit.trim() || null, period: r.period, recyclable: r.recyclable }))),
       manufacturingProcedure: e.manufacturingProcedure.trim() || null,
+      // Per-section "Not applicable" flags — always send the full map
+      // (unchecked sections are false; the DB stores the whole object).
+      checklistNa: JSON.stringify(productionNa.value),
       productionFlowchartUrl: project.value.productionFlowchartUrl ?? null,
       progress: project.value.progress ?? 0,
     })
@@ -789,8 +830,8 @@ async function saveProductionEdit() {
             You're the authorized representative for {{ company?.name || 'this customer' }}. Check the project
             details and production checklist, then mark it complete when everything looks right.
           </p>
-          <p v-if="!productionChecklistComplete" class="text-sm text-amber-700">
-            <i class="fas fa-circle-exclamation mr-1" />All production details are required before this project can be completed — fill in every section first.
+          <p v-if="checklistNudge" class="text-sm text-amber-700">
+            <i class="fas fa-circle-exclamation mr-1" />{{ checklistNudge }}
           </p>
           <div class="flex flex-wrap items-center gap-3 mt-4">
             <button
@@ -880,6 +921,10 @@ async function saveProductionEdit() {
           </div>
 
           <div v-else class="space-y-6">
+            <!-- Sections the rep explicitly marked "Not applicable" (no content) -->
+            <div v-if="nasWithoutContent.length" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600">
+              <i class="fas fa-circle-slash mr-1 text-gray-400" />Marked not applicable: {{ nasWithoutContent.map(s => s.label).join(', ') }}.
+            </div>
             <!-- Total project cost — shown to staff and to the authorized rep (they
               complete/verify these details; the read-only view for other
               clients stays staff-hidden) -->
@@ -1012,75 +1057,111 @@ async function saveProductionEdit() {
           <div class="bg-white rounded-lg shadow p-6">
             <div class="flex items-center justify-between mb-3">
               <h2 class="text-lg font-semibold text-gray-900">Raw Materials</h2>
-              <button @click="addEditRow('rawMaterials')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add material</button>
+              <div class="flex items-center gap-2">
+                <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Mark this section as not applicable to your company">
+                  <input type="checkbox" v-model="productionNa.rawMaterials" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
+                </label>
+                <button v-if="!productionNa.rawMaterials" @click="addEditRow('rawMaterials')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add material</button>
+              </div>
             </div>
-            <p v-if="!productionEdit.rawMaterials.length" class="text-sm text-gray-500">No raw materials — add one above.</p>
-            <div v-for="(m, i) in productionEdit.rawMaterials" :key="'eraw-' + i" class="grid grid-cols-12 gap-2 mb-2">
-              <input v-model="m.name" placeholder="Material" class="col-span-5 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
-              <input v-model="m.quantity" type="number" min="0" step="any" placeholder="Qty" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
-              <input v-model="m.unit" placeholder="Unit" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
-              <select v-model="m.period" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
-                <option value="MONTHLY">Per month</option><option value="YEARLY">Per year</option>
-              </select>
-              <button @click="removeEditRow('rawMaterials', i)" class="col-span-1 justify-self-end text-red-500 hover:text-red-700" title="Remove"><i class="fas fa-trash" /></button>
-            </div>
+            <p v-if="productionNa.rawMaterials" class="text-sm text-gray-500 italic">Marked as not applicable — your company has no raw material inputs.</p>
+            <template v-else>
+              <p v-if="!productionEdit.rawMaterials.length" class="text-sm text-gray-500">No raw materials — add one above.</p>
+              <div v-for="(m, i) in productionEdit.rawMaterials" :key="'eraw-' + i" class="grid grid-cols-12 gap-2 mb-2">
+                <input v-model="m.name" placeholder="Material" class="col-span-5 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                <input v-model="m.quantity" type="number" min="0" step="any" placeholder="Qty" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                <input v-model="m.unit" placeholder="Unit" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                <select v-model="m.period" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                  <option value="MONTHLY">Per month</option><option value="YEARLY">Per year</option>
+                </select>
+                <button @click="removeEditRow('rawMaterials', i)" class="col-span-1 justify-self-end text-red-500 hover:text-red-700" title="Remove"><i class="fas fa-trash" /></button>
+              </div>
+            </template>
           </div>
 
           <!-- Production output -->
           <div class="bg-white rounded-lg shadow p-6">
             <div class="flex items-center justify-between mb-3">
               <h2 class="text-lg font-semibold text-gray-900">Production Output</h2>
-              <button @click="addEditRow('productionOutput')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add product</button>
+              <div class="flex items-center gap-2">
+                <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Mark this section as not applicable to your company">
+                  <input type="checkbox" v-model="productionNa.productionOutput" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
+                </label>
+                <button v-if="!productionNa.productionOutput" @click="addEditRow('productionOutput')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add product</button>
+              </div>
             </div>
-            <p v-if="!productionEdit.productionOutput.length" class="text-sm text-gray-500">No products — add one above.</p>
-            <div v-for="(o, i) in productionEdit.productionOutput" :key="'eout-' + i" class="grid grid-cols-12 gap-2 mb-2">
-              <input v-model="o.name" placeholder="Product" class="col-span-3 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
-              <input v-model="o.quantity" type="number" min="0" step="any" placeholder="Qty" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
-              <input v-model="o.unit" placeholder="Unit" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
-              <select v-model="o.period" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
-                <option value="MONTHLY">Per month</option><option value="YEARLY">Per year</option>
-              </select>
-              <input v-model="o.pricePerUnit" type="number" min="0" step="any" placeholder="Price/Unit (₱)" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
-              <button @click="removeEditRow('productionOutput', i)" class="col-span-1 justify-self-end text-red-500 hover:text-red-700" title="Remove"><i class="fas fa-trash" /></button>
-            </div>
+            <p v-if="productionNa.productionOutput" class="text-sm text-gray-500 italic">Marked as not applicable — your company produces no saleable output.</p>
+            <template v-else>
+              <p v-if="!productionEdit.productionOutput.length" class="text-sm text-gray-500">No products — add one above.</p>
+              <div v-for="(o, i) in productionEdit.productionOutput" :key="'eout-' + i" class="grid grid-cols-12 gap-2 mb-2">
+                <input v-model="o.name" placeholder="Product" class="col-span-3 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                <input v-model="o.quantity" type="number" min="0" step="any" placeholder="Qty" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                <input v-model="o.unit" placeholder="Unit" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                <select v-model="o.period" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                  <option value="MONTHLY">Per month</option><option value="YEARLY">Per year</option>
+                </select>
+                <input v-model="o.pricePerUnit" type="number" min="0" step="any" placeholder="Price/Unit (₱)" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                <button @click="removeEditRow('productionOutput', i)" class="col-span-1 justify-self-end text-red-500 hover:text-red-700" title="Remove"><i class="fas fa-trash" /></button>
+              </div>
+            </template>
           </div>
 
           <!-- Waste management -->
           <div class="bg-white rounded-lg shadow p-6 space-y-5">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Waste Management Practices</label>
-              <textarea
-                v-model="productionEdit.wasteManagement"
-                rows="3"
-                placeholder="How do you manage your wastes (recyclable and non-recyclable)?"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-              ></textarea>
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-medium text-gray-700">Waste Management Practices</h3>
+              <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Mark this section as not applicable to your company">
+                <input type="checkbox" v-model="productionNa.wasteManagement" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
+              </label>
             </div>
+            <p v-if="productionNa.wasteManagement" class="text-sm text-gray-500 italic">Marked as not applicable — waste management does not apply to your operations.</p>
+            <textarea
+              v-else
+              v-model="productionEdit.wasteManagement"
+              rows="3"
+              placeholder="How do you manage your wastes (recyclable and non-recyclable)?"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            ></textarea>
             <div>
               <div class="flex items-center justify-between mb-3">
                 <h3 class="text-sm font-medium text-gray-700">Waste Types</h3>
-                <button @click="addEditRow('wasteMaterials')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add waste type</button>
-              </div>
-              <p v-if="!productionEdit.wasteMaterials.length" class="text-sm text-gray-500">No waste types — add one above.</p>
-              <div v-for="(w, i) in productionEdit.wasteMaterials" :key="'ewaste-' + i" class="grid grid-cols-12 gap-2 mb-2 items-center">
-                <input v-model="w.type" placeholder="Waste type" class="col-span-4 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
-                <input v-model="w.quantity" type="number" min="0" step="any" placeholder="Qty" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
-                <input v-model="w.unit" placeholder="Unit" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
-                <select v-model="w.period" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
-                  <option value="MONTHLY">Per month</option><option value="YEARLY">Per year</option>
-                </select>
-                <div class="col-span-2 flex items-center justify-between">
-                  <label class="flex items-center gap-1 text-sm text-gray-700"><input type="checkbox" v-model="w.recyclable" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Recyclable</label>
-                  <button @click="removeEditRow('wasteMaterials', i)" class="text-red-500 hover:text-red-700" title="Remove"><i class="fas fa-trash" /></button>
+                <div class="flex items-center gap-2">
+                  <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Mark this section as not applicable to your company">
+                    <input type="checkbox" v-model="productionNa.wasteMaterials" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
+                  </label>
+                  <button v-if="!productionNa.wasteMaterials" @click="addEditRow('wasteMaterials')" class="text-sm font-medium text-emerald-600 hover:text-emerald-700"><i class="fas fa-plus mr-1" />Add waste type</button>
                 </div>
               </div>
+              <p v-if="productionNa.wasteMaterials" class="text-sm text-gray-500 italic">Marked as not applicable — your company generates no waste types to list.</p>
+              <template v-else>
+                <p v-if="!productionEdit.wasteMaterials.length" class="text-sm text-gray-500">No waste types — add one above.</p>
+                <div v-for="(w, i) in productionEdit.wasteMaterials" :key="'ewaste-' + i" class="grid grid-cols-12 gap-2 mb-2 items-center">
+                  <input v-model="w.type" placeholder="Waste type" class="col-span-4 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                  <input v-model="w.quantity" type="number" min="0" step="any" placeholder="Qty" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                  <input v-model="w.unit" placeholder="Unit" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                  <select v-model="w.period" class="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                    <option value="MONTHLY">Per month</option><option value="YEARLY">Per year</option>
+                  </select>
+                  <div class="col-span-2 flex items-center justify-between">
+                    <label class="flex items-center gap-1 text-sm text-gray-700"><input type="checkbox" v-model="w.recyclable" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Recyclable</label>
+                    <button @click="removeEditRow('wasteMaterials', i)" class="text-red-500 hover:text-red-700" title="Remove"><i class="fas fa-trash" /></button>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
 
           <!-- Manufacturing process -->
           <div class="bg-white rounded-lg shadow p-6">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Manufacturing Procedure</label>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-sm font-medium text-gray-700">Manufacturing Procedure</label>
+              <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none" title="Mark this section as not applicable to your company">
+                <input type="checkbox" v-model="productionNa.manufacturingProcedure" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />Not applicable
+              </label>
+            </div>
+            <p v-if="productionNa.manufacturingProcedure" class="text-sm text-gray-500 italic">Marked as not applicable — your company does not manufacture products.</p>
             <textarea
+              v-else
               v-model="productionEdit.manufacturingProcedure"
               rows="4"
               placeholder="How do you manufacture your products/output?"

@@ -289,6 +289,10 @@ public class ProjectController {
         project.setWasteManagement(req.wasteManagement());
         project.setWasteMaterials(req.wasteMaterials());
         project.setManufacturingProcedure(req.manufacturingProcedure());
+        // Missing/invalid -> defaults to {} so the frontend gate can always
+        // parse it; a full-payload PUT that fails to echo the field therefore
+        // clears the flags (same null-clears contract as the other fields).
+        project.setChecklistNa(req.checklistNa() != null ? req.checklistNa() : "{}");
         project.setProductionFlowchartUrl(req.productionFlowchartUrl());
         project.setProgress(req.progress() != null ? req.progress() : 0);
     }

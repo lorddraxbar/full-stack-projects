@@ -69,6 +69,10 @@ public class Project {
     @Column(name = "manufacturing_procedure", columnDefinition = "TEXT")
     private String manufacturingProcedure;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "checklist_na", columnDefinition = "JSONB")
+    private String checklistNa;
+
     @Column(name = "production_flowchart_url", length = 500)
     private String productionFlowchartUrl;
 

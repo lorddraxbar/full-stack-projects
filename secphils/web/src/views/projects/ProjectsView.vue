@@ -239,6 +239,8 @@ const handleWizardSubmit = async (data: WizardData) => {
       wasteManagement: p.wasteManagement || null,
       wasteMaterials: p.wasteMaterials ? JSON.stringify(p.wasteMaterials) : null,
       manufacturingProcedure: p.manufacturingProcedure || null,
+      // Checklist "not applicable" flags default to none on create.
+      checklistNa: '{}',
     }
     const project = await useCreateProject(productionPayload)
     const projectId = (project as any).id as number

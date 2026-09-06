@@ -20,6 +20,7 @@ public record ProjectRequest(
         String wasteManagement,
         String wasteMaterials,
         String manufacturingProcedure,
+        String checklistNa,
         String productionFlowchartUrl,
         Integer progress
 ) {}
