@@ -1401,8 +1401,9 @@ async function saveProductionEdit() {
             class="flex flex-col gap-3 rounded-lg border p-3"
             :class="effectiveInternal ? 'border-slate-300 bg-slate-50' : 'border-emerald-300 bg-emerald-50/40'"
           >
-            <!-- Audience banner: where you see who will see this message. -->
+            <!-- Audience banner: sender-only — tells staff who will read this message. Clients have no audience choice. -->
             <div
+              v-if="!isClient"
               class="flex items-center gap-2 text-sm font-medium"
               :class="effectiveInternal ? 'text-slate-600' : 'text-emerald-800'"
             >
