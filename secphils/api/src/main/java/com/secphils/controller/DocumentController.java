@@ -16,6 +16,7 @@ import com.secphils.repository.ProjectRepository;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
 import com.secphils.service.DocumentTrashService;
+import com.secphils.service.DocumentNotificationService;
 import com.secphils.service.S3StorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -63,12 +64,14 @@ public class DocumentController {
     private final UserRepository userRepository;
     private final S3StorageService storageService;
     private final DocumentTrashService trashService;
+    private final DocumentNotificationService notificationService;
 
     public DocumentController(DocumentRepository documentRepository,
                               DocumentCommentRepository commentRepository,
                               ProjectRepository projectRepository, UserRepository userRepository,
                               AuditService auditService, S3StorageService storageService,
-                              DocumentTrashService trashService) {
+                              DocumentTrashService trashService,
+                              DocumentNotificationService notificationService) {
         this.documentRepository = documentRepository;
         this.commentRepository = commentRepository;
         this.projectRepository = projectRepository;
@@ -76,6 +79,7 @@ public class DocumentController {
         this.auditService = auditService;
         this.storageService = storageService;
         this.trashService = trashService;
+        this.notificationService = notificationService;
     }
 
     // ---------- reads (role-scoped) ----------
@@ -238,6 +242,7 @@ public class DocumentController {
             doc = documentRepository.save(doc);
             auditService.audit(actor, "DOCUMENT_UPLOAD", "Document", doc.getId(),
                     "Title: " + doc.getTitle() + " (" + bytes.length + " bytes)", http);
+            notificationService.onDocumentUploaded(doc, project, actor.id());
             return ResponseEntity.status(HttpStatus.CREATED).body(DocumentResponse.from(doc));
         } catch (RuntimeException e) {
             storageService.deleteQuietly(s3Uri); // don't leak an orphaned object

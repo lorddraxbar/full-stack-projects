@@ -1516,6 +1516,18 @@ const EMAIL_TEMPLATE_DEFAULTS = [
     vars: ['{{project}}', '{{actor}}'],
   },
   {
+    name: 'documentUploaded',
+    title: 'New document uploaded',
+    hint: 'Sent to the project\u2019s company members and provider staff when staff upload a document (in-app bell row paired with this email; gated by the "Document Uploaded" notification preference).',
+    subject: 'New document on {{project}}: {{document}}',
+    kicker: 'SecPhils \u00b7 {{project}}',
+    heading: 'New document uploaded \u2014 {{document}}',
+    body: 'Hi {{name}},\n\n{{uploader}} uploaded a new document to the project "{{project}}" ({{company}}):\n\n**{{document}}**\n\nOpen the project in the portal to view and download it.',
+    cta: 'View the project',
+    footer: "You're receiving this as a member of the project's team. Manage your notification preferences in the portal.",
+    vars: ['{{name}}', '{{document}}', '{{project}}', '{{company}}', '{{uploader}}'],
+  },
+  {
     name: 'landing',
     title: 'Landing page — contact form',
     hint: 'Sent to the company profile email addresses (or the default recipient below) when the website contact form is submitted. Body is full HTML.',

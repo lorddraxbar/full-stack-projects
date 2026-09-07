@@ -32,17 +32,20 @@ public class NotificationController {
     private static final Map<String, Boolean> DEFAULT_EMAIL = new LinkedHashMap<>();
     private static final Map<String, Boolean> DEFAULT_IN_APP = new LinkedHashMap<>();
     static {
-        // Keys owned by the Settings UI (email-handles panel).
-        for (String k : new String[]{"projectCreated", "newMessage", "projectUpdate",
-                "documentUploaded", "documentRequested",
-                "projectStatusChanged", "announcement", "teamInvitation"}) {
-            DEFAULT_EMAIL.put(k, true);
-        }
-        for (String k : new String[]{"newMessage", "documentUploaded",
+        // One shared key set for BOTH channels: every key here is honored by a
+        // real fan-out (MessageController, AnnouncementController,
+        // ProjectNotificationService, ProjectArchiveService, DocumentController).
+        // Channels stay independently toggleable; the SWITCHES are identical.
+        // Legacy keys (projectUpdate, documentRequested, teamInvitation) were
+        // dead switches — never read by any sender — and are pruned on read/save.
+        for (String k : new String[]{"projectCreated", "newMessage", "documentUploaded",
                 "projectStatusChanged", "announcement"}) {
+            DEFAULT_EMAIL.put(k, true);
             DEFAULT_IN_APP.put(k, true);
         }
     }
+
+    private static final java.util.Set<String> KNOWN_KEYS = DEFAULT_EMAIL.keySet();
 
     public NotificationController(NotificationRepository notificationRepository,
                                   NotificationPreferenceRepository preferenceRepository,
@@ -127,7 +130,11 @@ public class NotificationController {
         Map<String, Boolean> result = new LinkedHashMap<>(defaults);
         if (storedJson != null) {
             try {
-                result.putAll(objectMapper.readValue(storedJson, new TypeReference<Map<String, Boolean>>() {}));
+                Map<String, Boolean> stored = objectMapper.readValue(storedJson,
+                        new TypeReference<Map<String, Boolean>>() {});
+                // Drop legacy keys with no fan-out behind them — the UI must
+                // only ever render switches that actually do something.
+                stored.forEach((k, v) -> { if (KNOWN_KEYS.contains(k)) result.put(k, v); });
             } catch (Exception e) {
                 // malformed stored JSON — fall back to defaults
             }
@@ -137,7 +144,8 @@ public class NotificationController {
 
     private Map<String, Boolean> mergeMaps(Map<String, Boolean> defaults, Map<String, Boolean> incoming) {
         Map<String, Boolean> result = new LinkedHashMap<>(defaults);
-        if (incoming != null) result.putAll(incoming);
+        if (incoming != null)
+            incoming.forEach((k, v) -> { if (KNOWN_KEYS.contains(k)) result.put(k, v); });
         return result;
     }
 

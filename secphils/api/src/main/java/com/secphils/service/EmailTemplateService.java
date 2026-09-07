@@ -53,6 +53,7 @@ public class EmailTemplateService {
     public static final String PROJECT_STATUS_STAFF = "projectStatusStaff";
     public static final String PROJECT_ARCHIVED = "projectArchived";
     public static final String PROJECT_RESTORED = "projectRestored";
+    public static final String DOCUMENT_UPLOADED = "documentUploaded";
     public static final String LANDING = "landing";
 
     private final SystemSettingsRepository settingsRepository;
@@ -147,6 +148,13 @@ public class EmailTemplateService {
                     "The project '{{project}}' has been restored by {{actor}}.",
                     "View the project",
                     "You're receiving this as a member of the project's company. Manage your notification preferences in the portal.")),
+            Map.entry(DOCUMENT_UPLOADED, EmailTemplate.of(DOCUMENT_UPLOADED,
+                    "New document on {{project}}: {{document}}",
+                    "SecPhils · {{project}}",
+                    "New document uploaded — {{document}}",
+                    "Hi {{name}},\n\n{{uploader}} uploaded a new document to the project \"{{project}}\" ({{company}}):\n\n**{{document}}**\n\nOpen the project in the portal to view and download it.",
+                    "View the project",
+                    "You're receiving this as a member of the project's team. Manage your notification preferences in the portal.")),
             Map.entry(LANDING, EmailTemplate.of(LANDING,
                     "Landing page inquiry from {{firstName}} {{lastName}}",
                     "", "",

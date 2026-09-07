@@ -24,9 +24,10 @@ import java.util.Map;
  * Project lifecycle notifications. When a project is created via the wizard
  * or its status changes, the customer's authorized representative and the
  * provider side are notified — an in-app {@link Notification} row plus a
- * branded email for each, honoring each recipient's per-channel
- * "projectStatusChanged" preference (missing preference = allowed, same
- * convention as {@link ProjectArchiveService} and the message fan-out).
+ * branded email for each, honoring each recipient's per-channel preference
+ * (creation honors "projectCreated", status moves honor "projectStatusChanged";
+ * missing preference = allowed, same convention as {@link ProjectArchiveService}
+ * and the message fan-out).
  *
  *  onProjectCreated: the project just went live. The authorized rep is asked
  *                   to review and complete it; every other active provider
@@ -44,7 +45,9 @@ import java.util.Map;
 public class ProjectNotificationService {
 
     private static final Logger log = LoggerFactory.getLogger(ProjectNotificationService.class);
-    private static final String PREF_KEY = "projectStatusChanged";
+    /** Creation fan-out honors "projectCreated"; status moves honor "projectStatusChanged". */
+    private static final String KEY_CREATED = "projectCreated";
+    private static final String KEY_STATUS = "projectStatusChanged";
 
     private final ProjectRepository projects;
     private final UserRepository users;
@@ -78,7 +81,7 @@ public class ProjectNotificationService {
         // 1) The customer's authorized rep: review + complete the project.
         String repSubject = templateService.subject(EmailTemplateService.PROJECT_CREATED_REP, Map.of(
                 "company", companyName(project), "project", projectName(project)));
-        deliver(project, project.getCompany().getAuthorizedRep(), actorId,
+        deliver(project, project.getCompany().getAuthorizedRep(), actorId, KEY_CREATED,
                 "New project submitted — " + project.getName(),
                 repSubject,
                 templateCard(EmailTemplateService.PROJECT_CREATED_REP, Map.of(
@@ -93,7 +96,7 @@ public class ProjectNotificationService {
         String repNote = repName != null ? ", with " + repName + " as the authorized representative" : "";
         for (User u : activeProviderUsers(project.getCompany())) {
             if (u.getId().equals(actorId)) continue;
-            deliver(project, u, actorId,
+            deliver(project, u, actorId, KEY_CREATED,
                     "New project — " + project.getName(),
                     staffSubject,
                     templateCard(EmailTemplateService.PROJECT_CREATED_STAFF, Map.of(
@@ -116,7 +119,7 @@ public class ProjectNotificationService {
                 "company", companyName(project),
                 "statusLabel", label);
         String subject = templateService.subject(EmailTemplateService.PROJECT_STATUS_REP, vars);
-        deliver(project, project.getCompany().getAuthorizedRep(), actorId,
+        deliver(project, project.getCompany().getAuthorizedRep(), actorId, KEY_STATUS,
                 "Project " + label + " — " + project.getName(),
                 subject,
                 templateCard(EmailTemplateService.PROJECT_STATUS_REP,
@@ -128,7 +131,7 @@ public class ProjectNotificationService {
                 link, "PROJECT_STATUS");
         for (User u : activeProviderUsers(project.getCompany())) {
             if (u.getId().equals(actorId)) continue;
-            deliver(project, u, actorId,
+            deliver(project, u, actorId, KEY_STATUS,
                     "Project " + label + " — " + project.getName(),
                     subject,
                     templateCard(EmailTemplateService.PROJECT_STATUS_STAFF,
@@ -161,12 +164,12 @@ public class ProjectNotificationService {
     }
 
     /** In-app row + branded email for one recipient, each channel pref-gated. */
-    private void deliver(Project project, User recipient, Long skipIfSameId,
+    private void deliver(Project project, User recipient, Long skipIfSameId, String prefKey,
                          String notifTitle, String emailSubject, String emailHtml,
                          String link, String notifType) {
         if (recipient == null || recipient.getId().equals(skipIfSameId)) return;
         NotificationPreference pref = preferences.findByUserId(recipient.getId()).orElse(null);
-        if (prefAllows(recipient, pref == null ? null : pref.getInApp())) {
+        if (prefAllows(pref == null ? null : pref.getInApp(), prefKey)) {
             Notification n = new Notification();
             User ref = new User();
             ref.setId(recipient.getId());
@@ -180,7 +183,7 @@ public class ProjectNotificationService {
             n.setCreatedAt(LocalDateTime.now());
             notifications.save(n);
         }
-        if (prefAllows(recipient, pref == null ? null : pref.getEmail())
+        if (prefAllows(pref == null ? null : pref.getEmail(), prefKey)
                 && recipient.getEmail() != null && !recipient.getEmail().isBlank()) {
             try {
                 mail.sendHtml(recipient.getEmail(), emailSubject, emailHtml, link);
@@ -190,11 +193,11 @@ public class ProjectNotificationService {
         }
     }
 
-    private boolean prefAllows(User recipient, String channelJson) {
+    private boolean prefAllows(String channelJson, String prefKey) {
         try {
             if (channelJson == null || channelJson.isBlank()) return true;
             var m = objectMapper.readValue(channelJson, java.util.Map.class);
-            Object v = m.get(PREF_KEY);
+            Object v = m.get(prefKey);
             return v == null || Boolean.TRUE.equals(v);
         } catch (Exception e) {
             return true;
