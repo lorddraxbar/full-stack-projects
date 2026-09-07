@@ -6,7 +6,7 @@ import RowActionsMenu from '@/components/RowActionsMenu.vue'
 import BackToListButton from '@/components/BackToListButton.vue'
 import {
   useGetMe, useGetProject, useGetCompany,
-  useGetDocuments, useCreateDocument, useDeleteDocument,
+  useGetDocuments, useCreateDocument, useDeleteDocument, useUploadDocument,
   useGetMessages, useSendMessage, useUploadMessage, useDownloadMessage, useUpdateProject,
   useArchiveProject, useRestoreProject, useHardDeleteProject,
   useUpdateCompany, useGetCompanyTeamFor, useInviteCustomerRep, useSetAuthorizedRep,
@@ -322,6 +322,46 @@ async function deleteDocument(id: number) {
     documents.value = await useGetDocuments({ projectId: projectId.value })
   } catch (err: any) {
     saveError.value = err?.response?.data?.message || 'Failed to delete document'
+  }
+}
+
+// ---------- Client: submit a requested document ----------
+// Providers ask clients for files (permits, certificates, data sheets); the
+// client side of that request is a SUBMISSION — additive, allowed for every
+// company team member (same policy as posting messages). Editing/deleting
+// documents stays staff-only server-side. Mirrors the Documents view's
+// submit modal so the flow is identical wherever the client files it.
+const submitOpen = ref(false)
+const submitting = ref(false)
+const submitError = ref('')
+const submitForm = ref({ title: '', description: '', file: null as File | null })
+const submitFileInput = ref<HTMLInputElement | null>(null)
+
+function openSubmitDialog() {
+  submitForm.value = { title: '', description: '', file: null }
+  submitError.value = ''
+  submitOpen.value = true
+}
+
+async function submitRequestedDoc() {
+  if (!submitForm.value.title.trim()) { submitError.value = 'Title is required'; return }
+  if (!submitForm.value.file) { submitError.value = 'Choose a file to upload'; return }
+  submitting.value = true
+  submitError.value = ''
+  try {
+    await useUploadDocument({
+      projectId: projectId.value,
+      title: submitForm.value.title.trim(),
+      description: submitForm.value.description.trim() || undefined,
+      file: submitForm.value.file,
+    })
+    submitOpen.value = false
+    if (submitFileInput.value) submitFileInput.value.value = ''
+    documents.value = await useGetDocuments({ projectId: projectId.value })
+  } catch (err: any) {
+    submitError.value = err?.response?.data?.message || 'Failed to submit document'
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -1497,9 +1537,16 @@ async function saveProductionEdit() {
           >
             <i class="fas fa-upload mr-1" /> Add Document
           </button>
+          <button
+            v-else
+            @click="openSubmitDialog"
+            class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+          >
+            <i class="fas fa-upload mr-1" /> Submit Document
+          </button>
         </div>
         <div v-if="documents.length === 0" class="p-6 text-sm text-gray-500">
-          No documents for this project yet.
+          {{ isClient ? 'No documents for this project yet. Use Submit Document to file a file the SECPhils team requested.' : 'No documents for this project yet.' }}
         </div>
         <div v-else class="overflow-x-auto">
           <table class="w-full">
@@ -1788,6 +1835,66 @@ async function saveProductionEdit() {
               Permanent deletion requires your password inside the retention window.
             </p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= CLIENT SUBMIT DOCUMENT DIALOG ================= -->
+    <div
+      v-if="submitOpen"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      @click.self="submitOpen = false"
+    >
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-1">Submit a Document</h3>
+        <p class="text-sm text-gray-600 mb-4">
+          File the document the SECPhils team requested. It's stored with this project
+          and the team is notified automatically. You can't edit or delete submitted files.
+        </p>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+            <input
+              v-model="submitForm.title"
+              type="text"
+              placeholder="e.g. CNC Permit — Renewal 2026"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea
+              v-model="submitForm.description"
+              rows="2"
+              placeholder="Optional notes about this document..."
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">File *</label>
+            <input
+              ref="submitFileInput"
+              type="file"
+              class="w-full text-sm text-gray-600 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-emerald-50 file:text-emerald-700 file:font-medium hover:file:bg-emerald-100 file:cursor-pointer cursor-pointer"
+              @change="(e: Event) => submitForm.file = (e.target as HTMLInputElement).files?.[0] || null"
+            />
+          </div>
+        </div>
+        <p v-if="submitError" class="text-sm text-red-600 mt-3">{{ submitError }}</p>
+        <div class="mt-6 flex justify-end gap-3">
+          <button
+            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium"
+            @click="submitOpen = false"
+          >
+            Cancel
+          </button>
+          <button
+            class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
+            :disabled="submitting"
+            @click="submitRequestedDoc"
+          >
+            {{ submitting ? 'Submitting…' : 'Submit Document' }}
+          </button>
         </div>
       </div>
     </div>

@@ -306,14 +306,14 @@ onMounted(async () => {
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
       <div>
         <h1 class="text-2xl font-bold text-gray-900">Documents</h1>
-        <p class="text-gray-600 mt-1">View, upload, and manage project documents</p>
+        <p class="text-gray-600 mt-1">{{ isClient ? 'View and download project documents, or submit requested files' : 'View, upload, and manage project documents' }}</p>
       </div>
       <button
         v-if="view === 'documents'"
         class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
         @click="showUploadModal = true"
       >
-        + Upload Document
+        <i class="fas fa-upload mr-1" />{{ isClient ? 'Submit Document' : 'Upload Document' }}
       </button>
     </div>
 
@@ -565,7 +565,11 @@ onMounted(async () => {
     <div v-if="showUploadModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-black/30" @click="showUploadModal = false" />
       <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Upload Document</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ isClient ? 'Submit a Document' : 'Upload Document' }}</h2>
+        <p v-if="isClient" class="text-sm text-gray-600 -mt-2 mb-4">
+          File the document the SECPhils team requested. It's stored with your project
+          and the team is notified automatically.
+        </p>
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Title *</label>
@@ -607,9 +611,13 @@ onMounted(async () => {
               {{ selectedFileInfo.name }} ({{ selectedFileInfo.size }})
             </p>
           </div>
-          <p class="text-xs text-gray-500">
-            The file is uploaded to secure object storage. Only staff can upload or delete;
-            all members of the project's company can view and download.
+          <p v-if="isClient" class="text-xs text-gray-500">
+            Your submission is stored in secure object storage and the SECPhils team is
+            notified. You can't edit or delete submitted files — the team manages them.
+          </p>
+          <p v-else class="text-xs text-gray-500">
+            The file is uploaded to secure object storage. The project's company team is
+            notified; they can view and download but can't modify or delete documents.
           </p>
         </div>
         <p v-if="uploadError" class="text-sm text-red-600 mt-3">{{ uploadError }}</p>

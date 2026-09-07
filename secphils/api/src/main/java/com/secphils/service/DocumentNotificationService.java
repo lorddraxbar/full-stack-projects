@@ -23,8 +23,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Document-upload fan-out. When staff uploads a document to a project, the
- * people allowed to see it hear about it: the project company's active
+ * Document-upload fan-out. When a document is filed on a project — by provider
+ * staff OR by a client submitting a requested deliverable — the people allowed
+ * to see it hear about it: the project company's active
  * members plus the provider-side staff (the uploader themselves is skipped).
  * Each recipient gets an in-app {@link Notification} row and a branded email,
  * each gated independently by their "documentUploaded" preference (missing
@@ -120,7 +121,7 @@ public class DocumentNotificationService {
                                     link,
                                     templateService.footer(EmailTemplateService.DOCUMENT_UPLOADED, perRecipient)),
                             link,
-                            // uploads are staff-only; brand-collapse the mail-from
+                            // uploads (staff or client submissions) all mail from the brand
                             DisplayNamePolicy.NO_REPLY_EMAIL);
                 } catch (Exception e) {
                     log.warn("Document-upload email to {} failed: {}", u.getEmail(), e.getMessage());

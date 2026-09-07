@@ -202,6 +202,15 @@ public class DocumentController {
      * Multipart upload: the file bytes go straight to S3 and the document row
      * stores the resulting s3:// reference. If the DB insert fails after a
      * successful S3 put, the orphaned object is removed best-effort.
+     *
+     * <p>Open to provider staff AND to clients of the project's company —
+     * the "provider asked for a document" flow: the client SUBMITS a
+     * deliverable (permits, certificates, data sheets) for their own
+     * company's project. Like messages, submitting is additive: every
+     * company team member may file one (not just the authorized rep).
+     * Modifying, re-tagging or trashing any document stays staff-only
+     * (requireStaff on create/update/trash), so clients never touch
+     * existing records. Fan-out notifies the team either way.
      */
     @PostMapping("/upload")
     @Transactional
@@ -212,7 +221,6 @@ public class DocumentController {
             @RequestParam("file") MultipartFile file,
             HttpServletRequest http) throws IOException {
         AuthUser actor = CurrentUser.require();
-        requireStaff(actor);
         if (title == null || title.isBlank()) throw ApiException.badRequest("Title is required");
         if (file == null || file.isEmpty()) throw ApiException.badRequest("No file was uploaded");
 
