@@ -187,7 +187,14 @@ public class UserController {
         user.setEmail(req.email());
         user.setFirstName(req.firstName());
         user.setLastName(req.lastName());
-        user.setRole(req.role() != null ? req.role() : "CLIENT");
+        // SECURITY: roles are a closed set. An arbitrary string here would
+        // become the Spring authority "ROLE_<string>" at auth time and the
+        // frontend select can never produce one — reject anything unknown.
+        String role = req.role() != null && !req.role().isBlank() ? req.role().trim().toUpperCase() : "CLIENT";
+        if (!role.equals("CLIENT") && !role.equals("USER") && !role.equals("ADMIN")) {
+            throw ApiException.badRequest("Role must be CLIENT, USER or ADMIN");
+        }
+        user.setRole(role);
         // For provider staff (USER/ADMIN), default the company to the acting admin's own company
         // (the provider company) unless an explicit company was chosen.
         Long companyId = req.companyId();
@@ -322,7 +329,15 @@ public class UserController {
         }
         if (req.firstName() != null && !req.firstName().isBlank()) user.setFirstName(req.firstName());
         if (req.lastName() != null && !req.lastName().isBlank()) user.setLastName(req.lastName());
-        if (req.role() != null && !req.role().isBlank()) user.setRole(req.role());
+        if (req.role() != null && !req.role().isBlank()) {
+            // SECURITY: closed role set (see create()) — arbitrary strings would
+            // become ROLE_<string> authorities and grant unintended access.
+            String newRole = req.role().trim().toUpperCase();
+            if (!newRole.equals("CLIENT") && !newRole.equals("USER") && !newRole.equals("ADMIN")) {
+                throw ApiException.badRequest("Role must be CLIENT, USER or ADMIN");
+            }
+            user.setRole(newRole);
+        }
         if (req.isActive() != null) user.setIsActive(req.isActive());
         // Phone is applied on non-null so a blank value clears it (the null-safe
         // name/email fields above only apply when non-blank).

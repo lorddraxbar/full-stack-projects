@@ -49,8 +49,11 @@ const profileInitial = computed(() => profileFullName.value.charAt(0).toUpperCas
 const avatarInput = ref<HTMLInputElement | null>(null)
 const savingProfile = ref(false)
 
+const meId = ref<number | null>(null)
+
 async function loadProfile() {
   const u = await useGetMe()
+  meId.value = u?.id ?? null
   profile.value = {
     firstName: u?.firstName ?? '',
     lastName: u?.lastName ?? '',
@@ -100,7 +103,7 @@ function onAvatarSelected(e: Event) {
 }
 
 // ---------- Client: Company Profile ----------
-const company = ref({ name: '', businessType: '', owner: '', ownerPhone: '', address: '', contactDetails: '' })
+const company = ref({ name: '', businessType: '', owner: '', ownerPhone: '', address: '', contactDetails: '', authorizedRepId: null as number | null })
 
 async function loadCompany() {
   try {
@@ -112,6 +115,7 @@ async function loadCompany() {
       ownerPhone: c?.ownerPhone ?? '',
       address: c?.location ?? '',
       contactDetails: c?.contactDetails ?? '',
+      authorizedRepId: c?.authorizedRepId ?? null,
     }
   } catch {
     // Client not linked to a company yet — leave the form empty.
@@ -136,8 +140,15 @@ async function saveCompany() {
 
 // ---------- Client: Team & Invitations ----------
 const clientTeam = ref<CompanyTeamMember[]>([])
-const inviteForm = ref({ name: '', email: '', phone: '', role: '' })
+const inviteForm = ref({ name: '', email: '', phone: '' })
 const inviting = ref(false)
+
+// Everyone invited from here is a CLIENT account of this company (the backend
+// hard-codes it). The one meaningful distinction is the authorized rep — the
+// person allowed to review and complete projects — so the table labels that
+// instead of echoing the internal role string.
+const repId = computed(() => company.value.authorizedRepId)
+const isRep = (m: CompanyTeamMember) => repId.value != null && Number(repId.value) === Number(m.id)
 
 async function loadTeam() {
   try {
@@ -158,9 +169,8 @@ async function inviteMember() {
       name: inviteForm.value.name.trim() || inviteForm.value.email.trim(),
       email: inviteForm.value.email.trim(),
       phone: inviteForm.value.phone.trim() || undefined,
-      role: inviteForm.value.role.trim() || 'Team Member',
     })
-    inviteForm.value = { name: '', email: '', phone: '', role: '' }
+    inviteForm.value = { name: '', email: '', phone: '' }
     await loadTeam()
     flash('success', 'Invitation sent. The team member will receive an email with an account setup link.')
   } catch (e: any) {
@@ -593,7 +603,7 @@ onMounted(async () => {
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Access</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 </tr>
               </thead>
@@ -602,7 +612,13 @@ onMounted(async () => {
                   <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ member.name }}</td>
                   <td class="px-6 py-4 text-sm text-gray-600">{{ member.email }}</td>
                   <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ member.phone || '—' }}</td>
-                  <td class="px-6 py-4 text-sm text-gray-600">{{ member.role }}</td>
+                  <td class="px-6 py-4 text-sm text-gray-600">
+                    <span v-if="isRep(member)" class="px-2 py-1 text-xs font-medium rounded-full bg-teal-100 text-teal-800">
+                      <i class="fas fa-user-check mr-1" />Authorized Representative
+                    </span>
+                    <span v-else class="text-gray-600">Team member</span>
+                    <span v-if="meId === member.id" class="text-xs text-gray-400 ml-1">(you)</span>
+                  </td>
                   <td class="px-6 py-4">
                     <span
                       :class="[
@@ -633,8 +649,11 @@ onMounted(async () => {
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Invite a Team Member</h2>
           <p class="text-sm text-gray-600 mb-4">
             Invited members receive an email with an account setup link and are added to your company.
+            New members can view your projects, messages and documents; only the
+            <span class="font-medium text-gray-800">Authorized Representative</span> can review and complete projects.
+            To change who that is, contact your SECPhils representative.
           </p>
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
               <input
@@ -659,15 +678,6 @@ onMounted(async () => {
                 v-model="inviteForm.phone"
                 type="tel"
                 placeholder="0917 000 0000"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-              <input
-                v-model="inviteForm.role"
-                type="text"
-                placeholder="Team Member"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>

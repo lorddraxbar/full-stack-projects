@@ -182,6 +182,11 @@ public class CompanyController {
         }
         List<CompanyTeamMemberResponse> team = userRepository.findAll().stream()
                 .filter(u -> companyId.equals(u.getCompanyId()))
+                // SECURITY: mirror the staff-side /{id}/team filter — a client's
+                // team view shows only the company's CLIENT accounts. Provider
+                // staff may share a companyId (the provider company) and must
+                // never surface in a client's Team & Invitations list.
+                .filter(u -> u.getRole() != null && u.getRole().trim().equalsIgnoreCase("CLIENT"))
                 .map(CompanyTeamMemberResponse::from)
                 .toList();
         return ResponseEntity.ok(team);
@@ -235,7 +240,13 @@ public class CompanyController {
         invitee.setFirstName(inviteeName[0]);
         invitee.setLastName(inviteeName[1]);
         if (req.phone() != null && !req.phone().isBlank()) invitee.setPhone(req.phone());
-        invitee.setRole(req.role() != null && !req.role().isBlank() ? req.role() : "CLIENT");
+        // SECURITY: team members of a customer company are ALWAYS CLIENTs.
+        // The caller here is themselves a CLIENT (client self-service invite) —
+        // honouring a caller-supplied role let any client mint an ADMIN/USER
+        // account via the invite link (privilege escalation, verified live
+        // 2026-09-07). The old `role` request field is ignored; the DTO no
+        // longer declares it.
+        invitee.setRole("CLIENT");
         invitee.setCompanyId(company.getId());
         invitee.setIsActive(false);
         invitee = userRepository.save(invitee);

@@ -301,7 +301,7 @@ export async function useGetCompanyTeam() {
   return response.data as CompanyTeamMember[]
 }
 
-export async function useInviteTeamMember(data: { name: string; email: string; phone?: string; role?: string }) {
+export async function useInviteTeamMember(data: { name: string; email: string; phone?: string }) {
   const response = await api.post('/companies/me/team/invite', data)
   return response.data
 }

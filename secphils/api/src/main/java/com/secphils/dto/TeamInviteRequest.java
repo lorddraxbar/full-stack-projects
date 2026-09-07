@@ -4,10 +4,11 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-/** Invite a new member to the caller's company (Team & Invitations). */
+/** Invite a new member to the caller's company (Team & Invitations).
+ *  Invitees are always CLIENT accounts of the caller's company — there is
+ *  deliberately no `role` field (see CompanyController.inviteTeamMember). */
 public record TeamInviteRequest(
         @NotBlank(message = "Name is required") String name,
         @NotBlank(message = "Email is required") @Email String email,
-        @Size(max = 40) String phone,
-        @Size(max = 40) String role
+        @Size(max = 40) String phone
 ) {}
