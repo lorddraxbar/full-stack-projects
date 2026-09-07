@@ -13,6 +13,7 @@ import com.secphils.repository.UserRepository;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
 import com.secphils.service.MailService;
+import com.secphils.service.RepChangeNotificationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,12 +39,14 @@ public class CompanyController {
     private final MailService mailService;
     private final SystemSettingsRepository settingsRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RepChangeNotificationService repChangeNotifications;
     private final String inviteBaseUrl;
     private final Duration inviteTtl;
 
     public CompanyController(CompanyRepository companyRepository, UserRepository userRepository,
                              AuditService auditService, MailService mailService,
                              SystemSettingsRepository settingsRepository, PasswordEncoder passwordEncoder,
+                             RepChangeNotificationService repChangeNotifications,
                              @Value("${app.invite.base-url}") String inviteBaseUrl,
                              @Value("${app.invite.token-ttl:24h}") Duration inviteTtl) {
         this.companyRepository = companyRepository;
@@ -52,6 +55,7 @@ public class CompanyController {
         this.mailService = mailService;
         this.settingsRepository = settingsRepository;
         this.passwordEncoder = passwordEncoder;
+        this.repChangeNotifications = repChangeNotifications;
         this.inviteBaseUrl = inviteBaseUrl;
         this.inviteTtl = inviteTtl;
     }
@@ -132,6 +136,7 @@ public class CompanyController {
                                                   HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
         Company company = companyRepository.findById(id).orElseThrow(() -> ApiException.notFound("Company"));
+        Long previousRepId = company.getAuthorizedRep() == null ? null : company.getAuthorizedRep().getId();
         apply(company, req);
         if (req.authorizedRepId() != null) {
             User rep = userRepository.findById(req.authorizedRepId())
@@ -147,6 +152,12 @@ public class CompanyController {
         }
         company = companyRepository.save(company);
         auditService.audit(actor, "COMPANY_UPDATE", "Company", company.getId(), "Name: " + company.getName(), http);
+        // The wizard's existing-customer path moves the rep through this PUT —
+        // announce a REAL change (re-selecting the current rep stays silent).
+        Long newRepId = company.getAuthorizedRep() == null ? null : company.getAuthorizedRep().getId();
+        if (newRepId != null && !newRepId.equals(previousRepId)) {
+            repChangeNotifications.onRepChanged(company, previousRepId, company.getAuthorizedRep(), actor.id());
+        }
         return ResponseEntity.ok(CompanyResponse.from(company));
     }
 
@@ -202,10 +213,16 @@ public class CompanyController {
             touched = true;
         }
         if (touched) userRepository.save(rep);
+        Long previousRepId = company.getAuthorizedRep() == null ? null : company.getAuthorizedRep().getId();
         company.setAuthorizedRep(rep);
         company = companyRepository.save(company);
         auditService.audit(actor, "COMPANY_REP_SET", "Company", company.getId(),
                 "Rep: " + rep.getEmail(), http);
+        // Same announcement the wizard path gets (re-selecting the current rep
+        // stays silent): new rep + released old rep + provider staff.
+        if (!rep.getId().equals(previousRepId)) {
+            repChangeNotifications.onRepChanged(company, previousRepId, rep, actor.id());
+        }
         return ResponseEntity.ok(CompanyResponse.from(company));
     }
 

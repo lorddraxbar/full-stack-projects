@@ -54,6 +54,8 @@ public class EmailTemplateService {
     public static final String PROJECT_ARCHIVED = "projectArchived";
     public static final String PROJECT_RESTORED = "projectRestored";
     public static final String DOCUMENT_UPLOADED = "documentUploaded";
+    public static final String REP_ASSIGNED = "repAssigned";
+    public static final String REP_REMOVED = "repRemoved";
     public static final String LANDING = "landing";
 
     private final SystemSettingsRepository settingsRepository;
@@ -155,6 +157,20 @@ public class EmailTemplateService {
                     "Hi {{name}},\n\n{{uploader}} uploaded a new document to the project \"{{project}}\" ({{company}}):\n\n**{{document}}**\n\nOpen the project in the portal to view and download it.",
                     "View the project",
                     "You're receiving this as a member of the project's team. Manage your notification preferences in the portal.")),
+            Map.entry(REP_ASSIGNED, EmailTemplate.of(REP_ASSIGNED,
+                    "You're the authorized representative for {{company}}",
+                    "SecPhils · {{company}}",
+                    "You are now the authorized representative",
+                    "Hi {{name}},\n\nYou are now the authorized representative for {{company}}. In this role you review your company's projects in the portal and mark them complete when everything looks right.\n\n{{countLabel}}",
+                    "Open my projects",
+                    "You're receiving this because SECPhils designated you as the authorized representative for {{company}}. Manage your notification preferences in the portal.")),
+            Map.entry(REP_REMOVED, EmailTemplate.of(REP_REMOVED,
+                    "Authorized representative changed for {{company}}",
+                    "SecPhils · {{company}}",
+                    "No longer the authorized representative",
+                    "Hi {{name}},\n\nThe authorized representative role for {{company}} now belongs to **{{newRep}}**. You no longer need to review or complete projects — your normal portal access is unchanged.",
+                    "Open my projects",
+                    "You're receiving this because SECPhils updated the authorized representative for {{company}}. Manage your notification preferences in the portal.")),
             Map.entry(LANDING, EmailTemplate.of(LANDING,
                     "Landing page inquiry from {{firstName}} {{lastName}}",
                     "", "",

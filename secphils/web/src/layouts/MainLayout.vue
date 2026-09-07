@@ -50,6 +50,7 @@ const notifRoute = (n: Notif) => {
     case 'Message': return '/messages'
     case 'Project': return '/projects'
     case 'Document': return '/documents'
+    case 'Company': return '/projects'
     // Clients have no dashboard; send unknown types to their landing page.
     default: return role.value === 'CLIENT' ? '/projects' : '/dashboard'
   }
