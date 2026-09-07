@@ -5,6 +5,7 @@ import {
   useUploadMessage, useDownloadMessage,
 } from '@/services/api'
 import { useRole } from '@/composables/useRole'
+import DocumentPreviewModal from '@/components/DocumentPreviewModal.vue'
 import Pagination from '@/components/Pagination.vue'
 import { formatDateTime, timeAgo, formatFileSize } from '@/lib/labels'
 
@@ -116,6 +117,14 @@ async function downloadAttachment(msg: any) {
   } catch (err: any) {
     sendError.value = err?.response?.data?.message || 'Failed to download file'
   }
+}
+
+// ---------- Attachment preview (shared modal — same surface as Documents) ----------
+const previewOpen = ref(false)
+const previewDoc = ref<{ kind: 'message'; id: number; title: string; fileName: string } | null>(null)
+function previewAttachment(msg: any) {
+  previewDoc.value = { kind: 'message', id: msg.id, title: msg.attachmentFileName || 'Attachment', fileName: msg.attachmentFileName || '' }
+  previewOpen.value = true
 }
 
 // Project row enriched by GET /projects with the per-project message preview
@@ -362,6 +371,14 @@ onMounted(loadConversations)
                 </span>
                 <button
                   type="button"
+                  @click="previewAttachment(msg)"
+                  class="text-xs font-medium underline"
+                  :class="isOwn(msg) ? 'text-emerald-200 hover:text-white' : 'text-emerald-700 hover:text-emerald-900'"
+                >
+                  Preview
+                </button>
+                <button
+                  type="button"
                   @click="downloadAttachment(msg)"
                   class="text-xs font-medium underline"
                   :class="isOwn(msg) ? 'text-emerald-200 hover:text-white' : 'text-emerald-700 hover:text-emerald-900'"
@@ -460,5 +477,8 @@ onMounted(loadConversations)
         </div>
       </div>
     </div>
+
+    <!-- Attachment preview (shared modal with the Documents surfaces) -->
+    <DocumentPreviewModal v-model:open="previewOpen" :doc="previewDoc" />
   </div>
 </template>

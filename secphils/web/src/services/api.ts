@@ -437,6 +437,20 @@ export async function useDocumentContentBlob(id: number) {
   return response.data as Blob
 }
 
+/**
+ * Authenticated inline content for message-attachment previews: same access
+ * rules as the attachment download (internal messages 404 for clients), with
+ * the API's safe inline allowlist. Anything else arrives as octet-stream —
+ * callers must treat that as "no preview, offer download".
+ */
+export async function useMessageContentBlob(id: number) {
+  const response = await api.get(`/messages/${id}/content`, {
+    responseType: 'blob',
+    timeout: 120_000,
+  })
+  return response.data as Blob
+}
+
 export async function useCreateDocument(data: Record<string, unknown>) {
   const response = await api.post('/documents', data)
   return response.data

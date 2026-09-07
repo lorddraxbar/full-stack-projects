@@ -1,21 +1,22 @@
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount } from 'vue'
-import { useDocumentContentBlob } from '@/services/api'
+import { useDocumentContentBlob, useMessageContentBlob } from '@/services/api'
 
 /**
- * Inline document preview (shared by the Documents view and the project
- * Documents tab, so every surface renders files identically). Fetches the
- * authenticated /documents/{id}/content blob and renders it by MIME type:
- * images inline, PDFs in the browser viewer, plain text readable. The API
- * only inlines a safe non-executable allowlist — anything else (SVG, Office,
- * archives) arrives as octet-stream and lands on the fallback card, which
- * offers Download instead.
+ * Inline preview (Documents view, project Documents tab, Messages inbox,
+ * project Messages tab — every attachment surface renders files identically).
+ * Fetches the authenticated content blob (document or message attachment)
+ * and renders it by MIME type: images inline, PDFs in the browser viewer,
+ * plain text readable. The API only inlines a safe non-executable allowlist —
+ * anything else (SVG, Office, archives) arrives as octet-stream and lands on
+ * the fallback card, which offers Download instead.
  *
- * v-model:open controls visibility; `doc` carries { id, title, fileName }.
+ * v-model:open controls visibility; `doc` carries { kind, id, title,
+ * fileName } where kind picks the endpoint ('document' | 'message').
  */
 const props = defineProps<{
   open: boolean
-  doc: { id: number; title: string; fileName?: string } | null
+  doc: { kind?: 'document' | 'message'; id: number; title: string; fileName?: string } | null
 }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
@@ -37,7 +38,9 @@ async function load() {
   if (!props.doc) return
   loading.value = true
   try {
-    const blob = await useDocumentContentBlob(props.doc.id)
+    const blob = props.doc.kind === 'message'
+      ? await useMessageContentBlob(props.doc.id)
+      : await useDocumentContentBlob(props.doc.id)
     objectUrl.value = URL.createObjectURL(blob)
     const mime = (blob.type || '').toLowerCase()
     if (mime.startsWith('image/')) kind.value = 'image'

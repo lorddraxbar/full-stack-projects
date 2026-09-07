@@ -12,6 +12,7 @@ import com.secphils.entity.Notification;
 import com.secphils.entity.NotificationPreference;
 import com.secphils.entity.Project;
 import com.secphils.policy.DisplayNamePolicy;
+import com.secphils.policy.InlineContentPolicy;
 import com.secphils.repository.DocumentRepository;
 import com.secphils.repository.MessageRepository;
 import com.secphils.repository.UserRepository;
@@ -232,6 +233,12 @@ public class MessageController {
      * Authenticated proxy download of a message attachment. S3 refs are
      * proxied (so access control is always enforced); plain http(s) refs
      * redirect to the source.
+     *
+     * <p>HARDENING: the uploader-supplied content type is NEVER echoed —
+     * downloads always go out as octet-stream + attachment + nosniff, since a
+     * stored {@code text/html} type would make a redirect/inline path
+     * script-executable same-origin. Real types are only ever chosen by
+     * {@link InlineContentPolicy} on the preview endpoint, by file extension.
      */
     @GetMapping("/{id}/download")
     @Transactional(readOnly = true)
@@ -258,8 +265,48 @@ public class MessageController {
                 ? "attachment" : m.getAttachmentFileName().replace(q, "");
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + q + name + q)
-                .contentType(m.getAttachmentContentType() == null
-                        ? MediaType.APPLICATION_OCTET_STREAM : MediaType.parseMediaType(m.getAttachmentContentType()))
+                .header("X-Content-Type-Options", "nosniff")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentLength(bytes.length)
+                .body(bytes);
+    }
+
+    /**
+     * Inline preview variant of the attachment download: same access rules,
+     * but files whose NAME EXTENSION is on {@link InlineContentPolicy}'s
+     * allowlist (PDF, raster images, plain text) are served with their real
+     * MIME and {@code Content-Disposition: inline} so the portal can render
+     * them. Everything else (SVG, Office, archives — and anything whose
+     * uploader lied about the type) is the same safe attachment.
+     */
+    @GetMapping("/{id}/content")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> content(@PathVariable Long id) {
+        AuthUser actor = CurrentUser.require();
+        Message m = messageRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Message"));
+        requireReadableBy(actor, m.getProject().getCompany().getId());
+        if (actor.isClient() && isInternal(m)) {
+            throw ApiException.notFound("Message");
+        }
+        String url = m.getAttachmentUrl();
+        if (url == null || url.isBlank()) {
+            throw ApiException.badRequest("This message has no file attached");
+        }
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(url)).build();
+        }
+        byte[] bytes = storageService.download(url);
+        String q = String.valueOf((char) 34);
+        String name = (m.getAttachmentFileName() == null || m.getAttachmentFileName().isBlank())
+                ? "attachment" : m.getAttachmentFileName().replace(q, "");
+        MediaType inline = InlineContentPolicy.inlineType(name).orElse(null);
+        boolean safeInline = inline != null;
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        (safeInline ? "inline" : "attachment") + "; filename=" + q + name + q)
+                .header("X-Content-Type-Options", "nosniff")
+                .contentType(safeInline ? inline : MediaType.APPLICATION_OCTET_STREAM)
                 .contentLength(bytes.length)
                 .body(bytes);
     }

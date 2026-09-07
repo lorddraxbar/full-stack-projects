@@ -15,6 +15,7 @@ import com.secphils.repository.DocumentRepository;
 import com.secphils.repository.ProjectRepository;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
+import com.secphils.policy.InlineContentPolicy;
 import com.secphils.service.DocumentTrashService;
 import com.secphils.service.DocumentNotificationService;
 import com.secphils.service.S3StorageService;
@@ -174,8 +175,7 @@ public class DocumentController {
         }
         byte[] bytes = storageService.download(url);
         String name = displayName(url, doc.getTitle());
-        String ext = name.lastIndexOf('.') >= 0 ? name.substring(name.lastIndexOf('.') + 1).toLowerCase() : "";
-        MediaType inline = INLINE_TYPES.get(ext);
+        MediaType inline = InlineContentPolicy.inlineType(name).orElse(null);
         boolean safeInline = inline != null;
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -185,17 +185,6 @@ public class DocumentController {
                 .contentLength(bytes.length)
                 .body(bytes);
     }
-
-    private static final java.util.Map<String, MediaType> INLINE_TYPES = java.util.Map.of(
-            "pdf", MediaType.APPLICATION_PDF,
-            "png", MediaType.IMAGE_PNG,
-            "jpg", MediaType.IMAGE_JPEG,
-            "jpeg", MediaType.IMAGE_JPEG,
-            "gif", MediaType.IMAGE_GIF,
-            "webp", MediaType.parseMediaType("image/webp"),
-            "bmp", MediaType.parseMediaType("image/bmp"),
-            "tiff", MediaType.parseMediaType("image/tiff"),
-            "txt", MediaType.TEXT_PLAIN);
 
     /**
      * Streams the file. S3-backed files are proxied through the API (works for

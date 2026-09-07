@@ -340,9 +340,13 @@ const submitFileInput = ref<HTMLInputElement | null>(null)
 
 // ---------- Document preview (shared modal with the Documents view) ----------
 const previewOpen = ref(false)
-const previewDoc = ref<{ id: number; title: string; fileName: string } | null>(null)
+const previewDoc = ref<{ kind?: 'document' | 'message'; id: number; title: string; fileName: string } | null>(null)
 function previewDocument(doc: any) {
-  previewDoc.value = { id: doc.id, title: doc.title, fileName: doc.fileName || '' }
+  previewDoc.value = { kind: 'document', id: doc.id, title: doc.title, fileName: doc.fileName || '' }
+  previewOpen.value = true
+}
+function previewAttachment(msg: any) {
+  previewDoc.value = { kind: 'message', id: msg.id, title: msg.attachmentFileName || 'Attachment', fileName: msg.attachmentFileName || '' }
   previewOpen.value = true
 }
 
@@ -1660,6 +1664,14 @@ async function saveProductionEdit() {
                   <i class="fas fa-paperclip mr-1"></i>{{ msg.attachmentFileName }}
                   <span v-if="msg.attachmentFileSize" class="opacity-70">({{ formatFileSize(msg.attachmentFileSize) }})</span>
                 </span>
+                <button
+                  type="button"
+                  @click="previewAttachment(msg)"
+                  class="text-xs font-medium underline"
+                  :class="isMine(msg) ? 'text-emerald-200 hover:text-white' : 'text-emerald-700 hover:text-emerald-900'"
+                >
+                  Preview
+                </button>
                 <button
                   type="button"
                   @click="downloadAttachment(msg)"
