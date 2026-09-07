@@ -1142,10 +1142,11 @@ async function saveProductionEdit() {
             <div v-if="nasWithoutContent.length" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600">
               <i class="fas fa-circle-slash mr-1 text-gray-400" />Marked not applicable: {{ nasWithoutContent.map(s => s.label).join(', ') }}.
             </div>
-            <!-- Total project cost — shown to staff and to the authorized rep (they
-              complete/verify these details; the read-only view for other
-              clients stays staff-hidden) -->
-            <div v-if="(!isClient || isAuthorizedRep) && project.totalCost != null" class="bg-white rounded-lg shadow p-6">
+            <!-- Total project cost — visible to ALL clients of the company
+              (visibility is uniform across the customer team; the rep-only
+              privilege is EDITING, not reading — mirrors the list page, which
+              already shows cost to every client) -->
+            <div v-if="project.totalCost != null" class="bg-white rounded-lg shadow p-6">
               <h2 class="text-sm font-medium text-gray-500 uppercase mb-1">Total Project Cost</h2>
               <p class="text-2xl font-bold text-gray-900">{{ formatPhp(project.totalCost) }}</p>
             </div>

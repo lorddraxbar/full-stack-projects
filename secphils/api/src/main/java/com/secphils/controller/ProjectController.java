@@ -170,6 +170,12 @@ public class ProjectController {
     public ResponseEntity<ProjectResponse> create(@Valid @RequestBody ProjectRequest req,
                                                   HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
+        // Projects are created by the provider (admin/staff wizard). Clients —
+        // including the authorized rep — request work through the team, they
+        // never file projects themselves; the UI hid this, the API now says so.
+        if (actor.isClient()) {
+            throw ApiException.forbidden("Projects can only be created by the SECPhils team");
+        }
         if (req.serviceId() == null) {
             throw ApiException.badRequest("Service type is required");
         }
@@ -206,6 +212,16 @@ public class ProjectController {
         AuthUser actor = CurrentUser.require();
         Project project = projectRepository.findById(id).orElseThrow(() -> ApiException.notFound("Project"));
         requireVisibleTo(actor, project.getCompany().getId());
+        // Clients are READ-only on projects with one exception: their company's
+        // authorized representative, who reviews production details and marks
+        // completion. The UI only ever showed those controls to the rep — this
+        // is the server-side enforcement (a non-rep client PUT previously
+        // succeeded, letting any team member rename, re-price or complete
+        // projects). Admin + provider staff keep their existing scopes.
+        if (actor.isClient() && !isRepOf(actor, project.getCompany())) {
+            throw ApiException.forbidden(
+                    "Only the company's authorized representative can update this project");
+        }
         if (!actor.isAdmin() && (req.companyId() == null || !req.companyId().equals(actor.getCompanyId()))) {
             throw ApiException.forbidden("You can only update projects of your own company");
         }
@@ -297,6 +313,12 @@ public class ProjectController {
         project.setProgress(req.progress() != null ? req.progress() : 0);
     }
 
+    /** True when the actor is the company's authorized representative. */
+    private boolean isRepOf(AuthUser actor, Company company) {
+        User rep = company == null ? null : company.getAuthorizedRep();
+        return rep != null && rep.getId().equals(actor.id());
+    }
+
     /** Clients/staff may only touch projects of their own company; admin is
      *  unrestricted. The customer company's authorized representative is an
      *  exception: they must be able to open the project (review link) and
@@ -304,9 +326,7 @@ public class ProjectController {
     private void requireVisibleTo(AuthUser actor, Long companyId) {
         if (actor.isAdmin()) return;
         if (companyId.equals(actor.getCompanyId())) return;
-        Company company = companyRepository.findById(companyId).orElse(null);
-        User rep = company == null ? null : company.getAuthorizedRep();
-        if (rep != null && rep.getId().equals(actor.id())) return;
+        if (isRepOf(actor, companyRepository.findById(companyId).orElse(null))) return;
         throw ApiException.notFound("Project"); // 404, not 403 — don't reveal other companies' data
     }
 
@@ -318,9 +338,7 @@ public class ProjectController {
             return; // staff & admin: cross-company reads
         }
         if (companyId.equals(actor.getCompanyId())) return;
-        Company company = companyRepository.findById(companyId).orElse(null);
-        User rep = company == null ? null : company.getAuthorizedRep();
-        if (rep != null && rep.getId().equals(actor.id())) return;
+        if (isRepOf(actor, companyRepository.findById(companyId).orElse(null))) return;
         throw ApiException.notFound("Project"); // 404, not 403 — don't reveal other companies' data
     }
 }
