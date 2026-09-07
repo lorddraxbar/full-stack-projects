@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useRole } from '@/composables/useRole'
 import RowActionsMenu from '@/components/RowActionsMenu.vue'
 import BackToListButton from '@/components/BackToListButton.vue'
+import DocumentPreviewModal from '@/components/DocumentPreviewModal.vue'
 import {
   useGetMe, useGetProject, useGetCompany,
   useGetDocuments, useCreateDocument, useDeleteDocument, useUploadDocument,
@@ -336,6 +337,14 @@ const submitting = ref(false)
 const submitError = ref('')
 const submitForm = ref({ title: '', description: '', file: null as File | null })
 const submitFileInput = ref<HTMLInputElement | null>(null)
+
+// ---------- Document preview (shared modal with the Documents view) ----------
+const previewOpen = ref(false)
+const previewDoc = ref<{ id: number; title: string; fileName: string } | null>(null)
+function previewDocument(doc: any) {
+  previewDoc.value = { id: doc.id, title: doc.title, fileName: doc.fileName || '' }
+  previewOpen.value = true
+}
 
 function openSubmitDialog() {
   submitForm.value = { title: '', description: '', file: null }
@@ -1566,7 +1575,12 @@ async function saveProductionEdit() {
                   <div class="flex items-center gap-3">
                     <i class="fas fa-file-lines text-emerald-500 text-lg" />
                     <div>
-                      <span class="font-medium text-gray-900 text-sm">{{ doc.title }}</span>
+                      <button
+                        v-if="doc.fileUrl"
+                        class="font-medium text-gray-900 text-sm hover:text-emerald-700 hover:underline text-left"
+                        @click="previewDocument(doc)"
+                      >{{ doc.title }}</button>
+                      <span v-else class="font-medium text-gray-900 text-sm">{{ doc.title }}</span>
                       <p v-if="doc.description" class="text-xs text-gray-500">{{ doc.description }}</p>
                     </div>
                   </div>
@@ -1580,6 +1594,13 @@ async function saveProductionEdit() {
                 <td class="px-6 py-4 text-sm text-gray-600">{{ doc.uploaderName || '—' }}</td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ formatDate(doc.uploadedAt) }}</td>
                 <td class="px-3 py-4 text-right whitespace-nowrap">
+                  <button
+                    v-if="doc.fileUrl"
+                    class="text-gray-700 hover:text-emerald-700 font-medium text-sm mr-3"
+                    @click="previewDocument(doc)"
+                  >
+                    <i class="fas fa-eye mr-1" />Preview
+                  </button>
                   <RowActionsMenu v-if="!isClient" :actions="[
                     { label: 'Delete', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => deleteDocument(doc.id) }
                   ]" />
@@ -1838,6 +1859,9 @@ async function saveProductionEdit() {
         </div>
       </div>
     </div>
+
+    <!-- ================= DOCUMENT PREVIEW ================= -->
+    <DocumentPreviewModal v-model:open="previewOpen" :doc="previewDoc" />
 
     <!-- ================= CLIENT SUBMIT DOCUMENT DIALOG ================= -->
     <div

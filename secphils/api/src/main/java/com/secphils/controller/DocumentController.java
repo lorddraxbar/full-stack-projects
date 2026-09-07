@@ -148,6 +148,56 @@ public class DocumentController {
     }
 
     /**
+     * Inline preview variant of /download: same access rules, but served with
+     * the file's real content type and {@code Content-Disposition: inline} so
+     * the browser can render it (PDF viewer / &lt;img&gt;). SECURITY: only a
+     * fixed allowlist of non-executable types is inlined (pdf, raster images,
+     * plain text). SVG and anything else is downgraded to an attachment with
+     * octet-stream + nosniff — an uploaded .svg can carry scripts, and the
+     * bytes are same-origin with the portal.
+     */
+    @GetMapping("/{id}/content")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> content(@PathVariable Long id) {
+        AuthUser actor = CurrentUser.require();
+        Document doc = documentRepository.findById(id).orElseThrow(() -> ApiException.notFound("Document"));
+        requireVisibleTo(actor, doc.getProject().getCompany().getId());
+        if (actor.isClient() && doc.getDeletedAt() != null) {
+            throw ApiException.notFound("Document");
+        }
+        String url = doc.getFileUrl();
+        if (url == null || url.isBlank()) {
+            throw ApiException.badRequest("This document has no file attached");
+        }
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(url)).build();
+        }
+        byte[] bytes = storageService.download(url);
+        String name = displayName(url, doc.getTitle());
+        String ext = name.lastIndexOf('.') >= 0 ? name.substring(name.lastIndexOf('.') + 1).toLowerCase() : "";
+        MediaType inline = INLINE_TYPES.get(ext);
+        boolean safeInline = inline != null;
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        (safeInline ? "inline" : "attachment") + "; filename=\"" + name.replace("\"", "") + "\"")
+                .header("X-Content-Type-Options", "nosniff")
+                .contentType(safeInline ? inline : MediaType.APPLICATION_OCTET_STREAM)
+                .contentLength(bytes.length)
+                .body(bytes);
+    }
+
+    private static final java.util.Map<String, MediaType> INLINE_TYPES = java.util.Map.of(
+            "pdf", MediaType.APPLICATION_PDF,
+            "png", MediaType.IMAGE_PNG,
+            "jpg", MediaType.IMAGE_JPEG,
+            "jpeg", MediaType.IMAGE_JPEG,
+            "gif", MediaType.IMAGE_GIF,
+            "webp", MediaType.parseMediaType("image/webp"),
+            "bmp", MediaType.parseMediaType("image/bmp"),
+            "tiff", MediaType.parseMediaType("image/tiff"),
+            "txt", MediaType.TEXT_PLAIN);
+
+    /**
      * Streams the file. S3-backed files are proxied through the API (works for
      * private buckets); plain http(s) references redirect to the source.
      */

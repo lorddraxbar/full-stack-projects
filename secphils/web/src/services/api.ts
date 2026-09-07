@@ -423,6 +423,20 @@ export async function useDownloadDocument(id: number) {
   return response.data as Blob
 }
 
+/**
+ * Authenticated inline content for previews: same access rules as the
+ * download, but the API serves allowlisted safe types (PDF, raster images,
+ * text) with their real MIME + inline disposition. Anything else arrives as
+ * octet-stream — callers must handle that as "no preview, offer download".
+ */
+export async function useDocumentContentBlob(id: number) {
+  const response = await api.get(`/documents/${id}/content`, {
+    responseType: 'blob',
+    timeout: 120_000,
+  })
+  return response.data as Blob
+}
+
 export async function useCreateDocument(data: Record<string, unknown>) {
   const response = await api.post('/documents', data)
   return response.data

@@ -6,6 +6,7 @@ import {
   useGetTrashDocuments, useRestoreDocument, useDeleteDocumentPermanently, useEmptyTrash,
 } from '@/services/api'
 import { useRetention } from '@/composables/useRetention'
+import DocumentPreviewModal from '@/components/DocumentPreviewModal.vue'
 import Pagination from '@/components/Pagination.vue'
 import {
   fileTypeLabel, FILE_TYPE_LABELS, FILE_TYPE_COLORS,
@@ -32,6 +33,7 @@ const passwordError = ref('')
 interface DocRow {
   id: number
   title: string
+  fileName: string
   description: string
   projectId: number
   project: string
@@ -130,6 +132,7 @@ function mapDoc(d: any): DocRow {
   return {
     id: d.id,
     title: d.title,
+    fileName: d.fileName || '',
     description: d.description || '',
     projectId: d.projectId,
     project: projectById.value[d.projectId] || `Project #${d.projectId}`,
@@ -205,6 +208,14 @@ async function downloadDocument(doc: DocRow) {
   } catch (e: any) {
     alert(e?.response?.data?.message || 'Failed to download document')
   }
+}
+
+// ---------- Preview ----------
+const previewOpen = ref(false)
+const previewDoc = ref<{ id: number; title: string; fileName: string } | null>(null)
+function previewDocument(doc: DocRow) {
+  previewDoc.value = { id: doc.id, title: doc.title, fileName: doc.fileName }
+  previewOpen.value = true
 }
 
 async function removeDocument(doc: DocRow) {
@@ -394,7 +405,12 @@ onMounted(async () => {
                 <i class="fas fa-file-lines text-emerald-600"></i>
               </div>
               <div class="min-w-0">
-                <h3 class="font-medium text-gray-900 truncate">{{ doc.title }}</h3>
+                <button
+                  v-if="doc.fileUrl"
+                  class="font-medium text-gray-900 truncate hover:text-emerald-700 hover:underline text-left"
+                  @click="previewDocument(doc)"
+                >{{ doc.title }}</button>
+                <h3 v-else class="font-medium text-gray-900 truncate">{{ doc.title }}</h3>
                 <p class="text-sm text-gray-600 truncate">{{ doc.project }}</p>
               </div>
             </div>
@@ -413,6 +429,13 @@ onMounted(async () => {
             </div>
             <div class="flex items-center gap-3">
               <span class="text-gray-500">{{ formatDate(doc.uploadedAt) }}</span>
+              <button
+                v-if="doc.fileUrl"
+                class="text-gray-700 hover:text-emerald-700 font-medium"
+                @click="previewDocument(doc)"
+              >
+                <i class="fas fa-eye mr-1" />Preview
+              </button>
               <button
                 v-if="doc.fileUrl"
                 class="text-emerald-600 hover:text-emerald-700 font-medium"
@@ -434,7 +457,7 @@ onMounted(async () => {
 
       <div v-if="filteredDocuments.length === 0" class="p-12 text-center">
         <p class="text-gray-600">
-          {{ documents.length === 0 ? 'No documents yet. Upload the first one.' : 'No documents found matching your criteria.' }}
+          {{ documents.length === 0 ? (isClient ? 'No documents yet — use Submit Document to file a requested file.' : 'No documents yet. Upload the first one.') : 'No documents found matching your criteria.' }}
         </p>
       </div>
       <Pagination v-model:page="docPage" :total="filteredDocuments.length" :page-size="pageSize" />
@@ -560,6 +583,9 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <!-- Document preview (shared modal — same surface as the project view) -->
+    <DocumentPreviewModal v-model:open="previewOpen" :doc="previewDoc" />
 
     <!-- Upload Modal -->
     <div v-if="showUploadModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
