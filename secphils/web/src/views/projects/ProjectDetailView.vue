@@ -7,14 +7,14 @@ import BackToListButton from '@/components/BackToListButton.vue'
 import {
   useGetMe, useGetProject, useGetCompany, useGetProjectTeam,
   useGetDocuments, useCreateDocument, useDeleteDocument,
-  useGetMessages, useSendMessage, useUpdateProject,
+  useGetMessages, useSendMessage, useUploadMessage, useDownloadMessage, useUpdateProject,
   useArchiveProject, useRestoreProject, useHardDeleteProject,
   useUpdateCompany, useUpdateUser,
 } from '@/services/api'
 import {
   projectStatusLabel, fileTypeLabel,
   PROJECT_STATUS_COLORS, FILE_TYPE_COLORS,
-  formatDate, formatDateTime, formatPhp,
+  formatDate, formatDateTime, formatPhp, formatFileSize,
 } from '@/lib/labels'
 
 const { isClient, isAdmin } = useRole()
@@ -220,6 +220,7 @@ async function hardDeleteProject() {
 // ---------- Messages ----------
 const messageDraft = ref('')
 const sending = ref(false)
+const sendError = ref('')
 // Safe by default: staff start staff-only; flip to share with the client.
 const sendInternal = ref(true)
 const visibleToClient = computed({
@@ -228,17 +229,65 @@ const visibleToClient = computed({
 })
 // What actually gets sent — a client can never be internal (the backend 403s it).
 const effectiveInternal = computed(() => !isClient.value && sendInternal.value)
+
+const pendingFile = ref<File | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024 // matches backend maxUploadMb / nginx cap
+
+function onFilePicked(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0]
+  if (!f) return
+  if (f.size > MAX_UPLOAD_BYTES) {
+    sendError.value = 'File is too large (max 25 MB)'
+    return
+  }
+  sendError.value = ''
+  pendingFile.value = f
+}
+
+function removePendingFile() {
+  pendingFile.value = null
+  if (fileInput.value) fileInput.value.value = ''
+}
+
 async function sendMessage() {
-  if (!messageDraft.value.trim() || sending.value) return
+  const text = messageDraft.value.trim()
+  const file = pendingFile.value
+  if ((!text && !file) || sending.value) return
   sending.value = true
+  sendError.value = ''
   try {
-    await useSendMessage(projectId.value, messageDraft.value.trim(), effectiveInternal.value)
+    if (file) {
+      await useUploadMessage({ projectId: projectId.value, body: text || undefined, file, internal: effectiveInternal.value })
+    } else {
+      await useSendMessage(projectId.value, text, effectiveInternal.value)
+    }
     messageDraft.value = ''
+    pendingFile.value = null
+    if (fileInput.value) fileInput.value.value = ''
     messages.value = await useGetMessages(projectId.value)
   } catch (err: any) {
-    saveError.value = err?.response?.data?.message || 'Failed to send message'
+    const msg = err?.response?.data?.message || 'Failed to send message'
+    sendError.value = msg
+    saveError.value = msg // the Overview "Add Update" card still surfaces send errors
   } finally {
     sending.value = false
+  }
+}
+
+async function downloadAttachment(msg: any) {
+  try {
+    const blob = await useDownloadMessage(msg.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = msg.attachmentFileName || 'attachment'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (err: any) {
+    sendError.value = err?.response?.data?.message || 'Failed to download file'
   }
 }
 
@@ -1388,19 +1437,46 @@ async function saveProductionEdit() {
               <p class="text-sm">{{ msg.body }}</p>
               <div
                 v-if="msg.attachmentFileName"
-                class="mt-2 pt-2 border-t text-xs"
+                class="mt-2 pt-2 border-t text-xs flex items-center justify-between gap-2"
                 :class="isMine(msg) ? 'border-white/20 text-emerald-100' : 'border-gray-300 text-gray-600'"
               >
-                <i class="fas fa-paperclip mr-1"></i>{{ msg.attachmentFileName }}
+                <span class="flex-1 truncate">
+                  <i class="fas fa-paperclip mr-1"></i>{{ msg.attachmentFileName }}
+                  <span v-if="msg.attachmentFileSize" class="opacity-70">({{ formatFileSize(msg.attachmentFileSize) }})</span>
+                </span>
+                <button
+                  type="button"
+                  @click="downloadAttachment(msg)"
+                  class="text-xs font-medium underline"
+                  :class="isMine(msg) ? 'text-emerald-200 hover:text-white' : 'text-emerald-700 hover:text-emerald-900'"
+                >
+                  Download
+                </button>
               </div>
             </div>
           </div>
         </div>
         <div class="p-6 border-t border-gray-200">
-          <div
-            class="flex flex-col gap-3 rounded-lg border p-3"
-            :class="effectiveInternal ? 'border-slate-300 bg-slate-50' : 'border-emerald-300 bg-emerald-50/40'"
-          >
+          <!-- Pending file chip -->
+                  <div v-if="pendingFile" class="mb-2 flex items-center gap-2">
+                    <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-lg">
+                      <i class="fas fa-paperclip text-emerald-600"></i>
+                      <span class="max-w-[220px] truncate">{{ pendingFile.name }}</span>
+                      <span class="text-xs text-emerald-600">{{ formatFileSize(pendingFile.size) }}</span>
+                      <button
+                        type="button"
+                        @click="removePendingFile"
+                        class="ml-1 text-emerald-500 hover:text-emerald-700"
+                        title="Remove file"
+                      >
+                        <i class="fas fa-times"></i>
+                      </button>
+                    </span>
+                  </div>
+                  <div
+                    class="flex flex-col gap-3 rounded-lg border p-3"
+                    :class="effectiveInternal ? 'border-slate-300 bg-slate-50' : 'border-emerald-300 bg-emerald-50/40'"
+                  >
             <!-- Audience banner: sender-only — tells staff who will read this message. Clients have no audience choice. -->
             <div
               v-if="!isClient"
@@ -1432,10 +1508,23 @@ async function saveProductionEdit() {
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm bg-white"
             ></textarea>
 
-            <div class="flex items-center justify-end">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="fileInput?.click()"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg text-gray-500 hover:bg-white hover:text-emerald-600 transition-colors text-sm"
+                  title="Attach a file"
+                >
+                  <i class="fas fa-paperclip"></i>
+                  <span class="hidden sm:inline">Attach</span>
+                </button>
+                <input ref="fileInput" type="file" class="hidden" @change="onFilePicked" />
+                <p v-if="sendError" class="text-xs text-red-600">{{ sendError }}</p>
+              </div>
               <button
                 @click="sendMessage"
-                :disabled="sending || !messageDraft.trim()"
+                :disabled="sending || (!messageDraft.trim() && !pendingFile)"
                 class="inline-flex items-center gap-2 px-5 py-2 rounded-lg text-white font-medium transition-colors disabled:opacity-50"
                 :class="effectiveInternal ? 'bg-slate-700 hover:bg-slate-800' : 'bg-emerald-600 hover:bg-emerald-700'"
               >
