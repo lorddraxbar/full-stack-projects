@@ -9,7 +9,7 @@ import {
   useGetDocuments, useCreateDocument, useDeleteDocument,
   useGetMessages, useSendMessage, useUploadMessage, useDownloadMessage, useUpdateProject,
   useArchiveProject, useRestoreProject, useHardDeleteProject,
-  useUpdateCompany, useUpdateUser,
+  useUpdateCompany, useGetCompanyTeamFor, useInviteCustomerRep, useSetAuthorizedRep,
 } from '@/services/api'
 import {
   projectStatusLabel, fileTypeLabel,
@@ -579,16 +579,33 @@ async function saveCompanyEdit() {
 // ---------- Overview editor: project address + authorized rep ----------
 // These two were split across the Company tab / Admin Controls. They now live
 // together in the Overview tab. The project address is a project field (PUT
-// project); the rep's name/email/phone live on the rep's User row (PUT user).
-// After the rep update we re-fetch the company so its derived rep fields
-// (authorizedRepName/Email/Phone) re-render from the fresh user row.
+// project); the rep is now chosen like the New Project wizard does — a picker
+// over the company's CLIENT team (GET /companies/{id}/team) plus an
+// "add a new representative" invite — and saved through the scoped
+// PUT /companies/{id}/authorized-rep. After saving we re-fetch the company so
+// its derived rep fields re-render.
 const overviewForm = ref<{
   address: string; addressDiffers: boolean;
-  repName: string; repEmail: string; repPhone: string;
-}>({ address: '', addressDiffers: false, repName: '', repEmail: '', repPhone: '' })
+  repUserId: string; repName: string; repEmail: string; repPhone: string;
+}>({ address: '', addressDiffers: false, repUserId: '', repName: '', repEmail: '', repPhone: '' })
 const editingOverview = ref(false)
 const overviewSaving = ref(false)
 const overviewError = ref('')
+
+// Rep picker state (mirrors NewProjectWizard's existing-customer flow).
+interface RepTeamMember { id: number; name: string; email: string; phone: string | null; status: string }
+const repTeam = ref<RepTeamMember[]>([])
+const repTeamLoading = ref(false)
+const repTeamError = ref('')
+const addingRep = ref(false)
+const addRepForm = ref({ name: '', email: '', phone: '' })
+const addRepBusy = ref(false)
+const addRepError = ref('')
+
+const repTeamCurrentId = computed(() => {
+  const id = (company.value as any)?.authorizedRepId
+  return id != null ? String(id) : ''
+})
 
 // The company's canonical address. New customer companies store it in
 // `location` (the wizard's "Company Address" field); the provider's own
@@ -599,23 +616,92 @@ const companyAddress = computed(() => {
   return c?.location || c?.headquarters || ''
 })
 
+async function loadRepTeam() {
+  repTeamError.value = ''
+  const companyId = (company.value as any)?.id
+  if (companyId == null) { repTeam.value = []; return }
+  repTeamLoading.value = true
+  try {
+    const team = await useGetCompanyTeamFor(companyId)
+    repTeam.value = (team as any[])
+      .filter(m => m != null && m.id != null)
+      .map(m => ({ id: m.id, name: m.name, email: m.email, phone: m.phone ?? null, status: m.status }))
+  } catch (e: any) {
+    repTeamError.value = e?.response?.data?.message || 'Failed to load the client users for this company'
+    repTeam.value = []
+  } finally {
+    repTeamLoading.value = false
+  }
+}
+
 function startOverviewEdit() {
   const p = project.value
   const c = company.value as any
   overviewForm.value = {
     address: p?.address || '',
     addressDiffers: !!p?.address,
+    repUserId: c?.authorizedRepId != null ? String(c.authorizedRepId) : '',
     repName: c?.authorizedRepName || '',
     repEmail: c?.authorizedRepEmail || '',
     repPhone: c?.authorizedRepPhone || '',
   }
   overviewError.value = ''
+  addingRep.value = false
+  addRepForm.value = { name: '', email: '', phone: '' }
+  addRepError.value = ''
   editingOverview.value = true
+  void loadRepTeam()
 }
 
 function cancelOverviewEdit() {
   editingOverview.value = false
-  overviewForm.value = { address: '', addressDiffers: false, repName: '', repEmail: '', repPhone: '' }
+  addingRep.value = false
+  overviewForm.value = { address: '', addressDiffers: false, repUserId: '', repName: '', repEmail: '', repPhone: '' }
+}
+
+// Choosing a team member in the picker loads their contact details into the
+// (still editable) name/email/phone boxes — staff can correct a rep's email
+// there; the scoped endpoint validates uniqueness.
+function onRepPick(id: string) {
+  overviewForm.value.repUserId = id
+  const m = repTeam.value.find(x => String(x.id) === id)
+  if (m) {
+    overviewForm.value.repName = m.name || ''
+    overviewForm.value.repEmail = m.email || ''
+    overviewForm.value.repPhone = m.phone || ''
+  }
+  addRepError.value = ''
+}
+
+async function addRep() {
+  addRepError.value = ''
+  const name = addRepForm.value.name.trim()
+  const email = addRepForm.value.email.trim()
+  if (!name || !email) {
+    addRepError.value = 'Enter the new representative’s full name and email.'
+    return
+  }
+  const companyId = (company.value as any)?.id
+  if (companyId == null) {
+    addRepError.value = 'Company not loaded — reload the page and try again.'
+    return
+  }
+  addRepBusy.value = true
+  try {
+    const created = await useInviteCustomerRep(companyId, {
+      name, email,
+      phone: addRepForm.value.phone.trim() || undefined,
+      setAsRep: false, // the rep only actually changes when Save is pressed
+    }) as any
+    addRepForm.value = { name: '', email: '', phone: '' }
+    addingRep.value = false
+    await loadRepTeam()
+    if (created?.id != null) onRepPick(String(created.id))
+  } catch (e: any) {
+    addRepError.value = e?.response?.data?.message || 'Failed to add the new representative.'
+  } finally {
+    addRepBusy.value = false
+  }
 }
 
 async function saveOverviewEdit() {
@@ -650,22 +736,16 @@ async function saveOverviewEdit() {
     })
     project.value = updated
 
-    // 2. The authorized rep's name/email/phone live on the rep's User row.
-    //    Email can't be cleared (unique, non-blank only); a blank name just
-    //    skips the first/last-name split. Re-fetch the company afterwards so
-    //    the derived rep fields reflect the new user row.
-    const repId = (company.value as any)?.authorizedRepId
-    if (repId) {
-      const email = f.repEmail.trim()
-      const repName = f.repName.trim()
-      const nameParts = repName ? repName.split(/\s+/) : []
-      await useUpdateUser(repId, {
-        email: email || undefined,
-        firstName: nameParts[0] || undefined,
-        lastName: nameParts.slice(1).join(' ') || undefined,
+    // 2. Authorized rep: scoped endpoint sets the pick AND applies the contact
+    //    fields to the rep's user row (name split + phone are blank-skips, so
+    //    picking someone else can't wipe fields unless typed).
+    if (f.repUserId) {
+      company.value = await useSetAuthorizedRep(p.companyId, {
+        repUserId: Number(f.repUserId),
+        fullName: f.repName.trim() || undefined,
+        email: f.repEmail.trim() || undefined,
         phone: f.repPhone.trim() || undefined,
       })
-      company.value = await useGetCompany(p.companyId)
     }
     editingOverview.value = false
   } catch (err: any) {
@@ -814,38 +894,135 @@ async function saveProductionEdit() {
             </p>
           </div>
 
-          <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Authorized Representative</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Authorized Representative</h3>
+          <template v-if="editingOverview">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-sm text-gray-500">Pick a client user from {{ company?.name || 'this company' }}, or add a new one.</p>
+              <button
+                type="button"
+                class="text-sm font-medium text-emerald-700 hover:text-emerald-800 underline underline-offset-2 shrink-0 ml-3"
+                :class="{ 'pointer-events-none opacity-50': repTeamLoading || !!repTeamError }"
+                @click="addingRep = !addingRep"
+              >
+                + Add a new representative
+              </button>
+            </div>
+            <div v-if="repTeamLoading" class="text-sm text-gray-500 py-2">Loading client users…</div>
+            <div v-else-if="repTeamError" class="text-sm text-red-600 py-2">{{ repTeamError }}</div>
+            <div v-else-if="repTeam.length === 0" class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+              This company has no client users yet. Add a new representative to continue.
+            </div>
+            <!-- 2+ client users: a picker (wizard-style); current rep pre-highlighted -->
+            <div v-else-if="repTeam.length > 1" class="max-h-56 overflow-y-auto rounded-lg border border-gray-200 divide-y mb-3">
+              <label
+                v-for="member in repTeam"
+                :key="member.id"
+                class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <input
+                  type="radio"
+                  name="overviewAuthorizedRep"
+                  class="h-4 w-4 accent-emerald-600"
+                  :checked="overviewForm.repUserId === member.id.toString()"
+                  @change="onRepPick(member.id.toString())"
+                />
+                <span class="flex-1 min-w-0">
+                  <span class="text-sm font-medium text-gray-900">{{ member.name }}</span>
+                  <span class="text-xs text-gray-500"> · {{ member.email }}</span>
+                  <span v-if="member.phone" class="text-xs text-gray-500"> · {{ member.phone }}</span>
+                </span>
+                <span v-if="repTeamCurrentId === member.id.toString()" class="text-xs font-medium text-emerald-700">current</span>
+                <span v-else class="text-xs text-gray-400">{{ member.status }}</span>
+              </label>
+            </div>
+            <!-- exactly one client user: auto-selected -->
+            <div v-else-if="repTeam.length === 1" class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm mb-3">
+              <span class="font-medium text-gray-900">{{ repTeam[0].name }}</span>
+              <span class="text-xs text-gray-500"> · {{ repTeam[0].email }}</span>
+              <span v-if="repTeam[0].phone" class="text-xs text-gray-500"> · {{ repTeam[0].phone }}</span>
+              <button
+                type="button"
+                class="text-xs text-emerald-700 underline underline-offset-2 ml-2"
+                @click="onRepPick(repTeam[0].id.toString())"
+              >select</button>
+            </div>
+            <div v-if="!overviewForm.repUserId && repTeam.length > 0" class="text-sm text-amber-700 mb-3">
+              Select the authorized representative (the person who reviews and completes projects).
+            </div>
+            <!-- Add-a-new-rep form (sends the portal invite, then pre-selects) -->
+            <div v-if="addingRep" class="rounded-lg border border-gray-200 p-4 space-y-3 bg-gray-50 mb-3">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Full Name *</label>
+                  <input v-model="addRepForm.name" placeholder="Full name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Email Address *</label>
+                  <input v-model="addRepForm.email" type="email" placeholder="email@company.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Phone</label>
+                  <input v-model="addRepForm.phone" placeholder="Phone (optional)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                </div>
+              </div>
+              <div v-if="addRepError" class="text-sm text-red-600">{{ addRepError }}</div>
+              <div class="flex items-center gap-2">
+                <button
+                  @click="addRep"
+                  :disabled="addRepBusy"
+                  class="bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                >{{ addRepBusy ? 'Adding…' : 'Invite & select' }}</button>
+                <button @click="addingRep = false" class="text-sm text-gray-600 hover:text-gray-800 px-2 py-1.5">Cancel</button>
+              </div>
+              <p class="text-xs text-gray-500">
+                Sends this person a portal invite and pre-selects them below. They become the authorized
+                representative when you press Save.
+              </p>
+            </div>
+            <!-- Contact details for the selected rep (blank = leave untouched) -->
+            <template v-if="overviewForm.repUserId">
+              <p class="text-xs text-gray-400 mb-2">Contact details for the selected representative — leave blank to keep what's on file.</p>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <p class="text-sm text-gray-500">Name</p>
+                  <input
+                    v-model="overviewForm.repName"
+                    class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                    placeholder="Full name"
+                  />
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Email Address</p>
+                  <input
+                    v-model="overviewForm.repEmail"
+                    type="email"
+                    class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                    placeholder="name@example.com"
+                  />
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Phone</p>
+                  <input
+                    v-model="overviewForm.repPhone"
+                    class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                    placeholder="+63 000 000 0000"
+                  />
+                </div>
+              </div>
+            </template>
+          </template>
+          <div v-else class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <p class="text-sm text-gray-500">Name</p>
-              <input
-                v-if="editingOverview"
-                v-model="overviewForm.repName"
-                class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                placeholder="Full name"
-              />
-              <p v-else class="text-gray-900 mt-1">{{ company?.authorizedRepName || '—' }}</p>
+              <p class="text-gray-900 mt-1">{{ company?.authorizedRepName || '—' }}</p>
             </div>
             <div>
               <p class="text-sm text-gray-500">Email Address</p>
-              <input
-                v-if="editingOverview"
-                v-model="overviewForm.repEmail"
-                type="email"
-                class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                placeholder="name@example.com"
-              />
-              <p v-else class="text-gray-900 mt-1">{{ company?.authorizedRepEmail || '—' }}</p>
+              <p class="text-gray-900 mt-1">{{ company?.authorizedRepEmail || '—' }}</p>
             </div>
             <div>
               <p class="text-sm text-gray-500">Phone</p>
-              <input
-                v-if="editingOverview"
-                v-model="overviewForm.repPhone"
-                class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                placeholder="+63 000 000 0000"
-              />
-              <p v-else class="text-gray-900 mt-1">{{ company?.authorizedRepPhone || '—' }}</p>
+              <p class="text-gray-900 mt-1">{{ company?.authorizedRepPhone || '—' }}</p>
             </div>
           </div>
 

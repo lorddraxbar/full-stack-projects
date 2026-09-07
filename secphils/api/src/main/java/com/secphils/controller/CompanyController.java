@@ -152,6 +152,63 @@ public class CompanyController {
 
     // ---- Client Settings: own company ----
 
+    /**
+     * Staff sets (or re-sets) a company's authorized representative from that
+     * company's CLIENT team — the same pick/add-new UX the New Project wizard
+     * uses (GET /{id}/team to pick, POST /{id}/team/invite to add). Scoped so
+     * the caller never has to PUT the whole company or touch the user row
+     * directly. Contact fields are optional and applied to the rep's User row:
+     * blank leaves it untouched; email only changes when it differs and
+     * collides with nobody.
+     */
+    @PutMapping("/{id}/authorized-rep")
+    @Transactional
+    public ResponseEntity<CompanyResponse> setAuthorizedRep(@PathVariable Long id,
+                                                            @Valid @RequestBody AuthorizedRepRequest req,
+                                                            HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        if (!actor.isUserOrAdmin()) {
+            throw ApiException.forbidden("Only provider staff can change the authorized representative");
+        }
+        Company company = companyRepository.findById(id).orElseThrow(() -> ApiException.notFound("Company"));
+        User rep = userRepository.findById(req.repUserId())
+                .orElseThrow(() -> ApiException.notFound("Selected user"));
+        // The rep must be a client of THIS company — mirrors the team picker's
+        // set and blocks pointing the rep at a provider or foreign account.
+        if (rep.getCompanyId() == null || !rep.getCompanyId().equals(company.getId())) {
+            throw ApiException.badRequest("The selected user is not a client of this company");
+        }
+        if (rep.getRole() == null || !rep.getRole().trim().equalsIgnoreCase("CLIENT")) {
+            throw ApiException.badRequest("The authorized representative must be a client account of this company");
+        }
+        boolean touched = false;
+        if (req.fullName() != null && !req.fullName().isBlank()) {
+            String[] parts = splitName(req.fullName().trim());
+            rep.setFirstName(parts[0]);
+            rep.setLastName(parts[1]);
+            touched = true;
+        }
+        if (req.email() != null && !req.email().isBlank()
+                && !req.email().trim().equalsIgnoreCase(rep.getEmail())) {
+            if (userRepository.findByEmail(req.email().trim()).isPresent()) {
+                throw ApiException.conflict("A user with this email already exists");
+            }
+            rep.setEmail(req.email().trim());
+            touched = true;
+        }
+        if (req.phone() != null && !req.phone().isBlank()
+                && !req.phone().trim().equals(rep.getPhone())) {
+            rep.setPhone(req.phone().trim());
+            touched = true;
+        }
+        if (touched) userRepository.save(rep);
+        company.setAuthorizedRep(rep);
+        company = companyRepository.save(company);
+        auditService.audit(actor, "COMPANY_REP_SET", "Company", company.getId(),
+                "Rep: " + rep.getEmail(), http);
+        return ResponseEntity.ok(CompanyResponse.from(company));
+    }
+
     @GetMapping("/me")
     @Transactional(readOnly = true)
     public ResponseEntity<CompanyResponse> myCompany() {

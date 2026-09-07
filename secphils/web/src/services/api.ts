@@ -343,6 +343,13 @@ export async function useUpdateCompany(id: number, data: Record<string, unknown>
   return response.data
 }
 
+/** Staff sets a company's authorized rep from its CLIENT team (wizard picker
+ *  UX) and optionally updates that rep's contact fields, in one scoped call. */
+export async function useSetAuthorizedRep(companyId: number, data: { repUserId: number; fullName?: string; email?: string; phone?: string }) {
+  const response = await api.put(`/companies/${companyId}/authorized-rep`, data)
+  return response.data
+}
+
 // ---------- Roles & Permissions (ADMIN) ----------
 export async function useGetRoles() {
   const response = await api.get('/roles')
