@@ -5,7 +5,7 @@ import { useRole } from '@/composables/useRole'
 import RowActionsMenu from '@/components/RowActionsMenu.vue'
 import BackToListButton from '@/components/BackToListButton.vue'
 import {
-  useGetMe, useGetProject, useGetCompany, useGetProjectTeam,
+  useGetMe, useGetProject, useGetCompany,
   useGetDocuments, useCreateDocument, useDeleteDocument,
   useGetMessages, useSendMessage, useUploadMessage, useDownloadMessage, useUpdateProject,
   useArchiveProject, useRestoreProject, useHardDeleteProject,
@@ -25,7 +25,6 @@ const projectId = computed(() => Number(route.params.id))
 const me = ref<{ id: number; fullName: string; role: string } | null>(null)
 const project = ref<any>(null)
 const company = ref<any>(null)
-const team = ref<{ userId: number; fullName: string; role: string }[]>([])
 const documents = ref<any[]>([])
 const messages = ref<any[]>([])
 const loading = ref(true)
@@ -35,7 +34,7 @@ const saveError = ref('')
 // ---------- Role-based tabs ----------
 const tabs = computed(() => {
   const base = ['Overview', 'Production', 'Documents', 'Messages']
-  if (isClient.value) return [...base, 'Team']
+  if (isClient.value) return base
   // Provider side (admin or staff user) both get the Administration tab.
   if (isUser.value || isAdmin.value) {
     return ['Overview', 'Production', 'Documents', 'Messages', 'Company', 'Administration']
@@ -119,10 +118,6 @@ const checklistNudge = computed(() => {
   return ''
 })
 
-function initials(name: string): string {
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-}
-
 function isMine(msg: any): boolean {
   return me.value != null && msg.senderId === me.value.id
 }
@@ -138,14 +133,10 @@ async function load() {
     // Initialize the admin form only once the project has loaded
     initAdminForm()
 
-    const [teamRes, docsRes, msgsRes] = await Promise.all([
-      useGetProjectTeam(projectId.value).catch(() => []),
+    const [docsRes, msgsRes] = await Promise.all([
       useGetDocuments({ projectId: projectId.value }).catch(() => []),
       useGetMessages(projectId.value).catch(() => []),
     ])
-    team.value = (Array.isArray(teamRes) ? teamRes : []).map((m: any) => ({
-      userId: m.userId, fullName: m.fullName, role: m.role,
-    }))
     documents.value = Array.isArray(docsRes) ? docsRes : []
     messages.value = Array.isArray(msgsRes) ? msgsRes : []
 
@@ -1313,27 +1304,6 @@ async function saveProductionEdit() {
             <button @click="saveCompanyEdit" :disabled="companySaving" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50">
               {{ companySaving ? 'Saving…' : 'Save' }}
             </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ================= TEAM (client) ================= -->
-      <div v-if="activeTab === 'Team'" class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Your Project Team</h2>
-        <div v-if="team.length === 0" class="text-sm text-gray-500">No team members assigned yet.</div>
-        <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div
-            v-for="member in team"
-            :key="member.userId"
-            class="flex items-center gap-4 p-4 border border-gray-200 rounded-lg"
-          >
-            <div class="w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center text-white font-medium">
-              {{ initials(member.fullName) }}
-            </div>
-            <div>
-              <h3 class="font-medium text-gray-900">{{ member.fullName }}</h3>
-              <p class="text-sm text-gray-600">{{ member.role }}</p>
-            </div>
           </div>
         </div>
       </div>
