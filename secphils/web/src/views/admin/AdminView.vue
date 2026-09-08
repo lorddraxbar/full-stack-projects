@@ -885,25 +885,12 @@ const categoryRowActions = (c: ServiceCategoryItem): RowAction[] => {
 }
 
 // ---------- Project Configuration ----------
-// Workflow steps + status config are presentation-only (colors/labels have no
-// persistence endpoint) and stay session-scoped.
-const workflowSteps = ref(['Not Started', 'In Progress', 'On Hold', 'Completed'])
-const newStep = ref('')
-const addWorkflowStep = () => {
-  if (!newStep.value.trim()) return
-  workflowSteps.value.push(newStep.value.trim())
-  newStep.value = ''
-}
-const removeWorkflowStep = (step: string) => {
-  workflowSteps.value = workflowSteps.value.filter(s => s !== step)
-}
-
-const statusConfig = ref([
-  { name: 'Not Started', color: '#9ca3af', description: 'Project created, work not begun' },
-  { name: 'In Progress', color: '#2563eb', description: 'Active work underway' },
-  { name: 'On Hold', color: '#f59e0b', description: 'Paused pending client or resource availability' },
-  { name: 'Completed', color: '#10b981', description: 'All deliverables approved' },
-])
+// The two editors that used to live here (a step list and a status
+// label/color editor) were cut 2026-09-08: they mutated session-scoped refs
+// with no endpoint and no consumers — pure theater (the code comment admitted
+// it). Status labels and colors everywhere else come from lib/labels.ts.
+// Making project config genuinely DB-driven (wiring /dropdowns into the real
+// forms) is a planned feature; controls stay out until they do something.
 
 // Dropdown categories are persisted via /dropdowns (full CRUD).
 const dropdownCategories = ref<DropdownCategoryItem[]>([])
@@ -920,10 +907,6 @@ const loadDropdowns = async () => {
 }
 
 // ---------- Project Config search (covers the Dropdown Value Management list) ----------
-// Workflow steps & project statuses are small in-place config editors with
-// reorder-by-index controls, so they are intentionally NOT filtered (filtering
-// a reorderable list by display index corrupts ordering). The searchable
-// "item list" on this tab is the dropdown category/value management panel.
 const configSearch = ref('')
 
 const termsOf = (q: string) => q.trim().toLowerCase().split(/\s+/).filter(Boolean)
@@ -2455,81 +2438,10 @@ const isActiveTab = (tab: string) => activeTab.value === tab
 
     <!-- ================= PROJECT CONFIG ================= -->
     <div v-if="isActiveTab('projectConfig')" class="space-y-6">
-      <!-- Workflow + Status Config -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Workflow Steps</h2>
-          <p class="text-sm text-gray-600 mb-4">Standard project workflow sequence.</p>
-          <div class="space-y-2">
-            <div
-              v-for="(step, i) in workflowSteps"
-              :key="step"
-              class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded"
-            >
-              <span class="text-sm text-gray-700">
-                <span class="text-gray-400 mr-2">{{ i + 1 }}.</span>{{ step }}
-              </span>
-              <div class="flex gap-2">
-                <button
-                  v-if="i > 0"
-                  @click="() => { workflowSteps.splice(i - 1, 0, workflowSteps.splice(i, 1)[0]) }"
-                  class="text-emerald-600 hover:text-emerald-700 text-xs"
-                >
-                  <i class="fas fa-arrow-up" />
-                </button>
-                <button
-                  v-if="i < workflowSteps.length - 1"
-                  @click="() => { workflowSteps.splice(i + 1, 0, workflowSteps.splice(i, 1)[0]) }"
-                  class="text-emerald-600 hover:text-emerald-700 text-xs"
-                >
-                  <i class="fas fa-arrow-down" />
-                </button>
-                <button @click="removeWorkflowStep(step)" class="text-red-600 hover:text-red-700 text-xs">
-                  <i class="fas fa-trash" />
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="mt-4 flex gap-2">
-            <input
-              v-model="newStep"
-              type="text"
-              placeholder="New step name"
-              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-            />
-            <button @click="addWorkflowStep" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
-              + Add
-            </button>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Project Statuses</h2>
-          <p class="text-sm text-gray-600 mb-4">Status labels, colors, and descriptions.</p>
-          <div class="space-y-3">
-            <div v-for="status in statusConfig" :key="status.name" class="flex items-center gap-3">
-              <input v-model="status.color" type="color" class="w-8 h-8 border border-gray-300 rounded cursor-pointer bg-white" />
-              <div class="flex-1">
-                <input
-                  v-model="status.name"
-                  type="text"
-                  class="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                />
-                <input
-                  v-model="status.description"
-                  type="text"
-                  class="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs text-gray-500"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Dropdown Value Management -->
       <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-2">Dropdown Value Management</h2>
-        <p class="text-sm text-gray-600 mb-3">All static dropdown values used throughout the portal.</p>
+        <p class="text-sm text-gray-600 mb-3">The portal's canonical value vocabulary. Until forms are wired to read from here, they run on built-in copies of these lists — edits persist, but take effect once a form is connected.</p>
         <div class="relative max-w-md mb-4">
           <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
           <input
