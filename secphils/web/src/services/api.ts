@@ -595,6 +595,16 @@ export async function useMarkAllNotificationsRead() {
   return response.data
 }
 
+/**
+ * Consume one drawer section's notifications (messages | announcements |
+ * documents | projects): marks every unread row of that section's entity
+ * types read, so the unread badge on its nav item clears.
+ */
+export async function useMarkSectionRead(section: 'messages' | 'announcements' | 'documents' | 'projects') {
+  const response = await api.patch('/notifications/read-section', { section })
+  return response.data as { updated: number }
+}
+
 export interface NotificationPreferences {
   email: Record<string, boolean>
   inApp: Record<string, boolean>

@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useRole } from '../composables/useRole'
 import { useBrand } from '../composables/useBrand'
-import { useGetNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '../services/api'
+import { useGetNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, useMarkSectionRead } from '../services/api'
 
 const { role, setRole } = useRole()
 const { brand } = useBrand()
 const router = useRouter()
 
 const allNavItems = [
-  { name: 'Dashboard', path: '/dashboard', icon: 'fas fa-chart-bar', roles: ['USER', 'ADMIN'] },
-  { name: 'Projects', path: '/projects', icon: 'fas fa-folder', roles: ['CLIENT', 'USER', 'ADMIN'] },
-  { name: 'Documents', path: '/documents', icon: 'fas fa-file-alt', roles: ['CLIENT', 'USER', 'ADMIN'] },
-  { name: 'Messages', path: '/messages', icon: 'fas fa-comment-dots', roles: ['CLIENT', 'USER', 'ADMIN'] },
-  { name: 'Announcements', path: '/announcements', icon: 'fas fa-bullhorn', roles: ['CLIENT', 'USER', 'ADMIN'] },
-  { name: 'Reviews', path: '/reviews', icon: 'fas fa-star', roles: ['USER', 'ADMIN'] },
+  { name: 'Dashboard', path: '/dashboard', icon: 'fas fa-chart-bar', roles: ['USER', 'ADMIN'], section: null },
+  { name: 'Projects', path: '/projects', icon: 'fas fa-folder', roles: ['CLIENT', 'USER', 'ADMIN'], section: 'projects' },
+  { name: 'Documents', path: '/documents', icon: 'fas fa-file-alt', roles: ['CLIENT', 'USER', 'ADMIN'], section: 'documents' },
+  { name: 'Messages', path: '/messages', icon: 'fas fa-comment-dots', roles: ['CLIENT', 'USER', 'ADMIN'], section: 'messages' },
+  { name: 'Announcements', path: '/announcements', icon: 'fas fa-bullhorn', roles: ['CLIENT', 'USER', 'ADMIN'], section: 'announcements' },
+  { name: 'Reviews', path: '/reviews', icon: 'fas fa-star', roles: ['USER', 'ADMIN'], section: null },
 ]
 
 const navItems = computed(() =>
@@ -43,6 +43,39 @@ const notifications = ref<Notif[]>([])
 const isNotifOpen = ref(false)
 const notifRef = ref<HTMLElement | null>(null)
 const unreadCount = computed(() => notifications.value.filter(n => !n.isRead).length)
+
+// --- Drawer unread badges -----------------------------------------------------
+// Same rows that feed the bell — an item lights up while unread notifications
+// exist for its section, and visiting the section consumes them (marks those
+// rows read server-side), mirroring how the bell consumes one row at a time.
+const SECTION_OF_ENTITY: Record<string, string> = {
+  Announcement: 'announcements',
+  Message: 'messages',
+  Document: 'documents',
+  Project: 'projects',
+  Company: 'projects',
+}
+const sectionUnread = computed<Record<string, number>>(() => {
+  const m: Record<string, number> = {}
+  for (const n of notifications.value) {
+    if (n.isRead) continue
+    const sec = n.entityType ? SECTION_OF_ENTITY[n.entityType] : null
+    if (sec) m[sec] = (m[sec] || 0) + 1
+  }
+  return m
+})
+
+async function consumeSection(section: string | null) {
+  if (!section) return
+  try {
+    const res = await useMarkSectionRead(section as any)
+    if (res && (res as any).updated > 0) {
+      notifications.value.forEach(n => {
+        if (!n.isRead && n.entityType && SECTION_OF_ENTITY[n.entityType] === section) n.isRead = true
+      })
+    }
+  } catch { /* badge stays; the 60s poll reconciles */ }
+}
 
 const notifRoute = (n: Notif) => {
   switch (n.entityType) {
@@ -139,6 +172,17 @@ const isActive = (path: string) => {
   return route.path === path || route.path.startsWith(path + '/')
 }
 
+// Visiting a section = having seen its new items: consume its notifications
+// (clears the drawer badge + the bell rows for that section together).
+watch(
+  () => route.path,
+  (p) => {
+    const item = allNavItems.find(i => p === i.path || p.startsWith(i.path + '/'))
+    if (item) consumeSection(item.section)
+  },
+  { immediate: true },
+)
+
 const roleLabel = computed(() =>
   role.value === 'CLIENT' ? 'Client' : role.value === 'USER' ? 'User' : 'Admin'
 )
@@ -185,14 +229,30 @@ const logout = () => {
           :key="item.path"
           :to="item.path"
           :class="[
-            'flex items-center px-4 py-3 text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 transition-colors',
+            'flex items-center px-4 py-3 text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 transition-colors relative',
             isActive(item.path) ? 'bg-emerald-50 text-emerald-600 border-r-2 border-emerald-600' : '',
             !isSidebarOpen && !isMobile ? 'justify-center' : '',
           ]"
           @click="isMobile && (isSidebarOpen = false)"
         >
-          <i :class="item.icon" class="text-xl w-6 text-center" />
-          <span v-if="isSidebarOpen" class="ml-3 text-sm font-medium">{{ item.name }}</span>
+          <span class="relative">
+            <i :class="item.icon" class="text-xl w-6 text-center" />
+            <!-- Collapsed rail: unread dot on the icon -->
+            <span
+              v-if="item.section && sectionUnread[item.section] && !isSidebarOpen"
+              class="absolute -top-1 -right-1.5 w-2 h-2 bg-red-500 rounded-full"
+            />
+          </span>
+          <template v-if="isSidebarOpen">
+            <span class="ml-3 text-sm font-medium">{{ item.name }}</span>
+            <!-- Expanded drawer: unread count pill -->
+            <span
+              v-if="item.section && sectionUnread[item.section]"
+              class="ml-auto min-w-5 h-5 px-1.5 flex items-center justify-center text-[11px] font-bold text-white bg-red-500 rounded-full"
+            >
+              {{ sectionUnread[item.section] > 99 ? '99+' : sectionUnread[item.section] }}
+            </span>
+          </template>
         </RouterLink>
       </nav>
     </aside>

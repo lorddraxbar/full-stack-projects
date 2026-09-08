@@ -92,6 +92,42 @@ public class NotificationController {
         return ResponseEntity.ok(Map.of("updated", unread.size()));
     }
 
+    /** Entity types backing each drawer section (see MainLayout notifRoute). */
+    private static final Map<String, List<String>> SECTION_ENTITY_TYPES = Map.of(
+            "messages", List.of("Message"),
+            "announcements", List.of("Announcement"),
+            "documents", List.of("Document"),
+            "projects", List.of("Project", "Company"));
+
+    /**
+     * Consume a whole drawer section: marks every unread notification whose
+     * entityType belongs to the section (body {"section": "messages"}). This
+     * is what clears the drawer badge — visiting the section means the user
+     * has seen what's there (same semantics as the bell, which shares the
+     * exact same rows as its source). Unknown/absent section = 400.
+     */
+    @PatchMapping("/read-section")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> markSectionRead(
+            @RequestBody Map<String, String> body, HttpServletRequest http) {
+        AuthUser me = CurrentUser.require();
+        String section = body.get("section");
+        List<String> types = section == null ? null : SECTION_ENTITY_TYPES.get(section.toLowerCase());
+        if (types == null) {
+            throw ApiException.badRequest("Unknown section — expected one of "
+                    + String.join(", ", SECTION_ENTITY_TYPES.keySet()));
+        }
+        List<Notification> hit = notificationRepository
+                .findByRecipientIdAndIsReadFalseOrderByCreatedAtDesc(me.id()).stream()
+                .filter(n -> n.getEntityType() != null && types.contains(n.getEntityType()))
+                .toList();
+        hit.forEach(n -> n.setIsRead(true));
+        if (!hit.isEmpty()) notificationRepository.saveAll(hit);
+        auditService.audit(me, "NOTIFICATION_READ_SECTION", "Notification", null,
+                "Section: " + section + " — Count: " + hit.size(), http);
+        return ResponseEntity.ok(Map.of("updated", hit.size()));
+    }
+
     @GetMapping("/preferences")
     @Transactional(readOnly = true)
     public ResponseEntity<Map<String, Map<String, Boolean>>> getPreferences() {
