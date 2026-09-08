@@ -248,8 +248,10 @@ public class MessageController {
                 .orElseThrow(() -> ApiException.notFound("Message"));
         requireReadableBy(actor, m.getProject().getCompany().getId());
         // Internal attachments are not downloadable by client-role users — 404,
-        // same as an unknown id (don't reveal the message exists).
-        if (actor.isClient() && isInternal(m)) {
+        // same as an unknown id (don't reveal the message exists). Trashed
+        // messages (V33) are likewise invisible to clients; staff may still
+        // download from the trash pane until the purge.
+        if (actor.isClient() && (isInternal(m) || m.getDeletedAt() != null)) {
             throw ApiException.notFound("Message");
         }
         String url = m.getAttachmentUrl();
@@ -286,7 +288,7 @@ public class MessageController {
         Message m = messageRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Message"));
         requireReadableBy(actor, m.getProject().getCompany().getId());
-        if (actor.isClient() && isInternal(m)) {
+        if (actor.isClient() && (isInternal(m) || m.getDeletedAt() != null)) {
             throw ApiException.notFound("Message");
         }
         String url = m.getAttachmentUrl();

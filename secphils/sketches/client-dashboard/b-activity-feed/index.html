@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Client Dashboard — B · Activity Feed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #fff; color: #202020; -webkit-font-smoothing: antialiased; line-height: 1.5; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 32px 48px; }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
+  .head h1 { font-size: 22px; font-weight: 800; color: #202020; }
+  .head p { color: #757575; margin-top: 4px; font-size: 14px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat { background: #fff; border: 1px solid #e8e8e8; border-radius: 14px; padding: 18px 20px; }
+  .stat .top { display: flex; align-items: center; justify-content: space-between; }
+  .stat .num { font-size: 24px; font-weight: 800; margin-top: 6px; }
+  .stat .lab { font-size: 12.5px; color: #757575; margin-top: 1px; }
+  .grid { display: grid; grid-template-columns: 1.7fr 1fr; gap: 16px; }
+  .card { background: #fff; border: 1px solid #e8e8e8; border-radius: 14px; overflow: hidden; }
+  .card h2 { font-size: 15px; font-weight: 700; padding: 16px 20px; border-bottom: 1px solid #f1f1f1; display: flex; align-items: center; justify-content: space-between; }
+  .card h2 .link { font-size: 13px; font-weight: 600; color: #059669; text-decoration: none; }
+  /* timeline */
+  .tl { padding: 6px 20px; }
+  .trow { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid #f5f5f5; }
+  .trow:last-child { border-bottom: none; }
+  .ticon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .trow .bd { min-width: 0; }
+  .trow .h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .trow .who { font-size: 13px; font-weight: 600; }
+  .trow .when { font-size: 11.5px; color: #a3a3a3; }
+  .trow .ptxt { font-size: 13.5px; color: #202020; margin-top: 2px; }
+  .trow .pname { font-size: 12px; font-weight: 600; color: #0f9d7f; margin-top: 4px; }
+  .badge { font-size: 10.5px; font-weight: 600; border-radius: 999px; padding: 2px 8px; }
+  .b-msg { background: #ecfdf5; color: #059669; }
+  .b-ann { background: #fef9ec; color: #b45309; }
+  .b-doc { background: #eef2ff; color: #4f46e5; }
+  .b-rev { background: #fff7ed; color: #c2410c; }
+  .proj { padding: 16px 20px; border-bottom: 1px solid #f5f5f5; }
+  .proj:last-child { border-bottom: none; }
+  .proj .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .proj .nm { font-weight: 600; font-size: 14px; }
+  .proj .svc { font-size: 12px; color: #757575; margin-top: 1px; }
+  .chip { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 3px 10px; }
+  .c-in { background: #ecfdf5; color: #059669; }
+  .c-ns { background: #f5f5f5; color: #757575; }
+  .bar { height: 6px; background: #f1f1f1; border-radius: 999px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: #29ca8e; border-radius: 999px; }
+  .proj .meta { display: flex; align-items: center; justify-content: space-between; margin-top: 7px; font-size: 11.5px; color: #a3a3a3; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>Recent Activity</h1>
+      <p>Everything your consultants have shared, in one feed.</p>
+    </div>
+    <span class="badge b-msg" style="font-size:12px;padding:6px 14px">6 updates to read</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="top"><span style="font-size:11px;font-weight:600;color:#757575">Projects</span><i class="fa-solid fa-folder-open" style="color:#059669"></i></div>
+      <div class="num">39</div>
+    </div>
+    <div class="stat">
+      <div class="top"><span style="font-size:11px;font-weight:600;color:#757575">In progress</span><i class="fa-solid fa-spinner" style="color:#d97706"></i></div>
+      <div class="num">15</div>
+    </div>
+    <div class="stat">
+      <div class="top"><span style="font-size:11px;font-weight:600;color:#757575">Documents</span><i class="fa-regular fa-file-lines" style="color:#4f46e5"></i></div>
+      <div class="num">4</div>
+    </div>
+    <div class="stat">
+      <div class="top"><span style="font-size:11px;font-weight:600;color:#757575">Announcements</span><i class="fa-solid fa-bullhorn" style="color:#b45309"></i></div>
+      <div class="num">2</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Activity Feed <a class="link" href="#">View all</a></h2>
+      <div class="tl">
+        <div class="trow">
+          <div class="ticon" style="background:#ecfdf5"><i class="fa-regular fa-comment-dots" style="color:#059669"></i></div>
+          <div class="bd">
+            <div class="h"><span class="who">SECPhils</span><span class="badge b-msg">Message</span><span class="when">Today, 9:41 AM</span></div>
+            <div class="ptxt">"Good morning — we've submitted the compliance monitoring report for your review."</div>
+            <div class="pname">ECC Application — Calamba Plant</div>
+          </div>
+        </div>
+        <div class="trow">
+          <div class="ticon" style="background:#fef9ec"><i class="fa-solid fa-bullhorn" style="color:#b45309"></i></div>
+          <div class="bd">
+            <div class="h"><span class="who">SECPhils</span><span class="badge b-ann">Announcement</span><span class="when">Yesterday</span></div>
+            <div class="ptxt">New Compliance Calendar: permit filing deadlines move to the 15th of each month.</div>
+            <div class="pname">Company-wide</div>
+          </div>
+        </div>
+        <div class="trow">
+          <div class="ticon" style="background:#eef2ff"><i class="fa-regular fa-file-lines" style="color:#4f46e5"></i></div>
+          <div class="bd">
+            <div class="h"><span class="who">SECPhils</span><span class="badge b-doc">Document</span><span class="when">Aug 24</span></div>
+            <div class="ptxt">Uploaded: Air Quality Monitoring Report Q3.pdf (2.4 MB)</div>
+            <div class="pname">Air Quality Permit — Batangas Facility</div>
+          </div>
+        </div>
+        <div class="trow">
+          <div class="ticon" style="background:#ecfdf5"><i class="fa-regular fa-comment-dots" style="color:#059669"></i></div>
+          <div class="bd">
+            <div class="h"><span class="who">SECPhils</span><span class="badge b-msg">Message</span><span class="when">Aug 22</span></div>
+            <div class="ptxt">"Site inspection scheduled for Thursday, 10 AM. Kindly confirm availability."</div>
+            <div class="pname">Air Quality Permit — Batangas Facility</div>
+          </div>
+        </div>
+        <div class="trow">
+          <div class="ticon" style="background:#fff7ed"><i class="fa-regular fa-star" style="color:#c2410c"></i></div>
+          <div class="bd">
+            <div class="h"><span class="who">SECPhils</span><span class="badge b-rev">Review</span><span class="when">Aug 20</span></div>
+            <div class="ptxt">"Client feedback collected — requested changes to the site plan have been noted."</div>
+            <div class="pname">Water Discharge Permit — Renewal</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Projects <a class="link" href="#">View all</a></h2>
+      <div class="proj">
+        <div class="top"><div><div class="nm">ECC Application — Calamba Plant</div><div class="svc">Environmental Compliance Certificate (ECC)</div></div><span class="chip c-in">In Progress</span></div>
+        <div class="bar"><i style="width:68%"></i></div>
+        <div class="meta"><span>68% complete</span><span>14 updates</span></div>
+      </div>
+      <div class="proj">
+        <div class="top"><div><div class="nm">Air Quality Permit — Batangas</div><div class="svc">Environmental Compliance Certificate (ECC)</div></div><span class="chip c-in">In Progress</span></div>
+        <div class="bar"><i style="width:42%"></i></div>
+        <div class="meta"><span>42% complete</span><span>9 updates</span></div>
+      </div>
+      <div class="proj">
+        <div class="top"><div><div class="nm">Water Discharge Permit — Renewal</div><div class="svc">Environmental Compliance Certificate (ECC)</div></div><span class="chip c-ns">Not Started</span></div>
+        <div class="bar"><i style="width:0%"></i></div>
+        <div class="meta"><span>Not started</span><span>2 updates</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

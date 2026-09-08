@@ -6,6 +6,7 @@ import RowActionsMenu from '@/components/RowActionsMenu.vue'
 import BackToListButton from '@/components/BackToListButton.vue'
 import DocumentPreviewModal from '@/components/DocumentPreviewModal.vue'
 import RequestDeletionModal from '@/components/RequestDeletionModal.vue'
+import TrashMessageModal from '@/components/TrashMessageModal.vue'
 import {
   useGetMe, useGetProject, useGetCompany,
   useGetDocuments, useCreateDocument, useDeleteDocument, useUploadDocument,
@@ -122,6 +123,19 @@ const checklistNudge = computed(() => {
 
 function isMine(msg: any): boolean {
   return me.value != null && msg.senderId === me.value.id
+}
+
+// ---------- Staff-only message removal (erasure path, V33) ----------
+// Server enforces the same gate (staff + own-company-or-admin); the button is
+// UI only. Shared modal with the Messages inbox.
+const msgTrashTarget = ref<{ id: number; preview: string } | null>(null)
+function openTrash(msg: any) {
+  const preview = (msg.body || '').length > 90 ? msg.body.slice(0, 90) + '…' : (msg.body || '')
+  msgTrashTarget.value = { id: msg.id, preview }
+}
+async function onMessageRemoved() {
+  const msgsRes = await useGetMessages(projectId.value).catch(() => [])
+  messages.value = Array.isArray(msgsRes) ? msgsRes : []
 }
 
 async function load() {
@@ -1677,6 +1691,16 @@ async function saveProductionEdit() {
                 </p>
                 <p :class="['text-xs', isMine(msg) ? 'text-emerald-200' : 'text-gray-400']">
                   {{ formatDateTime(msg.createdAt) }}
+                  <button
+                    v-if="!isClient"
+                    type="button"
+                    title="Remove message (SECPhils staff — erasure path)"
+                    @click="openTrash(msg)"
+                    class="ml-2 opacity-60 hover:opacity-100 underline"
+                    :class="isMine(msg) ? 'text-emerald-200' : 'text-red-600'"
+                  >
+                    Remove
+                  </button>
                 </p>
               </div>
               <p class="text-sm">{{ msg.body }}</p>
@@ -1905,6 +1929,14 @@ async function saveProductionEdit() {
       v-model:open="requestOpen"
       :doc="requestDoc"
       @requested="(d) => showDelFlash(`Request sent \u2014 SECPhils will review \u201c${d.title}\u201d and remove it if appropriate.`)"
+    />
+
+    <!-- ================= STAFF REMOVE MESSAGE DIALOG (erasure path) ================= -->
+    <TrashMessageModal
+      :open="msgTrashTarget !== null"
+      :msg="msgTrashTarget"
+      @update:open="(v: boolean) => { if (!v) msgTrashTarget = null }"
+      @removed="onMessageRemoved"
     />
 
     <!-- ================= CLIENT SUBMIT DOCUMENT DIALOG ================= -->

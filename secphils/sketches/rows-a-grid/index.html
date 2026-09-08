@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Raleway',sans-serif; background:#f9f9f9; color:#202020; }
+.wrap { max-width:1140px; margin:0 auto; padding:28px 16px 40px; }
+.head { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.head h1 { font-size:24px; font-weight:700; }
+.head p { color:#757575; font-size:14px; margin-top:3px; }
+.newbtn { background:#29ca8e; color:#fff; border:none; border-radius:8px; padding:9px 16px;
+  font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+.filters { background:#fff; border:1px solid #e8e8e8; border-radius:10px; padding:14px 16px;
+  display:flex; gap:12px; margin-bottom:16px; }
+.filters .search { flex:1; height:40px; border:1px solid #e8e8e8; border-radius:8px;
+  padding:0 14px; font-family:inherit; font-size:14px; color:#202020; background:#fff; }
+.filters select { height:40px; border:1px solid #e8e8e8; border-radius:8px; padding:0 12px;
+  font-family:inherit; font-size:14px; color:#202020; background:#fff; }
+.pill { display:inline-block; font-size:11.5px; font-weight:600; padding:3px 10px;
+  border-radius:999px; letter-spacing:.01em; white-space:nowrap; }
+.card-shell { background:#fff; border:1px solid #e8e8e8; border-radius:10px; overflow:hidden; }
+.meta-ic { color:#a3a3a3; font-size:12px; margin-right:5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#29ca8e; margin-bottom:6px">Option A — Card grid</div>
+  
+  <div class="head">
+    <div>
+      <h1>All Projects</h1>
+      <p>Manage and track all your projects.</p>
+    </div>
+    <button class="newbtn">+ New Project</button>
+  </div>
+  <div class="filters">
+    <input class="search" placeholder="Search projects..." />
+    <select><option>All Status</option></select>
+  </div>
+
+  
+  <div class="card-shell" style="padding:16px; border-radius:10px;">
+    <div class="grid-a">
+      <div class="prow-a">
+        <div class="a-top">
+          <div class="a-chip"><i class="fas fa-clipboard-list"></i></div>
+          <div style="flex:1;min-width:0">
+            <div class="a-name">ECC — Sta. Rita Plant Expansion</div>
+          </div>
+          <span class="pill" style="background:#ccfbf1;color:#155e75;">In Progress</span>
+        </div>
+        <div class="a-meta">
+          <span><i class="fas fa-building meta-ic"></i>Strategic Engineering Consultancy</span>
+          <span><i class="fas fa-tag meta-ic"></i>Environmental Compliance Certificate (ECC)</span>
+        </div>
+        <div class="a-foot">
+          <div class="a-cost">₱5,500,000</div>
+          <div class="a-dates">
+            <span><i class="fas fa-calendar-plus meta-ic"></i>Aug 28, 2026</span>
+            <span><i class="fas fa-flag-checkered meta-ic"></i>—</span>
+          </div>
+        </div>
+        <div class="a-update">Draft ECC submitted to the regional office for review. <span style="color:#a3a3a3">· 2d ago</span></div>
+      </div>
+      <div class="prow-a">
+        <div class="a-top">
+          <div class="a-chip"><i class="fas fa-clipboard-list"></i></div>
+          <div style="flex:1;min-width:0">
+            <div class="a-name">Hazardous Waste Generator ID — New Assembly Line</div>
+          </div>
+          <span class="pill" style="background:#f3f4f6;color:#1f2937;">Not Started</span>
+        </div>
+        <div class="a-meta">
+          <span><i class="fas fa-building meta-ic"></i>Strategic Engineering Consultancy</span>
+          <span><i class="fas fa-tag meta-ic"></i>Hazardous Waste Generator ID</span>
+        </div>
+        <div class="a-foot">
+          <div class="a-cost">₱1,750,000</div>
+          <div class="a-dates">
+            <span><i class="fas fa-calendar-plus meta-ic"></i>Sep 1, 2026</span>
+            <span><i class="fas fa-flag-checkered meta-ic"></i>—</span>
+          </div>
+        </div>
+        <div class="a-update"><span style="color:#a3a3a3">No updates yet</span></div>
+      </div>
+      <div class="prow-a">
+        <div class="a-top">
+          <div class="a-chip"><i class="fas fa-clipboard-list"></i></div>
+          <div style="flex:1;min-width:0">
+            <div class="a-name">Office Building HVAC Retrofit</div>
+          </div>
+          <span class="pill" style="background:#dcfce7;color:#166534;">Completed</span>
+        </div>
+        <div class="a-meta">
+          <span><i class="fas fa-building meta-ic"></i>Strategic Engineering Consultancy</span>
+          <span><i class="fas fa-tag meta-ic"></i>Feasibility Studies for Businesses</span>
+        </div>
+        <div class="a-foot">
+          <div class="a-cost">—</div>
+          <div class="a-dates">
+            <span><i class="fas fa-calendar-plus meta-ic"></i>Aug 22, 2026</span>
+            <span><i class="fas fa-flag-checkered meta-ic"></i>Aug 22, 2026</span>
+          </div>
+        </div>
+        <div class="a-update">Feasibility report delivered; project closed. <span style="color:#a3a3a3">· 5d ago</span></div>
+      </div>
+      <div class="prow-a">
+        <div class="a-top">
+          <div class="a-chip"><i class="fas fa-clipboard-list"></i></div>
+          <div style="flex:1;min-width:0">
+            <div class="a-name">Discharge Permit — Riverfront Site</div>
+          </div>
+          <span class="pill" style="background:#f3f4f6;color:#6b7280;">Archived</span>
+        </div>
+        <div class="a-meta">
+          <span><i class="fas fa-building meta-ic"></i>Test Wire Co</span>
+          <span><i class="fas fa-tag meta-ic"></i>Discharge Permit (DP)</span>
+        </div>
+        <div class="a-foot">
+          <div class="a-cost">₱320,000</div>
+          <div class="a-dates">
+            <span><i class="fas fa-calendar-plus meta-ic"></i>Jul 30, 2026</span>
+            <span><i class="fas fa-flag-checkered meta-ic"></i>—</span>
+          </div>
+        </div>
+        <div class="a-update">Permit renewed; file archived at client request. <span style="color:#a3a3a3">· 3w ago</span></div>
+      </div></div>
+  </div>
+  <style>
+  .grid-a { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+  .prow-a { border:1px solid #e8e8e8; border-radius:10px; padding:16px; background:#fff;
+    transition: border-color .15s, box-shadow .15s; cursor:pointer; }
+  .prow-a:hover { border-color:#29ca8e; box-shadow:0 4px 14px rgba(41,202,142,.10); }
+  .a-top { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .a-chip { width:38px; height:38px; border-radius:9px; background:#e9f8f2; color:#1f9d6b;
+    display:flex; align-items:center; justify-content:center; font-size:15px; flex:none; }
+  .a-name { font-size:15px; font-weight:600; color:#202020; line-height:1.35; }
+  .a-meta { display:flex; flex-direction:column; gap:4px; font-size:13px; color:#757575;
+    margin-bottom:12px; }
+  .a-foot { display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:#f9f9f9; border-radius:8px; padding:10px 12px; margin-bottom:10px; }
+  .a-cost { font-size:14px; font-weight:700; color:#202020; }
+  .a-dates { display:flex; gap:12px; font-size:12px; color:#757575; }
+  .a-update { font-size:12.5px; color:#757575; line-height:1.4; }
+  </style>
+</div>
+</body>
+</html>

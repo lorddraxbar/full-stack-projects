@@ -47,6 +47,15 @@ public class Message {
     @Column(nullable = false, length = 20)
     private String visibility = "CLIENT";
 
+    /** Provider-only trash (V33): a stamped row is hidden from every thread
+     *  view and restorable until the retention window passes. */
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deleted_by_id")
+    private User deletedBy;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) createdAt = LocalDateTime.now();

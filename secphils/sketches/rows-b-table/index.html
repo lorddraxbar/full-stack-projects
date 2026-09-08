@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Raleway',sans-serif; background:#f9f9f9; color:#202020; }
+.wrap { max-width:1140px; margin:0 auto; padding:28px 16px 40px; }
+.head { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.head h1 { font-size:24px; font-weight:700; }
+.head p { color:#757575; font-size:14px; margin-top:3px; }
+.newbtn { background:#29ca8e; color:#fff; border:none; border-radius:8px; padding:9px 16px;
+  font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+.filters { background:#fff; border:1px solid #e8e8e8; border-radius:10px; padding:14px 16px;
+  display:flex; gap:12px; margin-bottom:16px; }
+.filters .search { flex:1; height:40px; border:1px solid #e8e8e8; border-radius:8px;
+  padding:0 14px; font-family:inherit; font-size:14px; color:#202020; background:#fff; }
+.filters select { height:40px; border:1px solid #e8e8e8; border-radius:8px; padding:0 12px;
+  font-family:inherit; font-size:14px; color:#202020; background:#fff; }
+.pill { display:inline-block; font-size:11.5px; font-weight:600; padding:3px 10px;
+  border-radius:999px; letter-spacing:.01em; white-space:nowrap; }
+.card-shell { background:#fff; border:1px solid #e8e8e8; border-radius:10px; overflow:hidden; }
+.meta-ic { color:#a3a3a3; font-size:12px; margin-right:5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#29ca8e; margin-bottom:6px">Option B — Status-rail table</div>
+  
+  <div class="head">
+    <div>
+      <h1>All Projects</h1>
+      <p>Manage and track all your projects.</p>
+    </div>
+    <button class="newbtn">+ New Project</button>
+  </div>
+  <div class="filters">
+    <input class="search" placeholder="Search projects..." />
+    <select><option>All Status</option></select>
+  </div>
+
+  
+  <div class="card-shell">
+    <table class="tbl-b">
+      <thead>
+        <tr>
+          <th style="width:34%">Project</th>
+          <th style="width:21%">Service</th>
+          <th style="width:12%; text-align:right">Cost</th>
+          <th style="width:12%">Created</th>
+          <th style="width:15%">Latest Update</th>
+          <th style="width:6%">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="b-cell b-proj">
+            <div class="b-rail" style="background:#29ca8e"></div>
+            <div style="min-width:0">
+              <div class="b-name">ECC — Sta. Rita Plant Expansion</div>
+              <div class="b-client"><i class="fas fa-building meta-ic"></i>Strategic Engineering Consultancy</div>
+            </div>
+          </td>
+          <td class="b-cell b-svc">Environmental Compliance Certificate (ECC)</td>
+          <td class="b-cell b-cost">₱5,500,000</td>
+          <td class="b-cell b-created">Aug 28, 2026</td>
+          <td class="b-cell b-update"><div class="b-upbody">Draft ECC submitted to the regional office for review.</div><div class="b-upat">2d ago</div></td>
+          <td class="b-cell b-status"><span class="pill" style="background:#ccfbf1;color:#155e75;">In Progress</span></td>
+        </tr>
+        <tr>
+          <td class="b-cell b-proj">
+            <div class="b-rail" style="background:#d1d5db"></div>
+            <div style="min-width:0">
+              <div class="b-name">Hazardous Waste Generator ID — New Assembly Line</div>
+              <div class="b-client"><i class="fas fa-building meta-ic"></i>Strategic Engineering Consultancy</div>
+            </div>
+          </td>
+          <td class="b-cell b-svc">Hazardous Waste Generator ID</td>
+          <td class="b-cell b-cost">₱1,750,000</td>
+          <td class="b-cell b-created">Sep 1, 2026</td>
+          <td class="b-cell b-update"><div class="b-upbody">No updates yet</div></td>
+          <td class="b-cell b-status"><span class="pill" style="background:#f3f4f6;color:#1f2937;">Not Started</span></td>
+        </tr>
+        <tr>
+          <td class="b-cell b-proj">
+            <div class="b-rail" style="background:#22c55e"></div>
+            <div style="min-width:0">
+              <div class="b-name">Office Building HVAC Retrofit</div>
+              <div class="b-client"><i class="fas fa-building meta-ic"></i>Strategic Engineering Consultancy</div>
+            </div>
+          </td>
+          <td class="b-cell b-svc">Feasibility Studies for Businesses</td>
+          <td class="b-cell b-cost">—</td>
+          <td class="b-cell b-created">Aug 22, 2026</td>
+          <td class="b-cell b-update"><div class="b-upbody">Feasibility report delivered; project closed.</div><div class="b-upat">5d ago</div></td>
+          <td class="b-cell b-status"><span class="pill" style="background:#dcfce7;color:#166534;">Completed</span></td>
+        </tr>
+        <tr>
+          <td class="b-cell b-proj">
+            <div class="b-rail" style="background:#a3a3a3"></div>
+            <div style="min-width:0">
+              <div class="b-name">Discharge Permit — Riverfront Site</div>
+              <div class="b-client"><i class="fas fa-building meta-ic"></i>Test Wire Co</div>
+            </div>
+          </td>
+          <td class="b-cell b-svc">Discharge Permit (DP)</td>
+          <td class="b-cell b-cost">₱320,000</td>
+          <td class="b-cell b-created">Jul 30, 2026</td>
+          <td class="b-cell b-update"><div class="b-upbody">Permit renewed; file archived at client request.</div><div class="b-upat">3w ago</div></td>
+          <td class="b-cell b-status"><span class="pill" style="background:#f3f4f6;color:#6b7280;">Archived</span></td>
+        </tr></tbody>
+    </table>
+  </div>
+  <style>
+  .tbl-b { width:100%; border-collapse:collapse; }
+  .tbl-b thead th { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em;
+    color:#a3a3a3; text-align:left; padding:11px 14px; border-bottom:1px solid #e8e8e8; background:#fff; }
+  .tbl-b tbody tr { transition:background .12s; cursor:pointer; }
+  .tbl-b tbody tr:hover { background:#f9f9f9; }
+  .tbl-b tbody tr + tr td { border-top:1px solid #ececec; }
+  .b-cell { padding:14px; font-size:13px; color:#757575; vertical-align:middle; }
+  .b-proj { display:table-cell; position:relative; padding-left:0 !important; }
+  .b-rail { display:inline-block; width:4px; height:38px; border-radius:4px; margin:0 12px 0 14px;
+    vertical-align:middle; }
+  .b-name { font-size:14.5px; font-weight:600; color:#202020; line-height:1.3; }
+  .b-client { font-size:12.5px; color:#757575; margin-top:3px; }
+  .b-svc { line-height:1.4; }
+  .b-cost { text-align:right; font-weight:600; color:#202020; font-variant-numeric:tabular-nums; }
+  .b-update { max-width:210px; }
+  .b-upbody { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.4; }
+  .b-upat { font-size:11.5px; color:#a3a3a3; margin-top:2px; }
+  .b-status { white-space:nowrap; }
+  </style>
+</div>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Client Dashboard — A · Status Overview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #fff; color: #202020; -webkit-font-smoothing: antialiased; line-height: 1.5; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 32px 64px; }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
+  .head h1 { font-size: 22px; font-weight: 800; color: #202020; }
+  .head p { color: #757575; margin-top: 4px; font-size: 14px; }
+  .pill { font-size: 12px; font-weight: 600; border: 1px solid #e8e8e8; border-radius: 999px; padding: 6px 14px; color: #757575; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat { background: #fff; border: 1px solid #e8e8e8; border-radius: 14px; padding: 18px 20px; display: flex; align-items: center; gap: 14px; }
+  .stat .ic { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .stat .num { font-size: 26px; font-weight: 800; line-height: 1.1; }
+  .stat .lab { font-size: 13px; color: #757575; margin-top: 2px; }
+  .grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; }
+  .card { background: #fff; border: 1px solid #e8e8e8; border-radius: 14px; overflow: hidden; }
+  .card h2 { font-size: 15px; font-weight: 700; padding: 16px 20px; border-bottom: 1px solid #f1f1f1; display: flex; align-items: center; justify-content: space-between; }
+  .card h2 .link { font-size: 13px; font-weight: 600; color: #059669; text-decoration: none; }
+  .proj { padding: 16px 20px; border-bottom: 1px solid #f5f5f5; }
+  .proj:last-child { border-bottom: none; }
+  .proj .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .proj .nm { font-weight: 600; font-size: 14px; }
+  .proj .svc { font-size: 12.5px; color: #757575; margin-top: 1px; }
+  .chip { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 3px 10px; flex-shrink: 0; }
+  .c-in { background: #ecfdf5; color: #059669; }
+  .c-ns { background: #f5f5f5; color: #757575; }
+  .c-co { background: #e8f7f3; color: #0f9d7f; }
+  .bar { height: 7px; background: #f1f1f1; border-radius: 999px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: #29ca8e; border-radius: 999px; }
+  .proj .meta { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #757575; }
+  .feed { padding: 6px 20px; }
+  .frow { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f5f5f5; position: relative; }
+  .frow:last-child { border-bottom: none; }
+  .fdot { width: 9px; height: 9px; border-radius: 50%; background: #29ca8e; margin-top: 6px; flex-shrink: 0; box-shadow: 0 0 0 4px #ecfdf5; }
+  .frow .t { font-size: 13.5px; color: #202020; font-weight: 500; }
+  .frow .s { font-size: 12px; color: #757575; margin-top: 2px; }
+  .frow .d { font-size: 11.5px; color: #a3a3a3; margin-top: 3px; }
+  .empty { padding: 28px 20px; text-align: center; color: #a3a3a3; font-size: 13px; }
+  .donutwrap { display: flex; align-items: center; justify-content: center; gap: 32px; padding: 28px 20px; }
+  .donut { position: relative; width: 128px; height: 128px; flex-shrink: 0; }
+  .donut svg { transform: rotate(-90deg); }
+  .donut .ctr { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .donut .ctr b { font-size: 24px; font-weight: 800; }
+  .donut .ctr span { font-size: 11px; color: #757575; }
+  .legend { display: flex; flex-direction: column; gap: 8px; }
+  .lg { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #202020; }
+  .lg .sw { width: 10px; height: 10px; border-radius: 3px; }
+  .lg .n { margin-left: auto; font-weight: 600; color: #757575; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>Client Dashboard</h1>
+      <p>Your projects and latest updates from your consultants.</p>
+    </div>
+    <span class="pill"><i class="fa-regular fa-circle-check" style="color:#059669"></i>&nbsp; All systems operational</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="ic" style="background:#ecfdf5"><i class="fa-solid fa-folder-open" style="color:#059669"></i></div>
+      <div><div class="num">39</div><div class="lab">Assigned Projects</div></div>
+    </div>
+    <div class="stat">
+      <div class="ic" style="background:#fef9ec"><i class="fa-solid fa-spinner" style="color:#d97706"></i></div>
+      <div><div class="num">15</div><div class="lab">In Progress</div></div>
+    </div>
+    <div class="stat">
+      <div class="ic" style="background:#e8f7f3"><i class="fa-regular fa-comment-dots" style="color:#0f9d7f"></i></div>
+      <div><div class="num">6</div><div class="lab">Unread Updates</div></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Your Projects <a class="link" href="#">View all <i class="fa-solid fa-arrow-right" style="font-size:11px"></i></a></h2>
+      <div class="proj">
+        <div class="top"><div><div class="nm">ECC Application — Calamba Plant</div><div class="svc">Environmental Compliance Certificate (ECC)</div></div><span class="chip c-in">In Progress</span></div>
+        <div class="bar"><i style="width:68%"></i></div>
+        <div class="meta"><span>68% complete</span><span><i class="fa-regular fa-message"></i> 14 updates</span></div>
+      </div>
+      <div class="proj">
+        <div class="top"><div><div class="nm">Air Quality Permit — Batangas Facility</div><div class="svc">Environmental Compliance Certificate (ECC)</div></div><span class="chip c-in">In Progress</span></div>
+        <div class="bar"><i style="width:42%"></i></div>
+        <div class="meta"><span>42% complete</span><span><i class="fa-regular fa-message"></i> 9 updates</span></div>
+      </div>
+      <div class="proj">
+        <div class="top"><div><div class="nm">Water Discharge Permit — Renewal</div><div class="svc">Environmental Compliance Certificate (ECC)</div></div><span class="chip c-ns">Not Started</span></div>
+        <div class="bar"><i style="width:0%"></i></div>
+        <div class="meta"><span>Not started yet</span><span><i class="fa-regular fa-message"></i> 2 updates</span></div>
+      </div>
+      <div class="proj">
+        <div class="top"><div><div class="nm">Waste Disposal Compliance Audit</div><div class="svc">Environmental Compliance Certificate (ECC)</div></div><span class="chip c-ns">Not Started</span></div>
+        <div class="bar"><i style="width:0%"></i></div>
+        <div class="meta"><span>Not started yet</span><span><i class="fa-regular fa-message"></i> 1 update</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Latest Updates</h2>
+      <div class="feed">
+        <div class="frow">
+          <span class="fdot"></span>
+          <div><div class="t">ECC Application — Calamba Plant</div><div class="s">"Good morning — we've submitted the compliance monitoring report for your review."</div><div class="d">Today, 9:41 AM · SECPhils</div></div>
+        </div>
+        <div class="frow">
+          <span class="fdot"></span>
+          <div><div class="t">Air Quality Permit — Batangas Facility</div><div class="s">"Site inspection scheduled for Thursday, 10 AM. Kindly confirm availability."</div><div class="d">Yesterday · SECPhils</div></div>
+        </div>
+        <div class="frow">
+          <span class="fdot"></span>
+          <div><div class="t">Announcement: New Compliance Calendar</div><div class="s">Quezon City: filing deadlines for all permits moving to the 15th of each month.</div><div class="d">Aug 22 · SECPhils</div></div>
+        </div>
+        <div class="frow">
+          <span class="fdot"></span>
+          <div><div class="t">Water Discharge Permit — Renewal</div><div class="s">"Documents received. We will begin the application next week."</div><div class="d">Aug 20 · SECPhils</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Overall Project Health</h2>
+    <div class="donutwrap">
+      <div class="donut">
+        <svg width="128" height="128" viewBox="0 0 128 128">
+          <circle cx="64" cy="64" r="52" fill="none" stroke="#f1f1f1" stroke-width="14"/>
+          <circle cx="64" cy="64" r="52" fill="none" stroke="#059669" stroke-width="14" stroke-dasharray="114.7 327.5" stroke-dashoffset="0" stroke-linecap="butt"/>
+          <circle cx="64" cy="64" r="52" fill="none" stroke="#d1d5db" stroke-width="14" stroke-dasharray="183.4 327.5" stroke-dashoffset="-114.7" stroke-linecap="butt"/>
+        </svg>
+        <div class="ctr"><b>39</b><span>projects</span></div>
+      </div>
+      <div class="legend">
+        <div class="lg"><span class="sw" style="background:#059669"></span> In progress <span class="n">15</span></div>
+        <div class="lg"><span class="sw" style="background:#d1d5db"></span> Not started <span class="n">24</span></div>
+        <div class="lg"><span class="sw" style="background:#e8e8e8"></span> Waiting on you <span class="n">0</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -320,6 +320,49 @@ export async function useRequestDocumentDeletion(documentId: number, note?: stri
   return response.data
 }
 
+// ---------- provider-only message trash (V33) ----------
+
+export interface MessageTrashRow {
+  id: number
+  projectId: number
+  projectName: string
+  projectCompany?: string | null
+  senderId?: number | null
+  senderName?: string | null
+  body: string
+  attachmentFileName?: string | null
+  visibility: string
+  createdAt: string
+  deletedAt: string
+  deletedByName?: string | null
+}
+
+export async function useGetMessageTrash() {
+  const response = await api.get('/messages/trash')
+  return response.data as MessageTrashRow[]
+}
+
+/** Provider-only: move a message to the trash (reason lands in the audit trail). */
+export async function useTrashMessage(id: number, reason: string) {
+  const response = await api.delete(`/messages/${id}/trash`, { data: { reason } })
+  return response.data
+}
+
+export async function useRestoreMessage(id: number) {
+  const response = await api.post(`/messages/${id}/restore`)
+  return response.data
+}
+
+export async function useDeleteMessagePermanently(id: number, password: string) {
+  const response = await api.delete(`/messages/${id}/permanent`, { data: { password } })
+  return response.data
+}
+
+export async function useEmptyMessageTrash(password: string) {
+  const response = await api.post('/messages/trash/empty', { password })
+  return response.data
+}
+
 export async function useGetCompany(id: number) {
   const response = await api.get(`/companies/${id}`)
   return response.data

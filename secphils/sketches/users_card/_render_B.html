@@ -1,0 +1,118 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root{
+    --primary:#29ca8e; --emerald600:#059669; --emerald500:#10b981; --emerald100:#d1fae5;
+    --emerald50:#ecfdf5; --gray900:#111827; --gray700:#374151; --gray600:#4b5563;
+    --gray500:#6b7280; --gray400:#9ca3af; --gray200:#e5e7eb; --gray100:#f3f4f6;
+    --border:#e8e8e8; --bg:#f5f6f8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--gray900);padding:28px 20px 60px}
+  h1.page{font-size:20px;font-weight:800;margin:0 0 4px}
+  p.page{color:var(--gray500);font-size:13px;margin:0 0 26px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;max-width:1160px;margin:0 auto 26px}
+  .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--emerald600);border-radius:999px;padding:3px 10px;margin-bottom:10px}
+  .tag.reco{background:var(--primary)}
+  .card{background:#fff;border-radius:12px;box-shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.1);border:1px solid #f0f0f0}
+  .card .hd{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--gray200)}
+  .card .hd h2{margin:0;font-size:18px;font-weight:600}
+  .card .view{font-size:13px;font-weight:500;color:var(--emerald600);text-decoration:none}
+  .card .view:hover{color:#047857}
+  /* Documents card (static, for context) */
+  .docs .body{display:grid;grid-template-columns:repeat(3,1fr)}
+  .docs .m{padding:20px;text-align:center}
+  .docs .m + .m{border-left:1px solid var(--gray100)}
+  .docs .m .n{font-size:24px;font-weight:700}
+  .docs .m .l{font-size:12px;color:var(--gray500);margin-top:4px}
+  /* ===== Variant A: refined tiles ===== */
+  .vA .body{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:20px}
+  .tile{border-radius:12px;padding:18px 16px;display:flex;align-items:center;gap:13px;border:1px solid var(--border);background:#fff;transition:box-shadow .15s}
+  .tile .ic{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto}
+  .tile .n{font-size:26px;font-weight:800;line-height:1}
+  .tile .l{font-size:12px;color:var(--gray500);margin-top:3px;font-weight:500}
+  .t-total .ic{background:var(--gray100);color:var(--gray600)}
+  .t-total .n{color:var(--gray900)}
+  .t-active .ic{background:var(--emerald100);color:var(--emerald600)}
+  .t-active .n{color:var(--emerald600)}
+  .t-inactive .ic{background:var(--gray100);color:var(--gray400)}
+  .t-inactive .n{color:var(--gray600)}
+  /* ===== Variant B: donut ===== */
+  .vB .body{display:grid;grid-template-columns:170px 1fr;gap:20px;padding:22px;align-items:center}
+  .donut{position:relative;width:160px;height:160px;justify-self:center}
+  .donut svg{transform:rotate(-90deg)}
+  .donut .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .donut .center .n{font-size:34px;font-weight:800;line-height:1;color:var(--gray900)}
+  .donut .center .l{font-size:12px;color:var(--gray500);margin-top:4px}
+  .legend{display:flex;flex-direction:column;gap:14px}
+  .lg-row{display:flex;align-items:center;gap:12px}
+  .lg-dot{width:12px;height:12px;border-radius:4px;flex:0 0 auto}
+  .lg-txt .n{font-size:22px;font-weight:700;line-height:1.1}
+  .lg-txt .l{font-size:12px;color:var(--gray500)}
+  .lg-meta{margin-left:auto;font-size:12px;color:var(--gray400);font-weight:600}
+  /* ===== Variant C: gauge ===== */
+  .vC .body{padding:24px;display:flex;flex-direction:column;align-items:center}
+  .gauge-wrap{position:relative;width:230px;height:120px}
+  .gauge-wrap svg{display:block}
+  .gauge-val{position:absolute;left:0;right:0;bottom:2px;text-align:center}
+  .gauge-val .n{font-size:38px;font-weight:800;color:var(--emerald600);line-height:1}
+  .gauge-val .l{font-size:12px;color:var(--gray500);margin-top:2px}
+  .vC .foot{display:flex;width:100%;margin-top:8px;border-top:1px solid var(--gray100);padding-top:14px}
+  .vC .foot .cell{flex:1;text-align:center}
+  .vC .foot .cell + .cell{border-left:1px solid var(--gray100)}
+  .vC .foot .n{font-size:20px;font-weight:700;color:var(--gray900)}
+  .vC .foot .l{font-size:12px;color:var(--gray500);margin-top:2px}
+  .note{font-size:12px;color:var(--gray500);margin-top:10px;max-width:520px}
+
+  body{padding:0;margin:0}
+  .row{max-width:1160px;margin:0 auto;padding:0}
+</style></head>
+<body>
+<div class="row" data-shot="B">
+    <div>
+      <span class="tag">Option B · Donut</span>
+      <div class="card docs">
+        <div class="hd"><h2>Documents</h2><a class="view" href="#">View</a></div>
+        <div class="body">
+          <div class="m"><div class="n">1</div><div class="l">Total files</div></div>
+          <div class="m"><div class="n">0</div><div class="l">In trash</div></div>
+          <div class="m"><div class="n">0 B</div><div class="l">Storage used</div></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <span class="tag">Option B · Donut chart</span>
+      <div class="card vB" id="shotB">
+        <div class="hd"><h2>Users</h2><a class="view" href="#">View</a></div>
+        <div class="body">
+          <div class="donut">
+            <svg width="160" height="160" viewBox="0 0 160 160">
+              <circle cx="80" cy="80" r="62" fill="none" stroke="#eef1f0" stroke-width="18"></circle>
+              <!-- active = 8/12 = 66.6%  =>  0.666*2*pi*62 = 259.4 -->
+              <circle cx="80" cy="80" r="62" fill="none" stroke="#29ca8e" stroke-width="18"
+                      stroke-linecap="round" stroke-dasharray="259.4 1000"></circle>
+            </svg>
+            <div class="center"><div class="n">12</div><div class="l">Total users</div></div>
+          </div>
+          <div class="legend">
+            <div class="lg-row">
+              <span class="lg-dot" style="background:#29ca8e"></span>
+              <div class="lg-txt"><div class="n">8</div><div class="l">Active</div></div>
+              <div class="lg-meta">67%</div>
+            </div>
+            <div class="lg-row">
+              <span class="lg-dot" style="background:#eef1f0"></span>
+              <div class="lg-txt"><div class="n">4</div><div class="l">Inactive</div></div>
+              <div class="lg-meta">33%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note">The ring shows the active share at a glance (67% of the 12). Center holds the total; legend gives both counts.</p>
+    </div>
+  </div>
+
+  <!-- ===== VARIANT C ===== -->
+</body></html>

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Client Dashboard — C · Action Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #fff; color: #202020; -webkit-font-smoothing: antialiased; line-height: 1.5; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 32px 48px; }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
+  .head h1 { font-size: 22px; font-weight: 800; color: #202020; }
+  .head p { color: #757575; margin-top: 4px; font-size: 14px; }
+  /* attention strip */
+  .attn { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .acard { border-radius: 14px; padding: 18px 20px; display: flex; align-items: center; gap: 14px; }
+  .acard .ic { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+  .acard .num { font-size: 24px; font-weight: 800; line-height: 1.1; }
+  .acard .lab { font-size: 12.5px; margin-top: 2px; }
+  .a-msg { background: #ecfdf5; border: 1px solid #a7f3d0; }
+  .a-msg .ic { background: #fff; color: #059669; }
+  .a-ann { background: #fef9ec; border: 1px solid #fde68a; }
+  .a-ann .ic { background: #fff; color: #b45309; }
+  .a-need { background: #f5f5f5; border: 1px solid #e8e8e8; }
+  .a-need .ic { background: #fff; color: #757575; }
+  .grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; }
+  .card { background: #fff; border: 1px solid #e8e8e8; border-radius: 14px; overflow: hidden; }
+  .card h2 { font-size: 15px; font-weight: 700; padding: 16px 20px; border-bottom: 1px solid #f1f1f1; display: flex; align-items: center; justify-content: space-between; }
+  .card h2 .link { font-size: 13px; font-weight: 600; color: #059669; text-decoration: none; }
+  .item { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #f5f5f5; }
+  .item:last-child { border-bottom: none; }
+  .item .ic { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .item .bd { min-width: 0; flex: 1; }
+  .item .t { font-size: 13.5px; font-weight: 600; }
+  .item .s { font-size: 12px; color: #757575; margin-top: 1px; }
+  .item .d { font-size: 11.5px; color: #a3a3a3; margin-top: 2px; }
+  .goto { font-size: 12px; font-weight: 600; color: #059669; text-decoration: none; flex-shrink: 0; }
+  .proj { padding: 15px 20px; border-bottom: 1px solid #f5f5f5; display: flex; align-items: center; gap: 12px; }
+  .proj:last-child { border-bottom: none; }
+  .proj .ic { width: 36px; height: 36px; border-radius: 9px; background: #f1f1f1; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #059669; flex-shrink: 0; }
+  .proj .bd { flex: 1; min-width: 0; }
+  .proj .nm { font-size: 13.5px; font-weight: 600; }
+  .proj .svc { font-size: 11.5px; color: #757575; margin-top: 1px; }
+  .chip { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 3px 10px; flex-shrink: 0; }
+  .c-in { background: #ecfdf5; color: #059669; }
+  .c-ns { background: #f5f5f5; color: #757575; }
+  .bar { height: 5px; background: #f1f1f1; border-radius: 999px; overflow: hidden; margin-top: 6px; }
+  .bar > i { display: block; height: 100%; background: #29ca8e; border-radius: 999px; }
+  .empty { padding: 24px 20px; text-align: center; color: #a3a3a3; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>Client Dashboard</h1>
+      <p>Things that need your attention, at a glance.</p>
+    </div>
+    <span class="chip c-in" style="font-size:12px;padding:6px 14px"><i class="fa-regular fa-circle-check"></i>&nbsp; 3 things need you</span>
+  </div>
+
+  <div class="attn">
+    <div class="acard a-msg">
+      <div class="ic"><i class="fa-regular fa-envelope-open"></i></div>
+      <div><div class="num">4</div><div class="lab" style="color:#059669">Unread messages</div></div>
+    </div>
+    <div class="acard a-ann">
+      <div class="ic"><i class="fa-solid fa-bullhorn"></i></div>
+      <div><div class="num">1</div><div class="lab" style="color:#b45309">New announcement</div></div>
+    </div>
+    <div class="acard a-need">
+      <div class="ic"><i class="fa-regular fa-clock"></i></div>
+      <div><div class="num">2</div><div class="lab" style="color:#757575">Documents to review</div></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Needs Your Attention</h2>
+      <div class="item">
+        <div class="ic" style="background:#ecfdf5"><i class="fa-regular fa-envelope-open" style="color:#059669"></i></div>
+        <div class="bd">
+          <div class="t">Unread message from SECPhils</div>
+          <div class="s">"We've submitted the compliance monitoring report for your review."</div>
+          <div class="d">ECC Application — Calamba Plant · Today, 9:41 AM</div>
+        </div>
+        <a class="goto" href="#">Review <i class="fa-solid fa-arrow-right" style="font-size:11px"></i></a>
+      </div>
+      <div class="item">
+        <div class="ic" style="background:#fef9ec"><i class="fa-solid fa-bullhorn" style="color:#b45309"></i></div>
+        <div class="bd">
+          <div class="t">New announcement from SECPhils</div>
+          <div class="s">Compliance Calendar: filing deadlines move to the 15th of each month.</div>
+        </div>
+        <a class="goto" href="#">View <i class="fa-solid fa-arrow-right" style="font-size:11px"></i></a>
+      </div>
+      <div class="item">
+        <div class="ic" style="background:#fef9ec"><i class="fa-regular fa-file-lines" style="color:#4f46e5"></i></div>
+        <div class="bd">
+          <div class="t">Document waiting for your review</div>
+          <div class="s">Air Quality Monitoring Report Q3.pdf (2.4 MB)</div>
+          <div class="d">Air Quality Permit — Batangas Facility</div>
+        </div>
+        <a class="goto" href="#">Open <i class="fa-solid fa-arrow-right" style="font-size:11px"></i></a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Your Projects <a class="link" href="#">View all</a></h2>
+      <div class="proj">
+        <div class="ic"><i class="fa-solid fa-folder-open"></i></div>
+        <div class="bd">
+          <div class="nm">ECC Application — Calamba Plant</div>
+          <div class="svc">Environmental Compliance Certificate (ECC)</div>
+          <div class="bar"><i style="width:68%"></i></div>
+        </div>
+        <span class="chip c-in">In Progress</span>
+      </div>
+      <div class="proj">
+        <div class="ic"><i class="fa-solid fa-folder-open"></i></div>
+        <div class="bd">
+          <div class="nm">Air Quality Permit — Batangas</div>
+          <div class="svc">Environmental Compliance Certificate (ECC)</div>
+          <div class="bar"><i style="width:42%"></i></div>
+        </div>
+        <span class="chip c-in">In Progress</span>
+      </div>
+      <div class="proj">
+        <div class="ic"><i class="fa-solid fa-folder-open"></i></div>
+        <div class="bd">
+          <div class="nm">Water Discharge Permit — Renewal</div>
+          <div class="svc">Environmental Compliance Certificate (ECC)</div>
+          <div class="bar"><i style="width:0%"></i></div>
+        </div>
+        <span class="chip c-ns">Not Started</span>
+      </div>
+      <div class="empty"><i class="fa-regular fa-circle-check" style="font-size:20px;display:block;margin-bottom:6px"></i>No other actions needed right now.</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

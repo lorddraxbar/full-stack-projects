@@ -3,11 +3,15 @@ import { ref, computed, onMounted, watch } from 'vue'
 import {
   useGetMe, useGetProjects, useGetMessages, useSendMessage,
   useUploadMessage, useDownloadMessage,
+  useGetMessageTrash, useRestoreMessage, useDeleteMessagePermanently, useEmptyMessageTrash,
+  type MessageTrashRow,
 } from '@/services/api'
 import { useRole } from '@/composables/useRole'
 import DocumentPreviewModal from '@/components/DocumentPreviewModal.vue'
+import TrashMessageModal from '@/components/TrashMessageModal.vue'
 import Pagination from '@/components/Pagination.vue'
-import { formatDateTime, timeAgo, formatFileSize } from '@/lib/labels'
+import { formatDateTime, timeAgo, formatFileSize, formatDate } from '@/lib/labels'
+import { useRetention } from '@/composables/useRetention'
 
 interface Conversation {
   id: number
@@ -23,6 +27,83 @@ interface Conversation {
 
 const me = ref<{ id: number; fullName: string; companyId: number | null } | null>(null)
 const { isClient } = useRole()
+const { retentionDays } = useRetention()
+const isStaff = computed(() => !isClient.value)
+
+// Provider-only message removal (V33): the supported erasure path. Server
+// enforces the same gate (staff + own-company-or-admin); the button is UI only.
+const trashTarget = ref<{ id: number; preview: string } | null>(null)
+function openTrash(msg: any) {
+  const preview = (msg.body || '').length > 90 ? msg.body.slice(0, 90) + '…' : (msg.body || '')
+  trashTarget.value = { id: msg.id, preview }
+}
+async function onMessageRemoved() {
+  if (selectedId.value != null) await selectConversation(selectedId.value)
+  await loadConversations()
+  await loadMessageTrash()
+}
+
+// ---------- Staff-only message trash pane (V33) ----------
+// 'conversations' (default) or 'msgtrash' — the trash tab is staff-only, the
+// same shape as the Documents view's trash.
+const view = ref<'conversations' | 'msgtrash'>('conversations')
+const trashRows = ref<MessageTrashRow[]>([])
+const trashLoading = ref(false)
+const trashError = ref('')
+const passwordModal = ref<{ open: boolean; purpose: 'one' | 'all'; msgId: number | null }>(
+  { open: false, purpose: 'all', msgId: null })
+const passwordInput = ref('')
+const passwordBusy = ref(false)
+const passwordError = ref('')
+
+async function loadMessageTrash() {
+  trashLoading.value = true
+  trashError.value = ''
+  try {
+    trashRows.value = await useGetMessageTrash()
+  } catch (e: any) {
+    trashError.value = e?.response?.data?.message || 'Failed to load the message trash'
+  } finally {
+    trashLoading.value = false
+  }
+}
+
+async function restoreMsg(id: number) {
+  try {
+    await useRestoreMessage(id)
+    await loadMessageTrash()
+    if (selectedId.value != null) await selectConversation(selectedId.value)
+    await loadConversations()
+  } catch (e: any) {
+    trashError.value = e?.response?.data?.message || 'Failed to restore the message'
+  }
+}
+
+function openPasswordModal(purpose: 'one' | 'all', msgId: number | null) {
+  passwordInput.value = ''
+  passwordError.value = ''
+  passwordModal.value = { open: true, purpose, msgId }
+}
+
+async function confirmPassword() {
+  if (passwordBusy.value) return
+  if (!passwordInput.value) { passwordError.value = 'Password is required.'; return }
+  passwordBusy.value = true
+  passwordError.value = ''
+  try {
+    if (passwordModal.value.purpose === 'one' && passwordModal.value.msgId != null) {
+      await useDeleteMessagePermanently(passwordModal.value.msgId, passwordInput.value)
+    } else {
+      await useEmptyMessageTrash(passwordInput.value)
+    }
+    passwordModal.value = { open: false, purpose: 'all', msgId: null }
+    await loadMessageTrash()
+  } catch (e: any) {
+    passwordError.value = e?.response?.data?.message || 'Failed — password confirmation rejected'
+  } finally {
+    passwordBusy.value = false
+  }
+}
 const conversations = ref<Conversation[]>([])
 const selectedId = ref<number | null>(null)
 const messages = ref<any[]>([])
@@ -227,7 +308,10 @@ async function sendMessage() {
   }
 }
 
-onMounted(loadConversations)
+onMounted(async () => {
+  await loadConversations()
+  if (isStaff.value) await loadMessageTrash() // keeps the tab count honest
+})
 </script>
 
 <template>
@@ -237,7 +321,93 @@ onMounted(loadConversations)
       <p class="text-gray-600 mt-1">Project conversations with team members</p>
     </div>
 
-    <div v-if="loading" class="flex items-center justify-center py-20">
+    <!-- Tabs (staff + admin only) — same shape as the Documents view -->
+    <div v-if="!isClient" class="flex gap-1 mb-6 border-b border-gray-200">
+      <button
+        @click="view = 'conversations'"
+        :class="['pb-2 px-1 -mb-px text-sm font-medium border-b-2 transition-colors',
+          view === 'conversations' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700']"
+      >
+        Conversations
+      </button>
+      <button
+        @click="view = 'msgtrash'; loadMessageTrash()"
+        :class="['pb-2 px-1 -mb-px text-sm font-medium border-b-2 transition-colors',
+          view === 'msgtrash' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700']"
+      >
+        Message trash ({{ trashRows.length }})
+      </button>
+    </div>
+
+    <!-- Message trash pane (provider staff only — the supported erasure path) -->
+    <div v-if="view === 'msgtrash'" class="bg-white rounded-lg shadow overflow-hidden">
+      <div class="p-4 border-b border-gray-200 flex items-center justify-between gap-4">
+        <div>
+          <h2 class="font-semibold text-gray-900">Removed messages</h2>
+          <p class="text-sm text-gray-500 mt-0.5">
+            Purged automatically {{ retentionDays }} days after removal. Everything here is restorable until then,
+            and every step is recorded in the audit log.
+          </p>
+        </div>
+        <button
+          v-if="trashRows.length > 0"
+          class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium text-sm whitespace-nowrap"
+          @click="openPasswordModal('all', null)"
+        >
+          <i class="fas fa-trash mr-1" />Empty trash
+        </button>
+      </div>
+      <p v-if="trashError" class="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ trashError }}</p>
+      <div v-if="trashLoading" class="p-10 text-center text-gray-500 text-sm">Loading…</div>
+      <div v-else-if="trashRows.length === 0" class="p-10 text-center text-sm text-gray-500">
+        No removed messages. Nothing is recoverable.
+      </div>
+      <div v-else class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sender</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Removed</th>
+              <th class="px-6 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <tr v-for="row in trashRows" :key="row.id" class="hover:bg-gray-50 align-top">
+              <td class="px-6 py-4 text-sm text-gray-800 max-w-md">
+                {{ row.body.length > 120 ? row.body.slice(0, 120) + '…' : row.body }}
+                <span v-if="row.attachmentFileName" class="block text-xs text-gray-500 mt-1">
+                  <i class="fas fa-paperclip mr-1"></i>{{ row.attachmentFileName }}
+                </span>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600">{{ row.projectName }}</td>
+              <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ row.senderName || '—' }}</td>
+              <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                {{ formatDate(row.deletedAt) }}
+                <span class="block text-xs text-gray-400">by {{ row.deletedByName || '—' }}</span>
+              </td>
+              <td class="px-6 py-4 text-right whitespace-nowrap">
+                <button
+                  class="text-emerald-600 hover:text-emerald-700 font-medium text-sm mr-3"
+                  @click="restoreMsg(row.id)"
+                >
+                  Restore
+                </button>
+                <button
+                  class="text-red-600 hover:text-red-700 font-medium text-sm"
+                  @click="openPasswordModal('one', row.id)"
+                >
+                  Delete permanently
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div v-else-if="loading" class="flex items-center justify-center py-20">
       <svg class="animate-spin h-8 w-8 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -391,6 +561,16 @@ onMounted(loadConversations)
                 isOwn(msg) ? 'text-emerald-100' : 'text-gray-500'
               ]">
                 {{ formatDateTime(msg.createdAt) }}
+                <button
+                  v-if="isStaff"
+                  type="button"
+                  title="Remove message (SECPhils staff — erasure path)"
+                  @click="openTrash(msg)"
+                  class="ml-2 opacity-60 hover:opacity-100 underline"
+                  :class="isOwn(msg) ? 'text-emerald-200' : 'text-red-600'"
+                >
+                  Remove
+                </button>
               </p>
             </div>
           </div>
@@ -480,5 +660,49 @@ onMounted(loadConversations)
 
     <!-- Attachment preview (shared modal with the Documents surfaces) -->
     <DocumentPreviewModal v-model:open="previewOpen" :doc="previewDoc" />
+
+    <!-- Staff-only message removal (erasure path, V33) -->
+    <TrashMessageModal
+      :open="trashTarget !== null"
+      :msg="trashTarget"
+      @update:open="(v: boolean) => { if (!v) trashTarget = null }"
+      @removed="onMessageRemoved"
+    />
+
+    <!-- Password confirmation (shared by "delete permanently" and "empty trash") -->
+    <div v-if="passwordModal.open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/30" @click="passwordModal = { open: false, purpose: 'all', msgId: null }" />
+      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">Confirm with your password</h2>
+        <p class="text-sm text-gray-600 mb-4">
+          {{ passwordModal.purpose === 'one'
+            ? 'This permanently deletes the message row and its attachment (when no document mirrors it). This cannot be undone.'
+            : `This permanently deletes all ${trashRows.length} message(s) in the trash. This cannot be undone.` }}
+        </p>
+        <input
+          v-model="passwordInput"
+          type="password"
+          placeholder="Your account password"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+          @keyup.enter="confirmPassword"
+        />
+        <p v-if="passwordError" class="mt-2 text-sm text-red-600">{{ passwordError }}</p>
+        <div class="flex justify-end gap-3 mt-5">
+          <button
+            class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+            @click="passwordModal = { open: false, purpose: 'all', msgId: null }"
+          >
+            Cancel
+          </button>
+          <button
+            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
+            :disabled="passwordBusy"
+            @click="confirmPassword"
+          >
+            {{ passwordBusy ? 'Deleting…' : 'Delete permanently' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
