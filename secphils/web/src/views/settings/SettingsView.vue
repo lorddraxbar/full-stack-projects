@@ -142,6 +142,7 @@ async function saveCompany() {
 const clientTeam = ref<CompanyTeamMember[]>([])
 const inviteForm = ref({ name: '', email: '', phone: '' })
 const inviting = ref(false)
+const showInviteModal = ref(false)
 
 // Everyone invited from here is a CLIENT account of this company (the backend
 // hard-codes it). The one meaningful distinction is the authorized rep — the
@@ -171,6 +172,7 @@ async function inviteMember() {
       phone: inviteForm.value.phone.trim() || undefined,
     })
     inviteForm.value = { name: '', email: '', phone: '' }
+    showInviteModal.value = false
     await loadTeam()
     flash('success', 'Invitation sent. The team member will receive an email with an account setup link.')
   } catch (e: any) {
@@ -593,8 +595,14 @@ onMounted(async () => {
       <div v-if="activeTab === 'team'" class="space-y-6">
         <!-- Client Team Members -->
         <div class="bg-white rounded-lg shadow">
-          <div class="p-6 border-b border-gray-200">
+          <div class="p-6 border-b border-gray-200 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900">Client Team Members</h2>
+            <button
+              class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm"
+              @click="showInviteModal = true"
+            >
+              <i class="fas fa-plus mr-1" /> Invite a Team Member
+            </button>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full">
@@ -644,53 +652,63 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Invite Team Member -->
-        <div class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Invite a Team Member</h2>
-          <p class="text-sm text-gray-600 mb-4">
-            Invited members receive an email with an account setup link and are added to your company.
-            New members can view your projects, messages and documents; only the
-            <span class="font-medium text-gray-800">Authorized Representative</span> can review and complete projects.
-            To change who that is, contact your SECPhils representative.
-          </p>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-              <input
-                v-model="inviteForm.name"
-                type="text"
-                placeholder="Juan Dela Cruz"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+        <!-- Invite Team Member (dialog — same pattern as the other pages) -->
+        <div v-if="showInviteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/30" @click="showInviteModal = false" />
+          <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Invite a Team Member</h2>
+            <p class="text-sm text-gray-600 mb-4">
+              Invited members receive an email with an account setup link and are added to your company.
+              New members can view your projects, messages and documents; only the
+              <span class="font-medium text-gray-800">Authorized Representative</span> can review and complete projects.
+              To change who that is, contact your SECPhils representative.
+            </p>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <input
+                  v-model="inviteForm.name"
+                  type="text"
+                  placeholder="Juan Dela Cruz"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <input
+                  v-model="inviteForm.email"
+                  type="email"
+                  placeholder="juan@company.com"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phone <span class="font-normal text-gray-400">(optional)</span></label>
+                <input
+                  v-model="inviteForm.phone"
+                  type="tel"
+                  placeholder="0917 000 0000"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-              <input
-                v-model="inviteForm.email"
-                type="email"
-                placeholder="juan@company.com"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+            <div class="mt-6 flex justify-end gap-3">
+              <button
+                class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium"
+                :disabled="inviting"
+                @click="showInviteModal = false"
+              >
+                Cancel
+              </button>
+              <button
+                @click="inviteMember"
+                :disabled="inviting"
+                class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50 text-sm"
+              >
+                <i class="fas fa-paper-plane mr-1" />
+                {{ inviting ? 'Sending…' : 'Send Invitation' }}
+              </button>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Phone <span class="font-normal text-gray-400">(optional)</span></label>
-              <input
-                v-model="inviteForm.phone"
-                type="tel"
-                placeholder="0917 000 0000"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-          </div>
-          <div class="mt-4 flex justify-end">
-            <button
-              @click="inviteMember"
-              :disabled="inviting"
-              class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50"
-            >
-              <i class="fas fa-paper-plane mr-1" />
-              {{ inviting ? 'Sending…' : 'Send Invitation' }}
-            </button>
           </div>
         </div>
       </div>
