@@ -14,6 +14,7 @@ import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
 import com.secphils.service.MailService;
 import com.secphils.service.RepChangeNotificationService;
+import com.secphils.service.TeamRemovalNotificationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,6 +41,7 @@ public class CompanyController {
     private final SystemSettingsRepository settingsRepository;
     private final PasswordEncoder passwordEncoder;
     private final RepChangeNotificationService repChangeNotifications;
+    private final TeamRemovalNotificationService teamRemovalNotifications;
     private final String inviteBaseUrl;
     private final Duration inviteTtl;
 
@@ -47,6 +49,7 @@ public class CompanyController {
                              AuditService auditService, MailService mailService,
                              SystemSettingsRepository settingsRepository, PasswordEncoder passwordEncoder,
                              RepChangeNotificationService repChangeNotifications,
+                             TeamRemovalNotificationService teamRemovalNotifications,
                              @Value("${app.invite.base-url}") String inviteBaseUrl,
                              @Value("${app.invite.token-ttl:24h}") Duration inviteTtl) {
         this.companyRepository = companyRepository;
@@ -56,6 +59,7 @@ public class CompanyController {
         this.settingsRepository = settingsRepository;
         this.passwordEncoder = passwordEncoder;
         this.repChangeNotifications = repChangeNotifications;
+        this.teamRemovalNotifications = teamRemovalNotifications;
         this.inviteBaseUrl = inviteBaseUrl;
         this.inviteTtl = inviteTtl;
     }
@@ -264,6 +268,53 @@ public class CompanyController {
                 .map(CompanyTeamMemberResponse::from)
                 .toList();
         return ResponseEntity.ok(team);
+    }
+
+    /**
+     * The company's AUTHORIZED REPRESENTATIVE removes a teammate's portal
+     * access. This is a DEACTIVATION, never a hard delete — the same honest
+     * semantics admins use: login is blocked immediately (JwtAuthFilter
+     * re-checks active state per request), history stays attributed, and the
+     * member is restorable by a provider admin within the retention window.
+     * Rep-only by policy: the rep owns the company's access. The rep cannot
+     * remove themselves and cannot remove the rep (integrity wall — the
+     * companies.authorized_rep FK stays RESTRICT).
+     */
+    @PostMapping("/me/team/{userId}/deactivate")
+    @Transactional
+    public ResponseEntity<Void> deactivateTeamMember(@PathVariable Long userId, HttpServletRequest http) {
+        AuthUser me = CurrentUser.require();
+        User actor = userRepository.findById(me.id()).orElseThrow(() -> ApiException.notFound("User"));
+        Company company = ownCompany(me);
+        if (company.getAuthorizedRep() == null || !company.getAuthorizedRep().getId().equals(actor.getId())) {
+            throw ApiException.forbidden("Only the authorized representative can remove team members");
+        }
+        if (actor.getId().equals(userId)) {
+            throw ApiException.badRequest("You cannot remove your own access");
+        }
+        User target = userRepository.findById(userId)
+                .orElseThrow(() -> ApiException.notFound("Team member"));
+        // The target must be a CLIENT of THIS company — never a provider account,
+        // never another company's member.
+        if (target.getCompanyId() == null || !target.getCompanyId().equals(company.getId())) {
+            throw ApiException.notFound("Team member");
+        }
+        if (target.getRole() == null || !target.getRole().trim().equalsIgnoreCase("CLIENT")) {
+            throw ApiException.forbidden("Provider accounts cannot be removed here");
+        }
+        if (company.getAuthorizedRep().getId().equals(target.getId())) {
+            throw ApiException.conflict("The authorized representative cannot be removed. Contact SECPhils to change the representative first.");
+        }
+        if (!Boolean.TRUE.equals(target.getIsActive())) {
+            throw ApiException.conflict("This member's access is already removed");
+        }
+        target.setIsActive(false);
+        target.setDeactivatedAt(LocalDateTime.now());
+        userRepository.save(target);
+        auditService.audit(me, "COMPANY_TEAM_MEMBER_REMOVED", "Company", company.getId(),
+                "Removed: " + target.getEmail() + " (deactivated by authorized rep)", http);
+        teamRemovalNotifications.onMemberRemoved(company, target, actor, actor.getId());
+        return ResponseEntity.noContent().build();
     }
 
     /**

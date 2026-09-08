@@ -57,6 +57,8 @@ public class EmailTemplateService {
     public static final String REP_ASSIGNED = "repAssigned";
     public static final String REP_REMOVED = "repRemoved";
     public static final String REVIEW_SUBMITTED = "reviewSubmitted";
+    public static final String TEAM_ACCESS_REMOVED = "teamAccessRemoved";
+    public static final String TEAM_MEMBER_REMOVED = "teamMemberRemoved";
     public static final String LANDING = "landing";
 
     private final SystemSettingsRepository settingsRepository;
@@ -179,6 +181,20 @@ public class EmailTemplateService {
                     "Hi {{name}},\n\nThe authorized representative role for {{company}} now belongs to **{{newRep}}**. You no longer need to review or complete projects — your normal portal access is unchanged.",
                     "Open my projects",
                     "You're receiving this because SECPhils updated the authorized representative for {{company}}. Manage your notification preferences in the portal.")),
+            Map.entry(TEAM_ACCESS_REMOVED, EmailTemplate.of(TEAM_ACCESS_REMOVED,
+                    "Your portal access for {{company}} was removed",
+                    "SecPhils · {{company}}",
+                    "Portal access removed",
+                    "Hi {{name}},\n\nYour access to the {{company}} portal was removed by the company's authorized representative. You can no longer sign in to view projects, messages or documents. If you believe this is a mistake, contact your SECPhils representative.",
+                    "",
+                    "You're receiving this because your SECPhils portal access was changed. Manage your notification preferences in the portal.")),
+            Map.entry(TEAM_MEMBER_REMOVED, EmailTemplate.of(TEAM_MEMBER_REMOVED,
+                    "A team member's access was removed — {{company}}",
+                    "SecPhils · {{company}}",
+                    "Team member removed",
+                    "{{removedName}} ({{removedEmail}}) no longer has portal access to {{company}}. Their existing messages and documents remain part of your company's record.",
+                    "Open Team & Invitations",
+                    "You're receiving this because you manage the {{company}} portal team.")),
             Map.entry(LANDING, EmailTemplate.of(LANDING,
                     "Landing page inquiry from {{firstName}} {{lastName}}",
                     "", "",

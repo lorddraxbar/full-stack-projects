@@ -306,6 +306,12 @@ export async function useInviteTeamMember(data: { name: string; email: string; p
   return response.data
 }
 
+/** Rep-only: remove a teammate's portal access (a deactivation, not a delete). */
+export async function useRemoveTeamMember(userId: number) {
+  const response = await api.post(`/companies/me/team/${userId}/deactivate`)
+  return response.data
+}
+
 export async function useGetCompany(id: number) {
   const response = await api.get(`/companies/${id}`)
   return response.data

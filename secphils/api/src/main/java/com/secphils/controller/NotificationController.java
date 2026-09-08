@@ -40,7 +40,8 @@ public class NotificationController {
         // Legacy keys (projectUpdate, documentRequested, teamInvitation) were
         // dead switches — never read by any sender — and are pruned on read/save.
         for (String k : new String[]{"projectCreated", "newMessage", "documentUploaded",
-                "projectStatusChanged", "announcement", "authorizedRepChanged", "reviewSubmitted"}) {
+                "projectStatusChanged", "announcement", "authorizedRepChanged", "reviewSubmitted",
+                "teamMemberRemoved"}) {
             DEFAULT_EMAIL.put(k, true);
             DEFAULT_IN_APP.put(k, true);
         }

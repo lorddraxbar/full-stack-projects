@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRole } from '@/composables/useRole'
+import { useRetention } from '@/composables/useRetention'
 import {
   useGetMe,
   useUpdateMe,
@@ -8,6 +9,7 @@ import {
   useUpdateMyCompany,
   useGetCompanyTeam,
   useInviteTeamMember,
+  useRemoveTeamMember,
   useGetNotificationPreferences,
   useUpdateNotificationPreferences,
   useGetCommunicationSettings,
@@ -150,6 +152,40 @@ const showInviteModal = ref(false)
 // instead of echoing the internal role string.
 const repId = computed(() => company.value.authorizedRepId)
 const isRep = (m: CompanyTeamMember) => repId.value != null && Number(repId.value) === Number(m.id)
+
+// Removal is rep-only by policy (the rep owns the company's access) — mirrors
+// the server-side gate on POST /companies/me/team/{userId}/deactivate.
+const meIsRep = computed(
+  () =>
+    meId.value != null &&
+    repId.value != null &&
+    Number(repId.value) === Number(meId.value),
+)
+const canRemove = (m: CompanyTeamMember) =>
+  meIsRep.value && !isRep(m) && m.status !== 'Inactive'
+
+// Removal semantics: a DEACTIVATION, never a delete. The member loses login
+// immediately; their messages/documents stay on the record; SECPhils can
+// restore their access within the retention window.
+const { retentionDays } = useRetention()
+const memberToRemove = ref<CompanyTeamMember | null>(null)
+const removingMember = ref(false)
+
+async function removeMember() {
+  const m = memberToRemove.value
+  if (!m) return
+  removingMember.value = true
+  try {
+    await useRemoveTeamMember(m.id)
+    memberToRemove.value = null
+    await loadTeam()
+    flash('success', `${m.name}'s portal access has been removed.`)
+  } catch (e: any) {
+    flash('error', e?.response?.data?.message ?? 'Failed to remove the team member')
+  } finally {
+    removingMember.value = false
+  }
+}
 
 async function loadTeam() {
   try {
@@ -613,6 +649,9 @@ onMounted(async () => {
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Access</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    {{ meIsRep ? 'Actions' : '' }}
+                  </th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-200">
@@ -629,21 +668,30 @@ onMounted(async () => {
                   </td>
                   <td class="px-6 py-4">
                     <span
-                      :class="[
-                        'px-2 py-1 text-xs font-medium rounded-full',
+                      :class="['px-2 py-1 text-xs font-medium rounded-full',
                         member.status === 'Active'
                           ? 'bg-green-100 text-green-800'
                           : member.status === 'Invited'
                             ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-700',
-                      ]"
+                            : 'bg-gray-100 text-gray-700']"
                     >
                       {{ member.status }}
                     </span>
                   </td>
+                  <!-- Rep-only removal (mirrors the server gate). The rep's own
+                       row and already-removed members show nothing. -->
+                  <td class="px-6 py-4 text-right">
+                    <button
+                      v-if="canRemove(member)"
+                      class="text-sm text-red-600 hover:text-red-800 hover:underline font-medium"
+                      @click="memberToRemove = member"
+                    >
+                      Remove
+                    </button>
+                  </td>
                 </tr>
                 <tr v-if="clientTeam.length === 0">
-                  <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">
+                  <td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500">
                     No team members yet.
                   </td>
                 </tr>
@@ -707,6 +755,40 @@ onMounted(async () => {
               >
                 <i class="fas fa-paper-plane mr-1" />
                 {{ inviting ? 'Sending…' : 'Send Invitation' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Remove member (confirm dialog — same pattern as the invite modal).
+             Honest semantics: this cuts portal access (deactivation), it never
+             erases the member's history. -->
+        <div v-if="memberToRemove" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/30" @click="memberToRemove = null" />
+          <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Remove {{ memberToRemove.name }}?</h2>
+            <p class="text-sm text-gray-600 mb-2">
+              Their portal access will be cut off <span class="font-medium text-gray-800">immediately</span> —
+              they will not be able to sign in or receive updates.
+            </p>
+            <p class="text-sm text-gray-600 mb-4">
+              Their existing messages and documents stay part of your company's record, and
+              <span class="font-medium text-gray-800">SECPhils can restore their access within
+              {{ retentionDays }} days</span> if this was a mistake.
+            </p>
+            <div class="flex justify-end gap-3">
+              <button
+                class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                @click="memberToRemove = null"
+              >
+                Cancel
+              </button>
+              <button
+                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
+                :disabled="removingMember"
+                @click="removeMember"
+              >
+                {{ removingMember ? 'Removing…' : 'Remove Access' }}
               </button>
             </div>
           </div>
