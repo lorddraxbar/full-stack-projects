@@ -434,7 +434,11 @@ public class DocumentController {
         AuthUser actor = CurrentUser.require();
         requireStaff(actor);
         Document doc = documentRepository.findById(id).orElseThrow(() -> ApiException.notFound("Document"));
-        requireVisibleTo(actor, doc.getProject().getCompany().getId());
+        // Comments are a WRITE: stays company-scoped (own company or admin),
+        // unlike the widened cross-company reads.
+        if (!actor.isAdmin() && !doc.getProject().getCompany().getId().equals(actor.getCompanyId())) {
+            throw ApiException.forbidden("You can only comment on documents of your own company");
+        }
         if (doc.getDeletedAt() != null) {
             throw ApiException.conflict("Document is in the trash — restore it before commenting");
         }
@@ -458,9 +462,14 @@ public class DocumentController {
         }
     }
 
-    /** Clients/staff may only touch documents of their own company; admin is unrestricted. */
+    /** Read gate: clients see only their own company's documents; provider
+     *  staff (USER) and admins read across companies — the live list already
+     *  mirrors every company's documents to staff (see list()), so the
+     *  per-document reads must agree with it, or the Documents page renders
+     *  rows whose Download/Preview then 404. Write paths keep their own
+     *  company-scoped checks at the call site. */
     private void requireVisibleTo(AuthUser actor, Long companyId) {
-        if (!actor.isAdmin() && !companyId.equals(actor.getCompanyId())) {
+        if (actor.isClient() && !companyId.equals(actor.getCompanyId())) {
             throw ApiException.notFound("Document"); // 404, not 403 — don't reveal other companies' data
         }
     }
