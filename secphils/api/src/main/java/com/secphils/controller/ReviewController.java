@@ -8,6 +8,7 @@ import com.secphils.entity.Project;
 import com.secphils.entity.Review;
 import com.secphils.repository.ProjectRepository;
 import com.secphils.repository.ReviewRepository;
+import com.secphils.service.ReviewNotificationService;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,14 +32,17 @@ public class ReviewController {
     private final ProjectRepository projectRepository;
     private final AuditService auditService;
     private final UserRepository userRepository;
+    private final ReviewNotificationService reviewNotifications;
 
     public ReviewController(ReviewRepository reviewRepository, ProjectRepository projectRepository,
                             UserRepository userRepository,
-                              AuditService auditService) {
+                            AuditService auditService,
+                            ReviewNotificationService reviewNotifications) {
         this.reviewRepository = reviewRepository;
         this.projectRepository = projectRepository;
         this.auditService = auditService;
         this.userRepository = userRepository;
+        this.reviewNotifications = reviewNotifications;
     }
 
     @GetMapping
@@ -64,6 +68,14 @@ public class ReviewController {
         AuthUser actor = CurrentUser.require();
         Project project = projectRepository.findById(req.projectId())
                 .orElseThrow(() -> ApiException.notFound("Project"));
+        // A customer may only review their OWN company's projects (staff/admin
+        // are cross-company by design — they also file reviews on a customer's
+        // behalf via customerUserId). Same rule class as every other
+        // company-scoped gate: hidden in the UI is not enough.
+        if (actor.isClient() && (project.getCompany() == null
+                || !project.getCompany().getId().equals(actor.getCompanyId()))) {
+            throw ApiException.forbidden("You can only review projects of your own company");
+        }
         reviewRepository.findByProjectId(project.getId())
                 .ifPresent(existing -> {
                     throw ApiException.conflict("A review already exists for this project");
@@ -88,6 +100,9 @@ public class ReviewController {
         review.setCreatedAt(LocalDateTime.now());
         review = reviewRepository.save(review);
         auditService.audit(actor, "REVIEW_CREATE", "Review", review.getId(), "Project: " + project.getId(), http);
+        // Provider team hears about it (bell + email, pref-gated); the client
+        // who wrote it and every other client get nothing — see the service.
+        reviewNotifications.onReviewSubmitted(review, actor.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(ReviewResponse.from(review));
     }
 

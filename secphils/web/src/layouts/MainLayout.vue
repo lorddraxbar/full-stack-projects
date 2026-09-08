@@ -15,7 +15,7 @@ const allNavItems = [
   { name: 'Documents', path: '/documents', icon: 'fas fa-file-alt', roles: ['CLIENT', 'USER', 'ADMIN'], section: 'documents' },
   { name: 'Messages', path: '/messages', icon: 'fas fa-comment-dots', roles: ['CLIENT', 'USER', 'ADMIN'], section: 'messages' },
   { name: 'Announcements', path: '/announcements', icon: 'fas fa-bullhorn', roles: ['CLIENT', 'USER', 'ADMIN'], section: 'announcements' },
-  { name: 'Reviews', path: '/reviews', icon: 'fas fa-star', roles: ['USER', 'ADMIN'], section: null },
+  { name: 'Reviews', path: '/reviews', icon: 'fas fa-star', roles: ['USER', 'ADMIN'], section: 'reviews' },
 ]
 
 const navItems = computed(() =>
@@ -54,6 +54,7 @@ const SECTION_OF_ENTITY: Record<string, string> = {
   Document: 'documents',
   Project: 'projects',
   Company: 'projects',
+  Review: 'reviews',
 }
 const sectionUnread = computed<Record<string, number>>(() => {
   const m: Record<string, number> = {}
@@ -84,6 +85,7 @@ const notifRoute = (n: Notif) => {
     case 'Project': return '/projects'
     case 'Document': return '/documents'
     case 'Company': return '/projects'
+    case 'Review': return '/reviews'
     // Clients have no dashboard; send unknown types to their landing page.
     default: return role.value === 'CLIENT' ? '/projects' : '/dashboard'
   }

@@ -34,12 +34,13 @@ public class NotificationController {
     static {
         // One shared key set for BOTH channels: every key here is honored by a
         // real fan-out (MessageController, AnnouncementController,
-        // ProjectNotificationService, ProjectArchiveService, DocumentController).
+        // ProjectNotificationService, ProjectArchiveService, DocumentController,
+        // ReviewNotificationService).
         // Channels stay independently toggleable; the SWITCHES are identical.
         // Legacy keys (projectUpdate, documentRequested, teamInvitation) were
         // dead switches — never read by any sender — and are pruned on read/save.
         for (String k : new String[]{"projectCreated", "newMessage", "documentUploaded",
-                "projectStatusChanged", "announcement", "authorizedRepChanged"}) {
+                "projectStatusChanged", "announcement", "authorizedRepChanged", "reviewSubmitted"}) {
             DEFAULT_EMAIL.put(k, true);
             DEFAULT_IN_APP.put(k, true);
         }
@@ -97,7 +98,8 @@ public class NotificationController {
             "messages", List.of("Message"),
             "announcements", List.of("Announcement"),
             "documents", List.of("Document"),
-            "projects", List.of("Project", "Company"));
+            "projects", List.of("Project", "Company"),
+            "reviews", List.of("Review"));
 
     /**
      * Consume a whole drawer section: marks every unread notification whose

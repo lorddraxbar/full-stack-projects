@@ -1528,6 +1528,18 @@ const EMAIL_TEMPLATE_DEFAULTS = [
     vars: ['{{name}}', '{{document}}', '{{project}}', '{{company}}', '{{uploader}}'],
   },
   {
+    name: 'reviewSubmitted',
+    title: 'New review submitted',
+    hint: 'Sent to provider staff when a customer submits a project review (in-app bell row paired with this email; gated by the "Review Submitted" notification preference). Clients never receive this.',
+    subject: 'New {{rating}}-star review on {{project}}',
+    kicker: 'SecPhils \u00b7 Reviews',
+    heading: '{{reviewer}} left a review on {{project}}',
+    body: 'Hi {{name}},\n\n{{reviewer}} just submitted a **{{ratingLabel}} review** for the project \"{{project}}\" ({{company}}):\n\n**{{ratingLabel}}**\n\nOpen the Reviews page in the portal to read it and respond.',
+    cta: 'View all reviews',
+    footer: "You're receiving this as a member of the provider team. Manage your notification preferences in the portal.",
+    vars: ['{{name}}', '{{reviewer}}', '{{project}}', '{{company}}', '{{rating}}', '{{ratingLabel}}'],
+  },
+  {
     name: 'repAssigned',
     title: 'You are the new authorized representative',
     hint: 'Sent to the newly appointed authorized representative of a customer company (both the wizard and the project Overview editor). Paired with an in-app bell row; gated by the "Authorized Rep Changed" notification preference.',

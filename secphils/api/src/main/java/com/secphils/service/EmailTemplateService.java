@@ -56,6 +56,7 @@ public class EmailTemplateService {
     public static final String DOCUMENT_UPLOADED = "documentUploaded";
     public static final String REP_ASSIGNED = "repAssigned";
     public static final String REP_REMOVED = "repRemoved";
+    public static final String REVIEW_SUBMITTED = "reviewSubmitted";
     public static final String LANDING = "landing";
 
     private final SystemSettingsRepository settingsRepository;
@@ -157,6 +158,13 @@ public class EmailTemplateService {
                     "Hi {{name}},\n\n{{uploader}} uploaded a new document to the project \"{{project}}\" ({{company}}):\n\n**{{document}}**\n\nOpen the project in the portal to view and download it.",
                     "View the project",
                     "You're receiving this as a member of the project's team. Manage your notification preferences in the portal.")),
+            Map.entry(REVIEW_SUBMITTED, EmailTemplate.of(REVIEW_SUBMITTED,
+                    "New {{rating}}-star review on {{project}}",
+                    "SecPhils · Reviews",
+                    "{{reviewer}} left a review on {{project}}",
+                    "Hi {{name}},\n\n{{reviewer}} just submitted a **{{ratingLabel}} review** for the project \"{{project}}\" ({{company}}):\n\n**{{ratingLabel}}**\n\nOpen the Reviews page in the portal to read it and respond.",
+                    "View all reviews",
+                    "You're receiving this as a member of the provider team. Manage your notification preferences in the portal.")),
             Map.entry(REP_ASSIGNED, EmailTemplate.of(REP_ASSIGNED,
                     "You're the authorized representative for {{company}}",
                     "SecPhils · {{company}}",
