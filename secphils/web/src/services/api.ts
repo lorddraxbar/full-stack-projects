@@ -312,6 +312,14 @@ export async function useRemoveTeamMember(userId: number) {
   return response.data
 }
 
+/** Ask SECPhils to delete a document — posts a request message to the project
+ *  thread + staff fan-out. The file itself is untouched until staff trash it. */
+export async function useRequestDocumentDeletion(documentId: number, note?: string) {
+  const response = await api.post(`/documents/${documentId}/deletion-request`,
+    note && note.trim() ? { note: note.trim() } : {})
+  return response.data
+}
+
 export async function useGetCompany(id: number) {
   const response = await api.get(`/companies/${id}`)
   return response.data

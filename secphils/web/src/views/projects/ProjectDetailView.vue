@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRole } from '@/composables/useRole'
 import RowActionsMenu from '@/components/RowActionsMenu.vue'
 import BackToListButton from '@/components/BackToListButton.vue'
 import DocumentPreviewModal from '@/components/DocumentPreviewModal.vue'
+import RequestDeletionModal from '@/components/RequestDeletionModal.vue'
 import {
   useGetMe, useGetProject, useGetCompany,
   useGetDocuments, useCreateDocument, useDeleteDocument, useUploadDocument,
@@ -345,6 +346,23 @@ function previewDocument(doc: any) {
   previewDoc.value = { kind: 'document', id: doc.id, title: doc.title, fileName: doc.fileName || '' }
   previewOpen.value = true
 }
+
+// ---------- Client: request deletion (clients can't delete; the request lands
+// as a project message + staff notification). Shared modal with DocumentsView.
+const requestOpen = ref(false)
+const requestDoc = ref<{ id: number; title: string } | null>(null)
+function requestDeletion(doc: any) {
+  requestDoc.value = { id: doc.id, title: doc.title }
+  requestOpen.value = true
+}
+const delFlash = ref('')
+let delFlashTimer: ReturnType<typeof setTimeout> | null = null
+function showDelFlash(text: string) {
+  delFlash.value = text
+  if (delFlashTimer) clearTimeout(delFlashTimer)
+  delFlashTimer = setTimeout(() => (delFlash.value = ''), 6000)
+}
+onBeforeUnmount(() => { if (delFlashTimer) clearTimeout(delFlashTimer) })
 function previewAttachment(msg: any) {
   previewDoc.value = { kind: 'message', id: msg.id, title: msg.attachmentFileName || 'Attachment', fileName: msg.attachmentFileName || '' }
   previewOpen.value = true
@@ -1608,6 +1626,13 @@ async function saveProductionEdit() {
                   <RowActionsMenu v-if="!isClient" :actions="[
                     { label: 'Delete', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => deleteDocument(doc.id) }
                   ]" />
+                  <button
+                    v-else-if="doc.fileUrl"
+                    class="text-red-600 hover:text-red-700 font-medium text-sm"
+                    @click="requestDeletion(doc)"
+                  >
+                    Request deletion
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -1874,6 +1899,13 @@ async function saveProductionEdit() {
 
     <!-- ================= DOCUMENT PREVIEW ================= -->
     <DocumentPreviewModal v-model:open="previewOpen" :doc="previewDoc" />
+
+    <!-- ================= CLIENT REQUEST DELETION DIALOG ================= -->
+    <RequestDeletionModal
+      v-model:open="requestOpen"
+      :doc="requestDoc"
+      @requested="(d) => showDelFlash(`Request sent \u2014 SECPhils will review \u201c${d.title}\u201d and remove it if appropriate.`)"
+    />
 
     <!-- ================= CLIENT SUBMIT DOCUMENT DIALOG ================= -->
     <div

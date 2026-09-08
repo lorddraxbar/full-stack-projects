@@ -34,4 +34,7 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     @Query("select d from Document d left join fetch d.project left join fetch d.uploader left join fetch d.deletedBy where d.deletedAt is not null")
     List<Document> findWithRefsDeleted();
+
+    @Query("select d from Document d left join fetch d.project left join fetch d.uploader left join fetch d.deletedBy where d.id = :id")
+    java.util.Optional<Document> findWithRefsById(@org.springframework.data.repository.query.Param("id") Long id);
 }

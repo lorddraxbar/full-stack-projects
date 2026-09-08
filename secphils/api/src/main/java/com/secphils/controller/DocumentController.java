@@ -6,8 +6,11 @@ import com.secphils.dto.DocumentCommentRequest;
 import com.secphils.dto.DocumentCommentResponse;
 import com.secphils.dto.DocumentRequest;
 import com.secphils.dto.DocumentResponse;
+import com.secphils.dto.DeletionRequestRequest;
+import com.secphils.dto.MessageResponse;
 import com.secphils.entity.Document;
 import com.secphils.entity.DocumentComment;
+import com.secphils.entity.Message;
 import com.secphils.entity.Project;
 import com.secphils.entity.User;
 import com.secphils.repository.DocumentCommentRepository;
@@ -18,6 +21,7 @@ import com.secphils.security.CurrentUser;
 import com.secphils.policy.InlineContentPolicy;
 import com.secphils.service.DocumentTrashService;
 import com.secphils.service.DocumentNotificationService;
+import com.secphils.service.DocumentDeletionRequestService;
 import com.secphils.service.S3StorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -66,13 +70,15 @@ public class DocumentController {
     private final S3StorageService storageService;
     private final DocumentTrashService trashService;
     private final DocumentNotificationService notificationService;
+    private final DocumentDeletionRequestService deletionRequests;
 
     public DocumentController(DocumentRepository documentRepository,
                               DocumentCommentRepository commentRepository,
                               ProjectRepository projectRepository, UserRepository userRepository,
                               AuditService auditService, S3StorageService storageService,
                               DocumentTrashService trashService,
-                              DocumentNotificationService notificationService) {
+                              DocumentNotificationService notificationService,
+                              DocumentDeletionRequestService deletionRequests) {
         this.documentRepository = documentRepository;
         this.commentRepository = commentRepository;
         this.projectRepository = projectRepository;
@@ -81,6 +87,7 @@ public class DocumentController {
         this.storageService = storageService;
         this.trashService = trashService;
         this.notificationService = notificationService;
+        this.deletionRequests = deletionRequests;
     }
 
     // ---------- reads (role-scoped) ----------
@@ -365,6 +372,37 @@ public class DocumentController {
         AuthUser actor = CurrentUser.require();
         Document doc = trashService.restore(actor, id); // service writes DOCUMENT_RESTORE
         return ResponseEntity.ok(DocumentResponse.from(doc));
+    }
+
+    /**
+     * Ask SECPhils to remove this document — the convenience path for clients
+     * who would otherwise compose the message by hand. The request IS a message
+     * (a real row in the project conversation; the thread stays the record)
+     * plus a targeted staff fan-out — see DocumentDeletionRequestService. The
+     * file itself is untouched: removal stays a staff action (soft delete)
+     * after a human reads the request. Read access decides who may ask: any
+     * active member of the document's company (clients 404 cross-company and
+     * on trashed docs, same as every other client document read).
+     */
+    @PostMapping("/{id}/deletion-request")
+    @Transactional
+    public ResponseEntity<MessageResponse> requestDeletion(@PathVariable Long id,
+                                                           @RequestBody(required = false) DeletionRequestRequest req,
+                                                           HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        Document doc = documentRepository.findWithRefsById(id)
+                .orElseThrow(() -> ApiException.notFound("Document"));
+        requireVisibleTo(actor, doc.getProject().getCompany().getId());
+        if (doc.getDeletedAt() != null) {
+            throw ApiException.notFound("Document"); // trashed docs are invisible to clients
+        }
+        User sender = userRepository.findById(actor.id())
+                .orElseThrow(() -> ApiException.notFound("User"));
+        Message m = deletionRequests.requestDeletion(doc, doc.getProject(), sender,
+                req == null ? null : req.note(), actor.id());
+        auditService.audit(actor, "DOCUMENT_DELETION_REQUESTED", "Document", doc.getId(),
+                "Title: " + doc.getTitle() + " (request message " + m.getId() + ")", http);
+        return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(m));
     }
 
     /**

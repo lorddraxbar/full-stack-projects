@@ -1540,6 +1540,18 @@ const EMAIL_TEMPLATE_DEFAULTS = [
     vars: ['{{name}}', '{{reviewer}}', '{{project}}', '{{company}}', '{{rating}}', '{{ratingLabel}}'],
   },
   {
+    name: 'documentDeletionRequested',
+    title: 'Document deletion requested by client',
+    hint: 'Sent to provider staff when a client clicks \u201cRequest deletion\u201d on a document (Documents page or a project\u2019s Documents tab). The request also lands as a message in the project thread; the file itself is untouched until staff trash it. Paired with a bell row on the Documents section; gated by the "Document Deletion Requested" preference. Clients never receive this.',
+    subject: 'Deletion requested: {{document}}',
+    kicker: 'SecPhils \u00b7 Deletion request',
+    heading: 'A client asked to remove a document',
+    body: 'Hi {{name}},\n\n**{{requester}}** ({{company}}) asked SECPhils to remove the document **{{document}}** from project \"{{project}}\".{{note}}\n\nThe file stays visible to everyone until a staff member trash it from the Documents page (soft delete, restorable within the retention window). Open the project conversation to see the request and reply to the client.',
+    cta: 'Open the project',
+    footer: "You're receiving this because a customer requested document removal. Manage your notification preferences in the portal.",
+    vars: ['{{name}}', '{{requester}}', '{{company}}', '{{document}}', '{{project}}', '{{note}}'],
+  },
+  {
     name: 'teamAccessRemoved',
     title: 'Portal access removed (former team member)',
     hint: 'Sent to a team member when the company\u2019s authorized representative removes their portal access. Explains why login stopped working. Paired with an in-app bell row; the removed member receives it regardless of their preferences (it is the notice explaining the lockout, not a promotional message).',

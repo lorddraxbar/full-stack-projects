@@ -57,6 +57,7 @@ public class EmailTemplateService {
     public static final String REP_ASSIGNED = "repAssigned";
     public static final String REP_REMOVED = "repRemoved";
     public static final String REVIEW_SUBMITTED = "reviewSubmitted";
+    public static final String DOCUMENT_DELETION_REQUESTED = "documentDeletionRequested";
     public static final String TEAM_ACCESS_REMOVED = "teamAccessRemoved";
     public static final String TEAM_MEMBER_REMOVED = "teamMemberRemoved";
     public static final String LANDING = "landing";
@@ -181,6 +182,13 @@ public class EmailTemplateService {
                     "Hi {{name}},\n\nThe authorized representative role for {{company}} now belongs to **{{newRep}}**. You no longer need to review or complete projects — your normal portal access is unchanged.",
                     "Open my projects",
                     "You're receiving this because SECPhils updated the authorized representative for {{company}}. Manage your notification preferences in the portal.")),
+            Map.entry(DOCUMENT_DELETION_REQUESTED, EmailTemplate.of(DOCUMENT_DELETION_REQUESTED,
+                    "Deletion requested: {{document}}",
+                    "SecPhils · Deletion request",
+                    "A client asked to remove a document",
+                    "Hi {{name}},\n\n**{{requester}}** ({{company}}) asked SECPhils to remove the document **{{document}}** from project \"{{project}}\".{{note}}\n\nThe file stays visible to everyone until a staff member trash it from the Documents page (soft delete, restorable within the retention window). Open the project conversation to see the request and reply to the client.",
+                    "Open the project",
+                    "You're receiving this because a customer requested document removal. Manage your notification preferences in the portal.")),
             Map.entry(TEAM_ACCESS_REMOVED, EmailTemplate.of(TEAM_ACCESS_REMOVED,
                     "Your portal access for {{company}} was removed",
                     "SecPhils · {{company}}",
