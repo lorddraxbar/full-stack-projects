@@ -27,11 +27,18 @@ public class SystemSettings {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "JSONB")
-    private String integrations;
+    private String storage;
 
+    /** SMTP relay (host/port/username/password/from) — V34. Overrides the
+     *  env-configured sender at runtime; password masked on admin reads. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "JSONB")
-    private String storage;
+    private String smtp;
+
+    /** DocuSign JWT app credentials — V34. Live-tested, not decorative. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "JSONB")
+    private String docusign;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "google_sso", columnDefinition = "JSONB")

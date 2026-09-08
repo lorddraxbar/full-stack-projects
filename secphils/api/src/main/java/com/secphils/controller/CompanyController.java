@@ -454,7 +454,7 @@ public class CompanyController {
      *  owner + owner phone, address, contact string). */
     private void applyClientVisible(Company company, CompanyRequest req) {
         company.setName(req.name());
-        company.setIndustrySectors(req.industrySectors());
+        company.setBusinessType(req.businessType());
         company.setOwner(req.owner());
         company.setOwnerPhone(req.ownerPhone());
         company.setLocation(req.location());
@@ -473,7 +473,7 @@ public class CompanyController {
         if (req.description() != null) company.setDescription(req.description());
         if (req.about() != null) company.setAbout(req.about());
         if (req.tagline() != null) company.setTagline(req.tagline());
-        if (req.industrySectors() != null) company.setIndustrySectors(req.industrySectors());
+        if (req.businessType() != null) company.setBusinessType(req.businessType());
         if (req.headquarters() != null) company.setHeadquarters(req.headquarters());
         if (req.phone() != null) company.setPhone(req.phone());
         if (req.email() != null) company.setEmail(req.email());

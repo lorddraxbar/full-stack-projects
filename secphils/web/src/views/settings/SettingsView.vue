@@ -112,7 +112,7 @@ async function loadCompany() {
     const c = await useGetMyCompany()
     company.value = {
       name: c?.name ?? '',
-      businessType: c?.industrySectors ?? '',
+      businessType: c?.businessType ?? '',
       owner: c?.owner ?? '',
       ownerPhone: c?.ownerPhone ?? '',
       address: c?.location ?? '',
@@ -128,7 +128,7 @@ async function saveCompany() {
   try {
     await useUpdateMyCompany({
       name: company.value.name,
-      industrySectors: company.value.businessType,
+      businessType: company.value.businessType,
       owner: company.value.owner,
       ownerPhone: company.value.ownerPhone,
       location: company.value.address,

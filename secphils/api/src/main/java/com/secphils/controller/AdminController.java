@@ -3,7 +3,9 @@ package com.secphils.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.secphils.common.AuditService;
 import com.secphils.common.ApiException;
+import com.secphils.dto.DocuSignConfig;
 import com.secphils.dto.GoogleSsoConfig;
+import com.secphils.dto.SmtpConfig;
 import com.secphils.entity.AuditLog;
 import com.secphils.entity.SystemSettings;
 import com.secphils.policy.DisplayNamePolicy;
@@ -15,6 +17,8 @@ import com.secphils.repository.SystemSettingsRepository;
 import com.secphils.repository.UserRepository;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
+import com.secphils.service.DocuSignService;
+import com.secphils.service.MailService;
 import com.secphils.service.S3StorageService;
 import com.secphils.service.S3StorageService.StorageConfig;
 import com.secphils.service.SsoService;
@@ -46,13 +50,17 @@ public class AdminController {
     private final S3StorageService storageService;
     private final DisplayNamePolicy displayNamePolicy;
     private final RetentionPolicy retentionPolicy;
+    private final DocuSignService docuSignService;
+    private final MailService mailService;
 
     public AdminController(SystemSettingsRepository settingsRepository, AuditService auditService,
                            UserRepository userRepository, CompanyRepository companyRepository,
                            ProjectRepository projectRepository, ReviewRepository reviewRepository,
                            DataSource dataSource, S3StorageService storageService,
                            DisplayNamePolicy displayNamePolicy,
-                           RetentionPolicy retentionPolicy) {
+                           RetentionPolicy retentionPolicy,
+                           DocuSignService docuSignService,
+                           MailService mailService) {
         this.settingsRepository = settingsRepository;
         this.auditService = auditService;
         this.userRepository = userRepository;
@@ -63,6 +71,8 @@ public class AdminController {
         this.storageService = storageService;
         this.displayNamePolicy = displayNamePolicy;
         this.retentionPolicy = retentionPolicy;
+        this.docuSignService = docuSignService;
+        this.mailService = mailService;
     }
 
     /**
@@ -119,7 +129,32 @@ public class AdminController {
     public ResponseEntity<SystemSettings> getSettings() {
         SystemSettings settings = settingsRepository.findAll().stream().findFirst()
                 .orElseThrow(() -> ApiException.notFound("System settings"));
-        return ResponseEntity.ok(maskStorage(maskSso(settings)));
+        return ResponseEntity.ok(maskedResponse(settings));
+    }
+
+    /**
+     * Secrets must NEVER be masked onto the managed entity: a @Transactional
+     * PUT flushes every field change present at commit, so masking in-place
+     * persisted "********" over the real storage secret / SSO secret / SMTP
+     * password on every settings save (the historical SignatureDoesNotMatch
+     * footgun — root-caused 2026-09-08). Mask a detached copy instead.
+     */
+    private SystemSettings maskedResponse(SystemSettings s) {
+        SystemSettings c = new SystemSettings();
+        c.setId(s.getId());
+        c.setPortalName(s.getPortalName());
+        c.setEmailTemplates(s.getEmailTemplates());
+        c.setStorage(s.getStorage());
+        c.setSmtp(s.getSmtp());
+        c.setDocusign(s.getDocusign());
+        c.setGoogleSso(s.getGoogleSso());
+        c.setMaintenanceMode(s.getMaintenanceMode());
+        c.setInviteBaseUrl(s.getInviteBaseUrl());
+        c.setLandingContactEmail(s.getLandingContactEmail());
+        c.setBrandName(s.getBrandName());
+        c.setRetentionWindowDays(s.getRetentionWindowDays());
+        c.setUpdatedAt(s.getUpdatedAt());
+        return maskDocuSign(maskSmtp(maskStorage(maskSso(c))));
     }
 
     @PutMapping("/settings")
@@ -135,7 +170,11 @@ public class AdminController {
             if (json != null && !json.isBlank()) requireJsonArray(json);
             settings.setEmailTemplates(json == null || json.isBlank() ? null : json);
         }
-        if (body.containsKey("integrations")) settings.setIntegrations((String) body.get("integrations"));
+        if (body.containsKey("integrations")) {
+            throw ApiException.badRequest("Integrations were retired (V34) — configure SMTP and DocuSign directly.");
+        }
+        if (body.containsKey("smtp")) settings.setSmtp(normalizeSmtp(body.get("smtp"), settings.getSmtp()));
+        if (body.containsKey("docusign")) settings.setDocusign(normalizeDocuSign(body.get("docusign"), settings.getDocusign()));
         if (body.containsKey("securityPolicies")) settings.setSecurityPolicies((String) body.get("securityPolicies"));
         if (body.containsKey("storage")) settings.setStorage(normalizeStorage(body.get("storage"), settings.getStorage()));
         if (body.containsKey("googleSso")) settings.setGoogleSso(normalizeSso(body.get("googleSso"), settings.getGoogleSso()));
@@ -182,7 +221,7 @@ public class AdminController {
         displayNamePolicy.refresh();
         retentionPolicy.refresh();
         auditService.audit(actor, "SETTINGS_UPDATE", "SystemSettings", settings.getId(), null, http);
-        return ResponseEntity.ok(maskStorage(maskSso(settings)));
+        return ResponseEntity.ok(maskedResponse(settings));
     }
 
     /** Rejects non-JSON-array emailTemplates payloads before they corrupt the settings row. */
@@ -283,6 +322,131 @@ public class AdminController {
             in.clientSecret = cur.clientSecret == null ? "" : cur.clientSecret;
         }
         return SsoService.toJson(in);
+    }
+
+    /** Serializes a nested JSON payload value (Map) back to JSON —
+     *  String.valueOf(Map) yields "{k=v}" which is NOT JSON. */
+    private String writeJson(Object v) {
+        if (v == null) return "";
+        try {
+            return new ObjectMapper().writeValueAsString(v);
+        } catch (Exception e) {
+            throw ApiException.badRequest("Config payload is not serializable JSON");
+        }
+    }
+
+    // ---- SMTP (V34) —
+    private SystemSettings maskSmtp(SystemSettings s) {
+        if (s.getSmtp() != null) {
+            SmtpConfig cfg = parseSmtp(s.getSmtp());
+            if (cfg.password != null && !cfg.password.isBlank()) {
+                s.setSmtp(serializeSmtp(SmtpConfig.masked(cfg)));
+            }
+        }
+        return s;
+    }
+
+    private String normalizeSmtp(Object incoming, String currentJson) {
+        if (incoming == null) return currentJson;
+        String json = String.valueOf(incoming);
+        if (json.isBlank()) return currentJson;
+        SmtpConfig in = parseSmtp(json);
+        SmtpConfig cur = parseSmtp(currentJson);
+        // Masked or blank password = keep the stored one (same discipline as SSO).
+        if (in.password == null || in.password.isBlank() || SmtpConfig.SECRET_MASK.equals(in.password)) {
+            in.password = cur.password == null ? "" : cur.password;
+        }
+        if (in.host == null || in.host.isBlank()) {
+            throw ApiException.badRequest("SMTP host is required");
+        }
+        if (in.port <= 0 || in.port > 65535) {
+            throw ApiException.badRequest("SMTP port must be between 1 and 65535");
+        }
+        if ((in.username == null || in.username.isBlank())
+                && (in.password == null || in.password.isBlank())) {
+            throw ApiException.badRequest("SMTP username and password are required");
+        }
+        return serializeSmtp(in);
+    }
+
+    private SmtpConfig parseSmtp(String json) {
+        try {
+            if (json == null || json.isBlank()) return new SmtpConfig();
+            return new ObjectMapper().readValue(json, SmtpConfig.class);
+        } catch (Exception e) {
+            throw ApiException.badRequest("SMTP settings are not valid JSON");
+        }
+    }
+
+    private String serializeSmtp(SmtpConfig cfg) {
+        try {
+            return new ObjectMapper().writeValueAsString(cfg);
+        } catch (Exception e) {
+            throw ApiException.badRequest("SMTP settings are not serializable");
+        }
+    }
+
+    // ---- DocuSign (V34) ----
+    private SystemSettings maskDocuSign(SystemSettings s) {
+        if (s.getDocusign() != null) {
+            DocuSignConfig cfg = docuSignService.parse(s.getDocusign());
+            if (cfg.privateKey != null && !cfg.privateKey.isBlank()) {
+                s.setDocusign(docuSignService.serialize(DocuSignConfig.masked(cfg)));
+            }
+        }
+        return s;
+    }
+
+    private String normalizeDocuSign(Object incoming, String currentJson) {
+        if (incoming == null) return currentJson;
+        String json = String.valueOf(incoming);
+        if (json.isBlank()) return currentJson;
+        DocuSignConfig in = docuSignService.parse(json);
+        DocuSignConfig cur = docuSignService.parse(currentJson);
+        if (in.privateKey == null || in.privateKey.isBlank()
+                || DocuSignConfig.SECRET_MASK.equals(in.privateKey)) {
+            in.privateKey = cur.privateKey == null ? "" : cur.privateKey;
+        }
+        return docuSignService.serialize(in);
+    }
+
+    /** Live SMTP probe — sends one real email using the PAYLOAD config (not
+     *  the stored one), so admins can validate before saving. */
+    @PostMapping("/settings/smtp/test")
+    public ResponseEntity<Map<String, Object>> testSmtp(@RequestBody Map<String, Object> body,
+                                                        HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        String to = body.get("to") == null ? null : String.valueOf(body.get("to")).trim();
+        if (to == null || to.isEmpty() || !to.contains("@")) {
+            throw ApiException.badRequest("A test recipient email address is required");
+        }
+        SmtpConfig cfg = parseSmtp(writeJson(body.get("config")));
+        // A masked/blank password in the payload means "test with the stored one".
+        if (SmtpConfig.SECRET_MASK.equals(cfg.password) || cfg.password == null || cfg.password.isBlank()) {
+            SystemSettings s = settingsRepository.findAll().stream().findFirst().orElse(null);
+            if (s != null && s.getSmtp() != null) {
+                cfg.password = parseSmtp(s.getSmtp()).password;
+            }
+        }
+        auditService.audit(actor, "SMTP_TEST", "SystemSettings", null, "to: " + to, http);
+        return ResponseEntity.ok(mailService.testSend(cfg, to));
+    }
+
+    /** Live DocuSign probe — real JWT-grant token exchange using the payload
+     *  config (masked/blank private key = the stored one). */
+    @PostMapping("/settings/docusign/test")
+    public ResponseEntity<Map<String, Object>> testDocuSign(@RequestBody Map<String, Object> body,
+                                                            HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        DocuSignConfig in = docuSignService.parse(writeJson(body.get("config")));
+        if (DocuSignConfig.SECRET_MASK.equals(in.privateKey) || in.privateKey == null || in.privateKey.isBlank()) {
+            SystemSettings s = settingsRepository.findAll().stream().findFirst().orElse(null);
+            if (s != null && s.getDocusign() != null) {
+                in.privateKey = docuSignService.parse(s.getDocusign()).privateKey;
+            }
+        }
+        auditService.audit(actor, "DOCUSIGN_TEST", "SystemSettings", null, null, http);
+        return ResponseEntity.ok(docuSignService.testConnection(in));
     }
 
     /** Redacts the stored SSO client secret on read. */

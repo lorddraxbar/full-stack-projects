@@ -37,8 +37,8 @@ public class Company {
     @Column(length = 255)
     private String tagline;
 
-    @Column(name = "industry_sectors", length = 500)
-    private String industrySectors;
+    @Column(name = "business_type", length = 500)
+    private String businessType;
 
     @Column(length = 500)
     private String headquarters;

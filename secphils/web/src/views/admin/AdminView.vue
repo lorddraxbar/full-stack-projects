@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useTestSmtp, useTestDocuSign, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
 import { applyBrandTheme } from '../../composables/useBrandTheme'
@@ -354,7 +354,7 @@ const companyProfile = ref({
   tagline: '',
   description: '',
   about: '',
-  industrySectors: '',
+  businessType: '',
   headquarters: '',
   phone: '',
   email: '',
@@ -399,7 +399,7 @@ const loadProviderCompanyProfile = async () => {
         tagline: c.tagline ?? '',
         description: c.description ?? '',
         about: c.about ?? '',
-        industrySectors: c.industrySectors ?? '',
+        businessType: c.businessType ?? '',
         headquarters: c.headquarters ?? '',
         phone: c.phone ?? '',
         email: c.email ?? '',
@@ -439,7 +439,7 @@ const saveCompanyProfile = async () => {
       // fall back to the business description.
       about: companyProfile.value.about || '',
       tagline: companyProfile.value.tagline || null,
-      industrySectors: companyProfile.value.industrySectors || null,
+      businessType: companyProfile.value.businessType || null,
       headquarters: companyProfile.value.headquarters || null,
       phone: companyProfile.value.phone || null,
       email: companyProfile.value.email || null,
@@ -1140,7 +1140,6 @@ const systemSettings = ref({
   landingContactEmail: '',
 })
 const systemSettingsMessage = ref<{ ok: boolean; text: string } | null>(null)
-const integrationsMessage = ref<{ ok: boolean; text: string } | null>(null)
 
 // The three JSONB columns are stored in the DB as serialized JSON strings and
 // returned verbatim by GET /admin/settings. Parse defensively on load,
@@ -1285,6 +1284,136 @@ const saveSsoSettings = async () => {
   }
 }
 
+// ---------- SMTP relay (V34 — real settings, live after save) ----------
+interface SmtpForm {
+  host: string
+  port: number
+  username: string
+  password: string   // '********' when a password is already stored (masked by the API)
+  from: string
+}
+const DEFAULT_SMTP: SmtpForm = { host: 'smtp.zoho.com', port: 465, username: '', password: '', from: '' }
+const smtpForm = ref<SmtpForm>({ ...DEFAULT_SMTP })
+const smtpMessage = ref<{ ok: boolean; text: string } | null>(null)
+const smtpTestTo = ref('')
+const testingSmtp = ref(false)
+
+const loadSmtpSettings = (data: any) => {
+  const stored = parseJson<any>(data?.smtp, null)
+  smtpForm.value = {
+    host: stored?.host || DEFAULT_SMTP.host,
+    port: Number(stored?.port) || DEFAULT_SMTP.port,
+    username: stored?.username || '',
+    password: stored?.password || '',
+    from: stored?.from || '',
+  }
+}
+
+const smtpPayload = () => ({
+  host: smtpForm.value.host.trim(),
+  port: Number(smtpForm.value.port) || 465,
+  username: smtpForm.value.username.trim(),
+  password: smtpForm.value.password.trim(),
+  from: smtpForm.value.from.trim(),
+})
+
+const testSmtp = async () => {
+  smtpMessage.value = null
+  if (!smtpTestTo.value.includes('@')) {
+    smtpMessage.value = { ok: false, text: 'Enter the recipient email to test with.' }
+    return
+  }
+  testingSmtp.value = true
+  try {
+    const res = await useTestSmtp({ to: smtpTestTo.value.trim(), config: smtpPayload() })
+    smtpMessage.value = { ok: !!res.ok, text: res.message }
+  } catch (err: any) {
+    smtpMessage.value = { ok: false, text: err.response?.data?.message || 'SMTP test failed' }
+  } finally {
+    testingSmtp.value = false
+  }
+}
+
+const saveSmtpSettings = async () => {
+  smtpMessage.value = null
+  if (!smtpForm.value.host.trim()) {
+    smtpMessage.value = { ok: false, text: 'SMTP host is required.' }
+    return
+  }
+  try {
+    await useUpdateSystemSettings({ smtp: JSON.stringify(smtpPayload()) })
+    smtpMessage.value = { ok: true, text: 'SMTP settings saved — the next email uses them (no restart).' }
+  } catch (err: any) {
+    smtpMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save SMTP settings' }
+  }
+}
+
+// ---------- DocuSign (V34 — staged credentials + live JWT test; no feature ships on it yet) ----------
+interface DocuSignForm {
+  enabled: boolean
+  oauthBaseUrl: string
+  integrationKey: string
+  accountId: string
+  userId: string
+  privateKey: string   // '********' when a key is already stored (masked by the API)
+}
+const DEFAULT_DOCUSIGN: DocuSignForm = {
+  enabled: false,
+  oauthBaseUrl: 'https://account-docusign.com',
+  integrationKey: '', accountId: '', userId: '', privateKey: '',
+}
+const docusignForm = ref<DocuSignForm>({ ...DEFAULT_DOCUSIGN })
+const docusignMessage = ref<{ ok: boolean; text: string } | null>(null)
+const docusignSaving = ref(false)
+const testingDocuSign = ref(false)
+
+const loadDocuSignSettings = (data: any) => {
+  const stored = parseJson<any>(data?.docusign, null)
+  docusignForm.value = {
+    enabled: !!stored?.enabled,
+    oauthBaseUrl: stored?.oauthBaseUrl || DEFAULT_DOCUSIGN.oauthBaseUrl,
+    integrationKey: stored?.integrationKey || '',
+    accountId: stored?.accountId || '',
+    userId: stored?.userId || '',
+    privateKey: stored?.privateKey || '',
+  }
+}
+
+const docusignPayload = () => ({
+  enabled: docusignForm.value.enabled,
+  oauthBaseUrl: docusignForm.value.oauthBaseUrl.trim(),
+  integrationKey: docusignForm.value.integrationKey.trim(),
+  accountId: docusignForm.value.accountId.trim(),
+  userId: docusignForm.value.userId.trim(),
+  privateKey: docusignForm.value.privateKey.trim(),
+})
+
+const testDocuSign = async () => {
+  docusignMessage.value = null
+  testingDocuSign.value = true
+  try {
+    const res = await useTestDocuSign({ config: docusignPayload() })
+    docusignMessage.value = { ok: !!res.ok, text: res.message }
+  } catch (err: any) {
+    docusignMessage.value = { ok: false, text: err.response?.data?.message || 'DocuSign test failed' }
+  } finally {
+    testingDocuSign.value = false
+  }
+}
+
+const saveDocuSignSettings = async () => {
+  docusignMessage.value = null
+  docusignSaving.value = true
+  try {
+    await useUpdateSystemSettings({ docusign: JSON.stringify(docusignPayload()) })
+    docusignMessage.value = { ok: true, text: 'DocuSign credentials saved.' }
+  } catch (err: any) {
+    docusignMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save DocuSign settings' }
+  } finally {
+    docusignSaving.value = false
+  }
+}
+
 const loadSystemSettings = async () => {
   try {
     const data: any = await useGetSystemSettings()
@@ -1321,7 +1450,8 @@ const loadSystemSettings = async () => {
         footer: s?.footer ?? t.footer,
       }
     })
-    integrations.value = parseJson<any[]>(data.integrations, DEFAULT_INTEGRATIONS.map(t => ({ ...t })))
+    loadSmtpSettings(data)
+    loadDocuSignSettings(data)
     loadStorageSettings(data)
     loadSsoSettings(data)
   } catch {
@@ -1362,15 +1492,6 @@ const saveEmailTemplates = async () => {
   }
 }
 
-const saveIntegrations = async () => {
-  integrationsMessage.value = null
-  try {
-    await useUpdateSystemSettings({ integrations: JSON.stringify(integrations.value) })
-    integrationsMessage.value = { ok: true, text: 'Integrations saved.' }
-  } catch (err: any) {
-    integrationsMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save integrations' }
-  }
-}
 
 // The live email template catalog — one entry per transactional email the
 // app sends, mirrored 1:1 by EmailTemplateService.DEFAULTS on the backend.
@@ -1621,30 +1742,7 @@ const EMAIL_TEMPLATE_DEFAULTS = [
     vars: ['{{firstName}}', '{{lastName}}', '{{fullName}}', '{{email}}', '{{phone}}', '{{message}}'],
   },
 ]
-const DEFAULT_INTEGRATIONS = [
-  { id: 1, name: 'Gmail / Google Workspace', type: 'Email', status: 'Connected', detail: 'notifications@secphils.com' },
-  { id: 2, name: 'Slack', type: 'Notifications', status: 'Disconnected', detail: '—' },
-  { id: 3, name: 'Microsoft Teams', type: 'Notifications', status: 'Disconnected', detail: '—' },
-  { id: 4, name: 'DocuSign', type: 'Documents', status: 'Connected', detail: 'secphils@docusign.net' },
-]
 const emailTemplates = ref<any[]>(EMAIL_TEMPLATE_DEFAULTS.map(t => ({ ...t })))
-const integrations = ref<any[]>(DEFAULT_INTEGRATIONS.map(t => ({ ...t })))
-
-// Optimistic toggle + immediate persist; rolls back on failure.
-const toggleIntegration = async (i: (typeof integrations.value)[0]) => {
-  const prev = { status: i.status, detail: i.detail }
-  i.status = i.status === 'Connected' ? 'Disconnected' : 'Connected'
-  i.detail = i.status === 'Connected' ? (i.detail === '—' ? 'Connected' : i.detail) : '—'
-  integrationsMessage.value = null
-  try {
-    await useUpdateSystemSettings({ integrations: JSON.stringify(integrations.value) })
-    integrationsMessage.value = { ok: true, text: 'Integrations saved.' }
-  } catch (err: any) {
-    i.status = prev.status
-    i.detail = prev.detail
-    integrationsMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save integrations' }
-  }
-}
 
 // ---------- Tabs ----------
 const tabItems = [
@@ -3071,34 +3169,87 @@ const isActiveTab = (tab: string) => activeTab.value === tab
         </div>
       </div>
 
-      <!-- Integrations -->
+      <!-- SMTP Relay -->
       <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Integrations</h2>
-        <div class="space-y-3">
-          <div v-for="integration in integrations" :key="integration.id" class="flex items-center justify-between py-3 px-4 border border-gray-200 rounded-lg">
-            <div>
-              <p class="font-medium text-gray-900">{{ integration.name }}</p>
-              <p class="text-sm text-gray-500">{{ integration.type }} · {{ integration.detail }}</p>
-            </div>
-            <button
-              @click="toggleIntegration(integration)"
-              :class="[
-                'px-4 py-1.5 text-sm font-medium rounded-lg transition-colors',
-                integration.status === 'Connected'
-                  ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                  : 'bg-green-50 text-green-700 hover:bg-green-100',
-              ]"
-            >
-              {{ integration.status === 'Connected' ? 'Disconnect' : 'Connect' }}
-            </button>
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">SMTP Settings</h2>
+        <p class="text-sm text-gray-600 mb-4">The relay every portal email goes through — invites, messages, announcements, lifecycle notices. Saved credentials take effect on the next email, no restart. Left blank, the server's environment configuration is used instead.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">SMTP Host</label>
+            <input v-model="smtpForm.host" type="text" placeholder="smtp.zoho.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Port</label>
+            <input v-model.number="smtpForm.port" type="number" min="1" max="65535" placeholder="465" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+            <input v-model="smtpForm.username" type="text" autocomplete="off" placeholder="notifications@secphils.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <input v-model="smtpForm.password" type="password" autocomplete="new-password" placeholder="********" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">From Address</label>
+            <input v-model="smtpForm.from" type="email" placeholder="notifications@secphils.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+        </div>
+        <p class="text-xs text-gray-500 mt-3">The stored password is never shown again — leaving the mask (or blank) keeps it.</p>
+        <div class="mt-4 flex flex-wrap items-center gap-3 max-w-2xl">
+          <input v-model="smtpTestTo" type="email" placeholder="Send a live test email to…" class="flex-1 min-w-[220px] px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+          <button @click="testSmtp" :disabled="testingSmtp" class="px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm font-medium disabled:opacity-50 whitespace-nowrap">
+            {{ testingSmtp ? 'Sending…' : 'Test relay' }}
+          </button>
+        </div>
+        <div class="mt-4 flex items-center justify-end gap-3">
+          <p v-if="smtpMessage" :class="['text-sm', smtpMessage.ok ? 'text-green-700' : 'text-red-600']">{{ smtpMessage.text }}</p>
+          <button @click="saveSmtpSettings" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
+            Save SMTP Settings
+          </button>
+        </div>
+      </div>
+
+      <!-- DocuSign -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">DocuSign Settings</h2>
+        <p class="text-sm text-gray-600 mb-4">JWT-grant application credentials, staged for the e-signature flow (not yet wired into any document action). <strong>Test connection</strong> performs a real token exchange against DocuSign — it proves the private key, integration key, account and user ids all match.</p>
+        <div class="flex items-center gap-3 mb-4">
+          <input id="docusign-enabled" v-model="docusignForm.enabled" type="checkbox" class="w-4 h-4 accent-emerald-600" />
+          <label for="docusign-enabled" class="text-sm font-medium text-gray-700">Enable DocuSign integration</label>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Environment</label>
+            <select v-model="docusignForm.oauthBaseUrl" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
+              <option value="https://account-docusign.com">Production (account-docusign.com)</option>
+              <option value="https://account-docusign-int.com">Sandbox (account-docusign-int.com)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Integration Key</label>
+            <input v-model="docusignForm.integrationKey" type="text" autocomplete="off" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Account ID</label>
+            <input v-model="docusignForm.accountId" type="text" autocomplete="off" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">User ID (impersonated)</label>
+            <input v-model="docusignForm.userId" type="text" autocomplete="off" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">RSA Private Key</label>
+            <textarea v-model="docusignForm.privateKey" rows="4" autocomplete="off" placeholder="Paste the PEM key from the DocuSign app — or keep ******** to keep the stored key" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs"></textarea>
           </div>
         </div>
         <div class="mt-4 flex items-center justify-end gap-3">
-          <p v-if="integrationsMessage" :class="['text-sm', integrationsMessage.ok ? 'text-green-700' : 'text-red-600']">
-            {{ integrationsMessage.text }}
-          </p>
-          <button @click="saveIntegrations" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
-            Save Integrations
+          <p v-if="docusignMessage" :class="['text-sm', docusignMessage.ok ? 'text-green-700' : 'text-red-600']">{{ docusignMessage.text }}</p>
+          <button @click="testDocuSign" :disabled="testingDocuSign" class="px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm font-medium disabled:opacity-50 whitespace-nowrap">
+            {{ testingDocuSign ? 'Testing…' : 'Test connection' }}
+          </button>
+          <button @click="saveDocuSignSettings" :disabled="docusignSaving" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50">
+            {{ docusignSaving ? 'Saving…' : 'Save DocuSign Settings' }}
           </button>
         </div>
       </div>

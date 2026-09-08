@@ -1,35 +1,92 @@
 package com.secphils.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.secphils.dto.SmtpConfig;
+import com.secphils.entity.SystemSettings;
+import com.secphils.repository.SystemSettingsRepository;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
+import java.util.Properties;
 
 /**
- * Transactional mail via the configured SMTP provider (Zoho).
- * Mail failures are logged, never thrown — a broken SMTP relay must not
- * block user creation or other API calls.
+ * Transactional mail. The effective relay comes from
+ * {@code system_settings.smtp} (Admin Settings → SMTP, V34) and is read live
+ * on every send — saving new credentials takes effect immediately, no restart.
+ * With no usable DB config it falls back to the env-configured sender
+ * (spring.mail.*), so a fresh deploy works from .env before anyone opens the
+ * admin panel. Mail failures are logged, never thrown — a broken SMTP relay
+ * must not block user creation or other API calls.
  */
 @Service
 public class MailService {
 
     private static final Logger log = LoggerFactory.getLogger(MailService.class);
 
-    private final JavaMailSender mailSender;
-    private final String fromAddress;
+    private final JavaMailSenderImpl envSender;
+    private final String envFrom;
+    private final SystemSettingsRepository settingsRepository;
     private final EmailTemplateService templateService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public MailService(JavaMailSender mailSender,
+    public MailService(org.springframework.mail.javamail.JavaMailSender mailSender,
                        @Value("${spring.mail.from}") String fromAddress,
+                       SystemSettingsRepository settingsRepository,
                        EmailTemplateService templateService) {
-        this.mailSender = mailSender;
-        this.fromAddress = fromAddress;
+        this.envSender = (JavaMailSenderImpl) mailSender;
+        this.envFrom = fromAddress;
+        this.settingsRepository = settingsRepository;
         this.templateService = templateService;
+    }
+
+    /** The DB config if usable, else null (caller falls back to env). A
+     *  password equal to the read-mask is treated as UNUSABLE — the mask must
+     *  never reach the wire (footgun if the settings row ever holds it). */
+    private SmtpConfig dbConfig() {
+        SystemSettings s = settingsRepository.findAll().stream().findFirst().orElse(null);
+        if (s == null || s.getSmtp() == null || s.getSmtp().isBlank()) return null;
+        try {
+            SmtpConfig cfg = objectMapper.readValue(s.getSmtp(), SmtpConfig.class);
+            if (SmtpConfig.SECRET_MASK.equals(cfg.password)) {
+                log.warn("system_settings.smtp holds the read-mask as password — ignoring DB config, using env SMTP");
+                return null;
+            }
+            return cfg.isConfigured() ? cfg : null;
+        } catch (Exception e) {
+            log.warn("Unreadable smtp settings JSON — falling back to env SMTP: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /** Resolve a sender for the given config (DB wins, env is the default). */
+    private JavaMailSenderImpl senderFor(SmtpConfig cfg) {
+        if (cfg == null) return envSender;
+        JavaMailSenderImpl s = new JavaMailSenderImpl();
+        s.setHost(cfg.host);
+        s.setPort(cfg.port);
+        s.setUsername(cfg.username);
+        s.setPassword(cfg.password);
+        s.setDefaultEncoding("UTF-8");
+        boolean ssl = cfg.port == 465;
+        Properties p = s.getJavaMailProperties();
+        p.put("mail.smtp.auth", "true");
+        p.put("mail.smtp.ssl.enable", String.valueOf(ssl));
+        p.put("mail.smtp.ssl.trust", cfg.host);
+        if (!ssl) p.put("mail.smtp.starttls.enable", "true");
+        p.put("mail.smtp.connectiontimeout", "10000");
+        p.put("mail.smtp.timeout", "10000");
+        p.put("mail.smtp.writetimeout", "10000");
+        return s;
+    }
+
+    private String fromFor(SmtpConfig cfg) {
+        if (cfg != null && cfg.from != null && !cfg.from.isBlank()) return cfg.from;
+        return envFrom;
     }
 
     public void sendHtml(String to, String subject, String htmlBody, String link) {
@@ -41,20 +98,49 @@ public class MailService {
      * the sender (e.g. a website visitor). {@code replyTo} null = no Reply-To.
      */
     public void sendHtml(String to, String subject, String htmlBody, String link, String replyTo) {
+        SmtpConfig cfg = dbConfig();
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            JavaMailSenderImpl sender = senderFor(cfg);
+            MimeMessage message = sender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-            helper.setFrom(fromAddress);
+            helper.setFrom(fromFor(cfg));
             helper.setTo(to);
             helper.setSubject(subject);
             if (replyTo != null && !replyTo.isBlank()) {
                 helper.setReplyTo(replyTo);
             }
             helper.setText(htmlBody, true);
-            mailSender.send(message);
+            sender.send(message);
             log.info("Mail sent to {} — {} (link: {})", to, subject, link);
         } catch (Exception e) {
-            log.error("Failed to send mail to {} — {}: {}", to, subject, e.getMessage(), e);
+            log.error("Failed to send mail to {} — {}: {}", to, subject, e.getMessage());
+        }
+    }
+
+    /**
+     * Live connectivity probe for Admin Settings → SMTP: attempts one real
+     * send to {@code to} using the PROVIDED config (not the stored one), so
+     * admins can validate before saving. Throws nothing — returns the
+     * {ok, message} verdict.
+     */
+    public java.util.Map<String, Object> testSend(SmtpConfig cfg, String to) {
+        if (!cfg.isConfigured()) {
+            return java.util.Map.of("ok", false, "message", "Host and username are required.");
+        }
+        try {
+            JavaMailSenderImpl sender = senderFor(cfg);
+            MimeMessage message = sender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+            helper.setFrom(fromFor(cfg));
+            helper.setTo(to);
+            helper.setSubject("SECPhils SMTP test");
+            helper.setText("This is a live delivery test from SECPhils Admin Settings. If you received it, the relay works.", true);
+            sender.send(message);
+            return java.util.Map.of("ok", true,
+                    "message", "Test email sent to " + to + " via " + cfg.host + ":" + cfg.port);
+        } catch (Exception e) {
+            return java.util.Map.of("ok", false,
+                    "message", "SMTP failed: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
         }
     }
 
@@ -86,7 +172,7 @@ public class MailService {
     }
 
     private String renderInvite(String firstName, String fullName, String link, String inviter, String company) {
-        Map<String, String> vars = Map.of(
+        java.util.Map<String, String> vars = java.util.Map.of(
                 "name", firstNonBlank(firstName, fullName),
                 "fullName", firstNonBlank(fullName, firstName),
                 "inviter", inviter != null ? inviter : "A member",

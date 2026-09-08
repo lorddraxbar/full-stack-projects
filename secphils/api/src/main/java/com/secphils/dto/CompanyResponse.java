@@ -15,7 +15,7 @@ public record CompanyResponse(
         String description,
         String about,
         String tagline,
-        String industrySectors,
+        String businessType,
         String headquarters,
         String phone,
         String email,
@@ -38,7 +38,7 @@ public record CompanyResponse(
     public static CompanyResponse from(Company c) {
         User rep = c.getAuthorizedRep();
         return new CompanyResponse(c.getId(), c.getName(), c.getLocation(), c.getOwner(),
-                c.getOwnerPhone(), c.getDescription(), c.getAbout(), c.getTagline(), c.getIndustrySectors(), c.getHeadquarters(),
+                c.getOwnerPhone(), c.getDescription(), c.getAbout(), c.getTagline(), c.getBusinessType(), c.getHeadquarters(),
                 c.getPhone(), c.getEmail(), c.getWebsite(), c.getSocialLinks(), c.getTaxNumber(),
                 c.getBankingDetails(), c.getOperationalFields(), c.getBrandPrimary(),
                 c.getBrandSecondary(), c.getLogoUrl(), c.getContactDetails(),

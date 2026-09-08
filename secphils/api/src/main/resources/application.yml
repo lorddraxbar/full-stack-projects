@@ -17,6 +17,14 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    # Placeholder values for V34's SMTP seed (lowercase names — Spring relaxed
+    # binding lowercases placeholder keys, so camelCase names would miss).
+    placeholders:
+      smtphost: ${SMTP_HOST:smtp.zoho.com}
+      smtpport: ${SMTP_PORT:465}
+      smtpusername: ${SMTP_USERNAME:}
+      smtppassword: ${SMTP_PASSWORD:}
+      mailfrom: ${MAIL_FROM:notifications@secphils.com}
   servlet:
     multipart:
       # Document uploads (S3-backed); nginx caps the /api/ proxy at 25m

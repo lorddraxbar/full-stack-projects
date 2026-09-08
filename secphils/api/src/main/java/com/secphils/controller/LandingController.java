@@ -112,7 +112,7 @@ public class LandingController {
         m.put("description", company.getDescription());
         m.put("about", company.getAbout());
         m.put("tagline", company.getTagline());
-        m.put("industrySectors", company.getIndustrySectors());
+        m.put("businessType", company.getBusinessType());
         m.put("headquarters", company.getHeadquarters());
         m.put("phone", company.getPhone());
         m.put("email", company.getEmail());

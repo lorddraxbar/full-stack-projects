@@ -739,6 +739,20 @@ export async function useTestStorage(body: Record<string, unknown>) {
   return response.data as { ok: boolean; bucket?: string; message: string }
 }
 
+/** Live SMTP probe: sends one real email using the PAYLOAD config (masked or
+ * blank password = stored password). Returns { ok, message }. */
+export async function useTestSmtp(body: { to: string; config: Record<string, unknown> }) {
+  const response = await api.post('/admin/settings/smtp/test', body, { timeout: 45_000 })
+  return response.data as { ok: boolean; message: string }
+}
+
+/** Live DocuSign JWT-grant token exchange using the payload config
+ *  (masked or blank private key = stored key). Returns { ok, message }. */
+export async function useTestDocuSign(body: { config: Record<string, unknown> }) {
+  const response = await api.post('/admin/settings/docusign/test', body, { timeout: 30_000 })
+  return response.data as { ok: boolean; message: string }
+}
+
 // ---------- Public landing page ----------
 export interface LandingCompany {
   id?: number
@@ -748,7 +762,7 @@ export interface LandingCompany {
   description?: string
   about?: string
   tagline?: string
-  industrySectors?: string
+  businessType?: string
   headquarters?: string
   phone?: string
   email?: string

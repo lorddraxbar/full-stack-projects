@@ -10,7 +10,7 @@ public record CompanyRequest(
         String description,
         String about,
         String tagline,
-        String industrySectors,
+        String businessType,
         String headquarters,
         String phone,
         String email,
