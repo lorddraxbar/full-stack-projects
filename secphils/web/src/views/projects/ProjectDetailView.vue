@@ -9,7 +9,7 @@ import RequestDeletionModal from '@/components/RequestDeletionModal.vue'
 import TrashMessageModal from '@/components/TrashMessageModal.vue'
 import {
   useGetMe, useGetProject, useGetCompany,
-  useGetDocuments, useCreateDocument, useDeleteDocument, useUploadDocument,
+  useGetDocuments, useDeleteDocument, useUploadDocument,
   useGetMessages, useSendMessage, useUploadMessage, useDownloadMessage, useUpdateProject,
   useArchiveProject, useRestoreProject, useHardDeleteProject,
   useUpdateCompany, useGetCompanyTeamFor, useInviteCustomerRep, useSetAuthorizedRep,
@@ -306,27 +306,42 @@ function isInternal(msg: any): boolean {
 // ---------- Documents (add / delete) ----------
 const docDialogOpen = ref(false)
 const docSaving = ref(false)
-const docForm = ref({ title: '', description: '', fileUrl: '' })
+const docError = ref('')
+const docForm = ref({ title: '', description: '', file: null as File | null })
+const docFileInput = ref<HTMLInputElement | null>(null)
+
+const docFileInfo = computed(() => {
+  const f = docForm.value.file
+  if (!f) return null
+  const mb = f.size / (1024 * 1024)
+  const size = mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.ceil(f.size / 1024)} KB`
+  return { name: f.name, size }
+})
 
 function openDocDialog() {
-  docForm.value = { title: '', description: '', fileUrl: '' }
+  docForm.value = { title: '', description: '', file: null }
+  docError.value = ''
   docDialogOpen.value = true
 }
 
 async function submitDocument() {
-  if (!docForm.value.title.trim() || docSaving.value) return
+  if (docSaving.value) return
+  if (!docForm.value.title.trim()) { docError.value = 'Title is required'; return }
+  if (!docForm.value.file) { docError.value = 'Choose a file to upload'; return }
   docSaving.value = true
+  docError.value = ''
   try {
-    await useCreateDocument({
+    await useUploadDocument({
       projectId: projectId.value,
       title: docForm.value.title.trim(),
-      description: docForm.value.description.trim() || null,
-      fileUrl: docForm.value.fileUrl.trim() || null,
+      description: docForm.value.description.trim() || undefined,
+      file: docForm.value.file,
     })
     docDialogOpen.value = false
+    if (docFileInput.value) docFileInput.value.value = ''
     documents.value = await useGetDocuments({ projectId: projectId.value })
   } catch (err: any) {
-    saveError.value = err?.response?.data?.message || 'Failed to add document'
+    docError.value = err?.response?.data?.message || 'Failed to upload document'
   } finally {
     docSaving.value = false
   }
@@ -1587,7 +1602,7 @@ async function saveProductionEdit() {
             @click="openDocDialog"
             class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
           >
-            <i class="fas fa-upload mr-1" /> Add Document
+            <i class="fas fa-upload mr-1" /> Upload Document
           </button>
           <button
             v-else
@@ -2007,18 +2022,13 @@ async function saveProductionEdit() {
     </div>
 
     <!-- ================= DOCUMENT DIALOG ================= -->
-    <div
-      v-if="docDialogOpen"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      @click.self="docDialogOpen = false"
-    >
-      <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
-        <div class="p-6 border-b border-gray-200">
-          <h3 class="text-lg font-semibold text-gray-900">Add Document</h3>
-        </div>
-        <div class="p-6 space-y-4">
+    <div v-if="docDialogOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/30" @click="docDialogOpen = false" />
+      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Upload Document</h2>
+        <div class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Document Title</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title *</label>
             <input
               v-model="docForm.title"
               type="text"
@@ -2027,37 +2037,45 @@ async function saveProductionEdit() {
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">File URL (optional)</label>
-            <input
-              v-model="docForm.fileUrl"
-              type="url"
-              placeholder="https://… (link to the hosted file)"
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea
+              v-model="docForm.description"
+              rows="2"
+              placeholder="Optional notes about this document..."
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea
-              v-model="docForm.description"
-              rows="3"
-              placeholder="What does this document contain?"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            <label class="block text-sm font-medium text-gray-700 mb-1">File *</label>
+            <input
+              ref="docFileInput"
+              type="file"
+              class="w-full text-sm text-gray-600 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-emerald-50 file:text-emerald-700 file:font-medium hover:file:bg-emerald-100 file:cursor-pointer cursor-pointer"
+              @change="(e: Event) => docForm.file = (e.target as HTMLInputElement).files?.[0] || null"
             />
+            <p v-if="docFileInfo" class="text-xs text-gray-500 mt-2">
+              {{ docFileInfo.name }} ({{ docFileInfo.size }})
+            </p>
           </div>
+          <p class="text-xs text-gray-500">
+            The file is uploaded to secure object storage. The project's company team is
+            notified; they can view and download but can't modify or delete documents.
+          </p>
         </div>
-        <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
+        <p v-if="docError" class="text-sm text-red-600 mt-3">{{ docError }}</p>
+        <div class="mt-6 flex justify-end gap-3">
           <button
+            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium"
             @click="docDialogOpen = false"
-            class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Cancel
           </button>
           <button
-            @click="submitDocument"
+            class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
             :disabled="docSaving"
-            class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            @click="submitDocument"
           >
-            {{ docSaving ? 'Saving…' : 'Add Document' }}
+            {{ docSaving ? 'Saving...' : 'Save Document' }}
           </button>
         </div>
       </div>

@@ -478,12 +478,6 @@ export async function useMessageContentBlob(id: number) {
   return response.data as Blob
 }
 
-export async function useCreateDocument(data: Record<string, unknown>) {
-  const response = await api.post('/documents', data)
-  return response.data
-}
-
-
 export async function useDeleteDocument(id: number) {
   const response = await api.delete(`/documents/${id}`)
   return response.data
