@@ -64,183 +64,235 @@ onMounted(async () => {
         <p class="legal-eyebrow">Legal</p>
         <h1 class="legal-title">{{ pageTitle }}</h1>
         <div class="legal-title-accent"></div>
-        <p class="legal-meta">Last updated: <time datetime="2026-08">August 2026</time></p>
+        <p class="legal-meta">Last updated: <time datetime="2026-09">September 2026</time></p>
 
         <!-- ================= TERMS ================= -->
         <div v-if="isTerms" class="legal-body">
           <p class="legal-intro">
-            Please read these Terms of Service (these &ldquo;Terms&rdquo;) carefully before using
-            this website operated by <strong>Strategic Engineering Consultancy</strong>
-            (&ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;) (the &ldquo;Website&rdquo;). By accessing or using the Website,
-            you agree to be bound by these Terms. If you do not agree, do not use the
-            Website.
+            These Terms of Service (these &ldquo;Terms&rdquo;) govern your access to and use of the
+            website and the client portal (together, the &ldquo;Services&rdquo;) operated by
+            <strong>Strategic Engineering Consultancy</strong> (&ldquo;we&rdquo;, &ldquo;us&rdquo;, or
+            &ldquo;our&rdquo;). By accessing or using the Services, you agree to be bound by these
+            Terms. If you do not agree, do not use the Services. If you use the portal on
+            behalf of a company, you represent that you are authorized to act for that company.
           </p>
 
-          <h2>1. Use of the Website</h2>
+          <h2>1. Accounts and Access</h2>
           <p>
-            You may use the Website only for lawful purposes and in a way that does not
-            violate these Terms or any applicable laws or regulations. You are responsible
-            for your conduct and any data, text, or other content you submit to or through
-            the Website.
+            Portal access requires an account issued or approved by us. You must provide
+            accurate information, keep your credentials confidential, and accept
+            responsibility for all activity under your account. You must notify us promptly
+            of any unauthorized use. We may suspend or deactivate accounts that violate
+            these Terms, and we may restore them if the issue is resolved.
           </p>
 
-          <h2>2. Intellectual Property</h2>
+          <h2>2. Acceptable Use</h2>
           <p>
-            All content on the Website, including text, graphics, logos, images, software,
-            and other material, is the property of Strategic Engineering Consultancy or its
-            licensors and is protected by applicable intellectual property laws. You may not
-            copy, modify, distribute, or create derivative works without our prior written
-            consent.
+            You may use the Services only for lawful purposes. You must not upload unlawful,
+            infringing, or malicious content; attempt to disrupt, probe, or gain unauthorized
+            access to the Services; scrape or resell portal data; or misrepresent your
+            identity or affiliation.
           </p>
 
-          <h2>3. No Professional Relationship</h2>
+          <h2>3. Your Content and Our Content</h2>
           <p>
-            Information provided on the Website is for general informational purposes only
-            and does not constitute professional advice. Viewing the Website does not create
-            any consulting, agency, or professional relationship between you and
-            Strategic Engineering Consultancy.
+            Documents, messages, and other materials you submit through the portal remain
+            yours. You grant us a limited license to host, store, process, and display them
+            solely to provide the Services and perform your engagement. Portal software,
+            design, text, and branding are ours or our licensors&rsquo; and may not be copied
+            or distributed without our written consent. Ownership of consulting deliverables
+            is governed by your engagement agreement.
           </p>
 
-          <h2>4. Disclaimer of Warranties</h2>
+          <h2>4. Confidentiality</h2>
           <p>
-            The Website and its content are provided &ldquo;as is&rdquo; and &ldquo;as available&rdquo; without
-            warranties of any kind, either express or implied, including but not limited to
-            implied warranties of merchantability, fitness for a particular purpose, and
-            non-infringement. We do not guarantee that the Website will be uninterrupted,
-            secure, or error-free.
+            Project information exchanged through the portal is treated as confidential by
+            both sides and used only to carry out the engagement, except where it is public,
+            already known, or required to be disclosed by law.
           </p>
 
-          <h2>5. Limitation of Liability</h2>
+          <h2>5. Electronic Records and Signatures</h2>
           <p>
-            To the fullest extent permitted by law, Strategic Engineering Consultancy shall
-            not be liable for any indirect, incidental, special, consequential, or punitive
-            damages, or any loss of profits, data, or goodwill, arising out of or related to
-            your use of, or inability to use, the Website.
+            Records, documents, and electronic signatures processed through the Services have
+            the same legal effect as their paper equivalents to the extent permitted by
+            applicable law.
           </p>
 
-          <h2>6. Third-Party Links</h2>
+          <h2>6. Availability</h2>
           <p>
-            The Website may contain links to third-party websites or services that are not
-            operated by us. We have no control over, and assume no responsibility for, the
-            content or practices of any third-party sites.
+            The Services are provided on an &ldquo;as available&rdquo; basis. We may perform
+            maintenance and may modify or discontinue features; we are not liable for
+            interruptions beyond our reasonable control.
           </p>
 
-          <h2>7. Changes to These Terms</h2>
+          <h2>7. No Professional Advice Through the Website</h2>
           <p>
-            We may revise these Terms from time to time. Any changes will be effective
-            immediately upon posting the updated Terms on the Website. Your continued use of
-            the Website after any such changes constitutes your acceptance of the revised
-            Terms.
+            General content on our public website is informational only and does not create a
+            consulting, agency, or professional relationship. Professional advice is given
+            only through a signed engagement.
           </p>
 
-          <h2>8. Contact</h2>
+          <h2>8. Disclaimer of Warranties</h2>
           <p>
-            If you have any questions about these Terms of Service, please contact us at
-            <a :href="'mailto:' + contactEmail">{{ contactEmail }}</a>.
+            The Services are provided &ldquo;as is&rdquo; and &ldquo;as available&rdquo; without warranties of any
+            kind, express or implied, including merchantability, fitness for a particular
+            purpose, and non-infringement. We do not guarantee that the Services will be
+            uninterrupted, secure, or error-free.
+          </p>
+
+          <h2>9. Limitation of Liability</h2>
+          <p>
+            To the fullest extent permitted by law, we are not liable for any indirect,
+            incidental, special, consequential, or punitive damages, or any loss of profits,
+            data, or goodwill, arising from your use of or inability to use the Services, and
+            our aggregate liability arising out of the Services is limited to the amount you
+            paid us for the affected engagement in the twelve (12) months before the claim.
+          </p>
+
+          <h2>10. Termination</h2>
+          <p>
+            You may request account closure at any time. We may suspend or terminate access
+            for violation of these Terms or upon completion of your engagement, subject to
+            the data-retention practices described in our Privacy Policy. Sections on
+            intellectual property, confidentiality, disclaimers, and liability survive
+            termination.
+          </p>
+
+          <h2>11. Changes to These Terms</h2>
+          <p>
+            We may revise these Terms from time to time. Changes are effective upon posting;
+            material changes will be announced through the portal where practicable.
+            Continued use after posting constitutes acceptance.
+          </p>
+
+          <h2>12. Governing Law</h2>
+          <p>
+            These Terms are governed by the laws of the Republic of the Philippines. Any
+            dispute shall be brought before the competent courts of the province where our
+            principal office is located.
+          </p>
+
+          <h2>13. Contact</h2>
+          <p>
+            Questions about these Terms: <a :href="'mailto:' + contactEmail">{{ contactEmail }}</a>.
           </p>
         </div>
 
         <!-- ================= PRIVACY ================= -->
         <div v-else class="legal-body">
           <p class="legal-intro">
-            This Privacy Policy describes how Strategic Engineering Consultancy (&ldquo;we&rdquo;, &ldquo;us&rdquo;,
-            or &ldquo;our&rdquo;) collects, uses, and shares information when you use our website
-            secphils.com (the &ldquo;Website&rdquo;). By accessing or using the Website, you consent to
-            the data practices described in this Privacy Policy.
+            This Privacy Policy explains how <strong>Strategic Engineering Consultancy</strong>
+            (&ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;), a Philippine company, collects, uses,
+            discloses, and protects personal information when you use our public website or
+            the SECPhils client portal (together, the &ldquo;Services&rdquo;). We act as the personal
+            information controller and comply with the Republic Act No. 10173, or Data
+            Privacy Act of 2012 (DPA), and its implementing rules. By using the Services,
+            you consent to the practices described here.
           </p>
 
           <h2>1. Information We Collect</h2>
           <ul>
             <li>
-              <strong>Personal Information:</strong> We may collect personal
-              information that you voluntarily provide to us when you use the Website, such
-              as your name, email address, and contact information.
+              <strong>Account and company information:</strong> name, work email, phone
+              number, role, and your company's name and contact details, provided when your
+              account is created or by an administrator on your behalf.
             </li>
             <li>
-              <strong>Usage Data:</strong> We may also collect information about your
-              usage of the Website, including but not limited to your IP address, browser
-              type, operating system, and pages visited.
+              <strong>Project content:</strong> documents, messages, announcements, review
+              responses, and other materials you submit through the portal.
             </li>
             <li>
-              <strong>Cookies:</strong> We may use cookies and similar tracking
-              technologies to collect information about your interactions with the Website.
-              You can control the use of cookies through your browser settings.
+              <strong>Automatic data:</strong> device and browser type, IP address, and logs
+              of portal actions (time, feature, and actor) kept for security and audit
+              purposes.
+            </li>
+            <li>
+              <strong>Cookies and local storage:</strong> sign-in tokens are stored in your
+              browser so you stay logged in. We do not run advertising or third-party
+              tracking pixels on the Services.
             </li>
           </ul>
 
-          <h2>2. How We Use Your Information</h2>
+          <h2>2. How We Use Information</h2>
+          <ul>
+            <li>Provide the portal and perform your consulting engagement.</li>
+            <li>Create and secure your account, including sign-in and two-factor authentication.</li>
+            <li>Send service notifications by email or in-app alerts, per your preferences.</li>
+            <li>Maintain security, investigate misuse, troubleshoot, and meet legal obligations.</li>
+          </ul>
+
+          <h2>3. How We Disclose Information</h2>
           <ul>
             <li>
-              <strong>Provide Services:</strong> We may use your information to provide
-              and personalize the services offered on the Website, communicate with you, and
-              respond to your inquiries.
+              <strong>We never sell personal information.</strong> We share it with our
+              authorized staff and, as needed, with trusted service providers — cloud
+              hosting and storage, an electronic-signature provider, and an email delivery
+              provider — each bound to confidentiality and permitted only to perform
+              services for us.
             </li>
             <li>
-              <strong>Analytics:</strong> We may use your information to analyze trends,
-              administer the Website, and gather demographic information about our user base.
+              <strong>Within your organization:</strong> members of your company's project
+              team can see the project information shared with them in the portal.
             </li>
             <li>
-              <strong>Marketing:</strong> With your consent, we may send you promotional
-              emails about our products and services or other information that we think you
-              may find interesting.
+              <strong>Legal:</strong> we may disclose information to comply with law, legal
+              process, or lawful government requests.
             </li>
           </ul>
 
-          <h2>3. Information Sharing</h2>
-          <ul>
-            <li>
-              <strong>Legal Compliance:</strong> We may disclose your information to
-              comply with applicable laws, regulations, legal processes, or government
-              requests.
-            </li>
-          </ul>
-
-          <h2>4. Data Security</h2>
-          <ul>
-            <li>
-              <strong>Security Measures:</strong> We take reasonable measures to protect
-              your information from unauthorized access, disclosure, alteration, or
-              destruction.
-            </li>
-            <li>
-              <strong>No Guarantee:</strong> However, no method of transmission over the
-              internet or electronic storage is 100% secure, and we cannot guarantee the
-              absolute security of your information.
-            </li>
-          </ul>
-
-          <h2>5. Your Rights</h2>
-          <ul>
-            <li>
-              <strong>Access and Correction:</strong> You have the right to access and
-              correct any personal information we hold about you. You may also request that
-              we delete your personal information, subject to certain exceptions.
-            </li>
-            <li>
-              <strong>Opt-Out:</strong> You may opt-out of receiving promotional
-              communications from us by following the instructions provided in such
-              communications or by contacting us directly.
-            </li>
-          </ul>
-
-          <h2>6. Changes to this Privacy Policy</h2>
-          <ul>
-            <li>
-              <strong>Updates:</strong> We may update this Privacy Policy from time to
-              time by posting a new version on the Website. You should check this page
-              periodically to review any changes.
-            </li>
-          </ul>
-
-          <h2>7. Contact Us</h2>
+          <h2>4. Hosting and Cross-Border Processing</h2>
           <p>
-            If you have any questions about this Privacy Policy, please contact us at
-            <a :href="'mailto:' + contactEmail">{{ contactEmail }}</a>.
+            The Services run on cloud infrastructure (Amazon Web Services). Your data may be
+            stored and processed outside the Philippines; we rely on the providers'
+            contractual and technical safeguards consistent with the DPA.
           </p>
 
+          <h2>5. Data Retention</h2>
           <p>
-            By using the Website, you acknowledge that you have read, understood, and agree
-            to be bound by this Privacy Policy.
+            Personal and project data is kept while your account is active and your
+            engagement is ongoing. Deactivated accounts and removed items are fully deleted
+            after a short administrative recovery window (seven (7) days by default), unless
+            a longer period is configured for your organization. Security-audit logs and
+            records we must keep by law are retained as required.
+          </p>
+
+          <h2>6. Security</h2>
+          <p>
+            We use encrypted connections (HTTPS/TLS), salted password hashing, optional
+            two-factor authentication, role-based access controls, and activity auditing. No
+            method of transmission or storage is perfectly secure, and we cannot guarantee
+            absolute security.
+          </p>
+
+          <h2>7. Your Rights Under the DPA</h2>
+          <p>
+            As a data subject in the Philippines, you have the right to be informed of
+            processing; to access and correct your personal information; to erase or block
+            it; to object to processing; to data portability; and to be indemnified for
+            damages from unlawful processing. To exercise these rights, contact us at
+            <a :href="'mailto:' + contactEmail">{{ contactEmail }}</a>; we will respond
+            within a reasonable period allowed by law. You also have the right to file a
+            complaint with the National Privacy Commission (NPC).
+          </p>
+
+          <h2>8. Children</h2>
+          <p>
+            The Services are business tools intended for adults and are not directed at
+            persons under eighteen (18) years of age.
+          </p>
+
+          <h2>9. Changes to this Privacy Policy</h2>
+          <p>
+            We may update this Policy from time to time by posting a revised version on the
+            Services, with the effective date refreshed. Material changes will be announced
+            through the portal where practicable.
+          </p>
+
+          <h2>10. Contact and Data Protection Officer</h2>
+          <p>
+            Questions, requests, or concerns about this Policy or your personal information
+            may be directed to our Data Protection Officer at
+            <a :href="'mailto:' + contactEmail">{{ contactEmail }}</a>.
           </p>
         </div>
 
