@@ -166,18 +166,23 @@ const projectStats = computed(() => ({
 const RING_R = 45
 const RING_C = 2 * Math.PI * RING_R
 const projectRing = computed(() => {
-  // Segment geometry is fixed (these four locked codes); the legend text
-  // follows the live project_status vocabulary (V35 wiring).
+  // The four locked codes get fixed geometry; an "Other" bucket (only when
+  // non-zero) catches admin-added statuses from Project Config so the ring
+  // always reconciles with the total (V35 wiring — statuses are now data).
+  const s = projectStats.value
+  const other = s.total - s.inProgress - s.notStarted - s.completed - s.archived
   const defs = [
     { key: 'inProgress' as const, label: dropdownStatus.label('IN_PROGRESS'), color: '#059669' },
     { key: 'notStarted' as const, label: dropdownStatus.label('NOT_STARTED'), color: '#d1d5db' },
     { key: 'completed' as const, label: dropdownStatus.label('COMPLETED'), color: '#5eead4' },
     { key: 'archived' as const, label: dropdownStatus.label('ARCHIVED'), color: '#f43f5e' },
+    ...(other > 0 ? [{ key: 'other' as const, label: 'Other', color: '#f59e0b' }] : []),
   ]
   const total = projectStats.value.total || 1
+  const valueOf = (k: string) => k === 'other' ? other : (s as Record<string, number>)[k]
   let acc = 0
   return defs.map(d => {
-    const value = projectStats.value[d.key]
+    const value = valueOf(d.key)
     const frac = value / total
     const seg = {
       label: d.label, color: d.color, value,

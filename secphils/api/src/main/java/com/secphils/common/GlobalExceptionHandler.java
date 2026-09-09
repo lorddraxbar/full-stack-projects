@@ -70,6 +70,25 @@ public class GlobalExceptionHandler {
                 .body(new ProblemResponse(404, "Not Found", "No such endpoint: " + ex.getResourcePath(), LocalDateTime.now()));
     }
 
+    /** Honest HTTP verbs: a mapped resource hit with an unsupported method is
+     *  405, and a bad Content-Type is 415 — not the generic 500 these used to
+     *  leak through (with a stack-trace log line each). */
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ProblemResponse> handleMethodNotSupported(
+            org.springframework.web.HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(new ProblemResponse(405, "Method Not Allowed",
+                        ex.getMethod() + " is not supported on this endpoint", LocalDateTime.now()));
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ProblemResponse> handleMediaType(
+            org.springframework.web.HttpMediaTypeNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(new ProblemResponse(415, "Unsupported Media Type",
+                        "Unsupported Content-Type: " + ex.getContentType(), LocalDateTime.now()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemResponse> handleGeneric(Exception ex) {
         log.error("Unhandled exception", ex);

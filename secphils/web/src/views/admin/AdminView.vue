@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useTestSmtp, useTestDocuSign, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useTestSmtp, useTestDocuSign, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
 import { invalidateDropdownOptions, useDropdownOptions } from '../../composables/useDropdownOptions'
@@ -940,34 +940,9 @@ const filteredDropdownCategories = computed(() => {
   return out
 })
 const newDropdownValues: Record<number, string> = {}
-const addDropdownCategory = (category: DropdownCategoryItem) => {
-  dropdownCategories.value.push(category)
-}
-const newDropdownCategory = ref({ name: '', description: '' })
-const creatingDropdownCategory = ref(false)
-const addNewDropdownCategory = async () => {
-  const name = newDropdownCategory.value.name.trim()
-  if (!name) return
-  creatingDropdownCategory.value = true
-  try {
-    const created = await useCreateDropdownCategory({ name, description: newDropdownCategory.value.description.trim() || undefined })
-    addDropdownCategory(created)
-    newDropdownCategory.value = { name: '', description: '' }
-  } catch (e) {
-    alert('Failed to create category: ' + ((e as any)?.response?.data?.message || (e as Error).message))
-  } finally {
-    creatingDropdownCategory.value = false
-  }
-}
-const removeDropdownCategory = async (category: DropdownCategoryItem) => {
-  try {
-    await useDeleteDropdownCategory(category.id)
-    await loadDropdowns()
-    invalidateAllDropdowns()
-  } catch (e) {
-    alert('Failed to delete category: ' + ((e as any)?.response?.data?.message || (e as Error).message))
-  }
-}
+// Category create/rename/delete are GONE (server removed the endpoints): the
+// forms read categories by name, so an admin-created category could never be
+// consumed, and protected vocabularies are enforced in migrations.
 const addDropdownValue = async (category: DropdownCategoryItem, value: string) => {
   const v = value.trim()
   if (!v) return
@@ -986,18 +961,6 @@ const removeDropdownValue = async (_category: DropdownCategoryItem, dv: Dropdown
     invalidateAllDropdowns()
   } catch (e) {
     alert('Failed to delete value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
-  }
-}
-// Inline rename (the "Update" half of full CRUD) — no extra UI state.
-const renameDropdownCategory = async (cat: DropdownCategoryItem) => {
-  const name = prompt('Rename category', cat.name)?.trim()
-  if (!name || name === cat.name) return
-  try {
-    await useUpdateDropdownCategory(cat.id, { name })
-    await loadDropdowns()
-    invalidateAllDropdowns()
-  } catch (e) {
-    alert('Failed to rename category: ' + ((e as any)?.response?.data?.message || (e as Error).message))
   }
 }
 // Renames the DISPLAY LABEL — the stored code is load-bearing (projects,
@@ -2553,7 +2516,7 @@ const isActiveTab = (tab: string) => activeTab.value === tab
       <!-- Dropdown Value Management -->
       <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-2">Dropdown Value Management</h2>
-        <p class="text-sm text-gray-600 mb-3">The portal's canonical value vocabulary. Project statuses, announcement categories, and announcement audiences are read live by their forms — changes here show up on the next page load. Locked items (🔒) are structural codes the system's behavior keys on: rename their label, but they can't be deleted or re-coded.</p>
+        <p class="text-sm text-gray-600 mb-3">The portal's canonical value vocabulary — the categories are fixed (each one is wired to specific forms), and these three are read live: changes show up on the next page load. Add project statuses or announcement categories freely; delete is refused while anything still uses a value. 🔒 marks fixed codes (statuses, the two audiences): rename their label, never the code. Announcement audience is a fixed two-value switch — labels only.</p>
         <div class="relative max-w-md mb-4">
           <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
           <input
@@ -2572,29 +2535,6 @@ const isActiveTab = (tab: string) => activeTab.value === tab
           </button>
         </div>
 
-        <!-- Create category -->
-        <div class="flex flex-wrap items-center gap-2 mb-6">
-          <input
-            v-model="newDropdownCategory.name"
-            type="text"
-            placeholder="New category name"
-            class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm w-48"
-          />
-          <input
-            v-model="newDropdownCategory.description"
-            type="text"
-            placeholder="Description (optional)"
-            class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm w-56"
-          />
-          <button
-            :disabled="creatingDropdownCategory"
-            @click="addNewDropdownCategory"
-            class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
-          >
-            + Add Category
-          </button>
-        </div>
-
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div v-if="filteredDropdownCategories.length === 0" class="col-span-full text-sm text-gray-500">
             {{ configSearch && dropdownCategories.length > 0
@@ -2603,21 +2543,8 @@ const isActiveTab = (tab: string) => activeTab.value === tab
           </div>
           <div v-for="category in filteredDropdownCategories" :key="category.id" class="border border-gray-200 rounded-lg p-4">
             <div class="flex items-start justify-between mb-1">
-              <h3 class="font-semibold text-gray-900 text-sm">
-                {{ category.name }}
-                <span v-if="category.protectedCategory" class="ml-1 text-gray-400" title="Protected: enforced by the system, not editable here"><i class="fas fa-lock" /></span>
-              </h3>
-              <div v-if="!category.protectedCategory" class="flex items-center gap-2">
-                <button @click="renameDropdownCategory(category)" class="text-emerald-600 hover:text-emerald-800 text-xs" title="Rename category">
-                  <i class="fas fa-pen" />
-                </button>
-                <button @click="removeDropdownCategory(category)" class="text-red-500 hover:text-red-700 text-xs" title="Delete category">
-                  <i class="fas fa-trash" />
-                </button>
-              </div>
-              <div v-else class="flex items-center gap-2">
-                <span class="text-xs text-gray-400">read-only</span>
-              </div>
+              <h3 class="font-semibold text-gray-900 text-sm">{{ category.name }}</h3>
+              <span v-if="category.valueSetFrozen" class="text-xs text-gray-400" title="Fixed two-value switch — labels only">labels only</span>
             </div>
             <p v-if="category.description" class="text-xs text-gray-500 mb-2">{{ category.description }}</p>
             <div class="space-y-2 mt-2">
@@ -2628,16 +2555,16 @@ const isActiveTab = (tab: string) => activeTab.value === tab
                   <span v-if="value.protectedValue" class="ml-1 text-gray-300 text-[10px]" title="Structural code — label editable, delete/rename locked"><i class="fas fa-lock" /></span>
                 </span>
                 <div class="flex items-center gap-1.5">
-                  <button v-if="!category.protectedCategory" @click="renameDropdownValue(value)" class="text-emerald-600 hover:text-emerald-800 text-xs" title="Rename label">
+                  <button @click="renameDropdownValue(value)" class="text-emerald-600 hover:text-emerald-800 text-xs" title="Rename label">
                     <i class="fas fa-pen" />
                   </button>
-                  <button v-if="!category.protectedCategory && !value.protectedValue" @click="removeDropdownValue(category, value)" class="text-red-500 hover:text-red-700 text-xs" title="Delete value">
+                  <button v-if="!category.valueSetFrozen && !value.protectedValue" @click="removeDropdownValue(category, value)" class="text-red-500 hover:text-red-700 text-xs" title="Delete value">
                     <i class="fas fa-times" />
                   </button>
                 </div>
               </div>
             </div>
-            <div v-if="!category.protectedCategory" class="mt-3 flex gap-2">
+            <div v-if="!category.valueSetFrozen" class="mt-3 flex gap-2">
               <input
                 :value="newDropdownValues[category.id] || ''"
                 @input="newDropdownValues[category.id] = ($event.target as HTMLInputElement).value"

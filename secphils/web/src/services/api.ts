@@ -877,29 +877,17 @@ export interface DropdownCategoryItem {
   id: number
   name: string
   description?: string | null
-  /** V35: system-enforced vocabulary (user_role) — read-only in the panel. */
-  protectedCategory?: boolean
+  /** Value set is structure (audience): only label renames allowed. */
+  valueSetFrozen?: boolean
   values?: DropdownValueItem[]
 }
 
+// Category SET is fixed server-side (no create/update/delete endpoints): the
+// forms enumerate categories by name, so admin-created categories could never
+// be read by anything. Protected categories (user_role) are not returned.
 export async function useGetDropdowns(): Promise<DropdownCategoryItem[]> {
   const response = await api.get('/dropdowns')
   return response.data
-}
-
-
-export async function useCreateDropdownCategory(data: { name: string; description?: string }): Promise<DropdownCategoryItem> {
-  const response = await api.post('/dropdowns', data)
-  return response.data
-}
-
-export async function useUpdateDropdownCategory(id: number, data: { name?: string; description?: string }): Promise<DropdownCategoryItem> {
-  const response = await api.put(`/dropdowns/${id}`, data)
-  return response.data
-}
-
-export async function useDeleteDropdownCategory(id: number): Promise<void> {
-  await api.delete(`/dropdowns/${id}`)
 }
 
 export async function useCreateDropdownValue(data: { categoryId: number; value: string; displayLabel?: string; sortOrder?: number }): Promise<DropdownValueItem> {

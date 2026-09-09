@@ -156,7 +156,18 @@ public class AnnouncementController {
         a.setTitle(req.title());
         a.setBody(req.body());
         if (req.category() != null && !req.category().isBlank()) a.setCategory(req.category());
-        if (req.audience() != null && !req.audience().isBlank()) a.setAudience(req.audience());
+        if (req.audience() != null && !req.audience().isBlank()) {
+            // Audience is a binary visibility switch: the client-side list
+            // filter only understands PROJECT and COMPANY — anything else
+            // would make the announcement invisible to every client.
+            if (!"PROJECT".equals(req.audience()) && !"COMPANY".equals(req.audience())) {
+                throw ApiException.badRequest("audience must be PROJECT or COMPANY");
+            }
+            if ("PROJECT".equals(req.audience()) && project == null) {
+                throw ApiException.badRequest("audience PROJECT requires a projectId");
+            }
+            a.setAudience(req.audience());
+        }
         if (req.isPublished() != null) a.setIsPublished(req.isPublished());
     }
 

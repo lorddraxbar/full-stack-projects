@@ -10,6 +10,8 @@ import java.util.List;
 @Repository
 public interface AnnouncementRepository extends JpaRepository<Announcement, Long> {
 
+    boolean existsByCategory(String category);
+
     @Query("select a from Announcement a left join fetch a.company left join fetch a.project left join fetch a.createdBy where a.company.id = :companyId order by a.createdAt desc")
     List<Announcement> findWithRefsByCompanyId(@org.springframework.data.repository.query.Param("companyId") Long companyId);
 }

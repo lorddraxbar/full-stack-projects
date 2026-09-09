@@ -25,13 +25,15 @@ public final class DropdownProtection {
             "audience", Set.of("PROJECT", "COMPANY"));
 
     /**
-     * Categories the SPA forms read BY NAME (V35 wiring). Renaming or deleting
-     * them silently un-wires the form (the composable falls back to built-ins),
-     * so their identity is locked; adding/editing/deleting their VALUES stays
-     * open — that IS the feature.
+     * Categories whose VALUE SET is structure, not vocabulary (bbb3680 review).
+     * audience is a binary visibility switch: AnnouncementController.dispatch()
+     * ignores it (fan-out is always whole-company) while the client-side list
+     * filter only understands COMPANY and PROJECT+own-project — a third value
+     * an admin invented would make announcements silently invisible to every
+     * client. Renaming labels stays open; adding/deleting/re-coding does not.
+     * (user_role is protectedCategory, which is stricter: no writes at all.)
      */
-    private static final Set<String> WIRED = Set.of(
-            "project_status", "announcement_category", "audience");
+    private static final Set<String> FROZEN_VALUES = Set.of("audience");
 
     private DropdownProtection() {
     }
@@ -40,7 +42,7 @@ public final class DropdownProtection {
         return LOCKED.getOrDefault(categoryName, Set.of()).contains(code);
     }
 
-    public static boolean isWiredCategory(String categoryName) {
-        return WIRED.contains(categoryName);
+    public static boolean isFrozenValues(String categoryName) {
+        return FROZEN_VALUES.contains(categoryName);
     }
 }

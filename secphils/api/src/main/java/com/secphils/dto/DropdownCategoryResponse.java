@@ -10,7 +10,9 @@ public record DropdownCategoryResponse(
         Long id,
         String name,
         String description,
-        boolean protectedCategory,
+        /** True for categories whose VALUE SET is structure (audience): only
+         *  label renames allowed. UI mirrors this to hide add/delete affordances. */
+        boolean valueSetFrozen,
         List<DropdownValueResponse> values
 ) {
     public record DropdownValueResponse(
@@ -18,6 +20,7 @@ public record DropdownCategoryResponse(
             String value,
             String displayLabel,
             Integer sortOrder,
+            /** Structural code the backend keys on — label rename only. */
             boolean protectedValue
     ) {
         /** Caller must be inside a transaction (category is lazy). */
@@ -29,7 +32,7 @@ public record DropdownCategoryResponse(
 
     public static DropdownCategoryResponse from(DropdownCategory c) {
         return new DropdownCategoryResponse(c.getId(), c.getName(), c.getDescription(),
-                Boolean.TRUE.equals(c.getProtectedFlag()),
+                DropdownProtection.isFrozenValues(c.getName()),
                 c.getValues().stream()
                         .sorted((a, b) -> Integer.compare(a.getSortOrder(), b.getSortOrder()))
                         .map(DropdownValueResponse::from)
