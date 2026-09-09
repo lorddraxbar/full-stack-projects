@@ -877,43 +877,48 @@ onMounted(async () => {
       <!-- Notifications Tab (all roles) -->
       <div v-if="activeTab === 'notifications'" class="space-y-6">
         <div class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Email Notifications</h2>
-          <div class="space-y-3">
-            <div
-              v-for="(_value, key) in notificationPrefs.email"
-              :key="'email-' + key"
-              class="flex items-center justify-between py-2"
-            >
-              <span class="text-gray-700">{{ formatKey(key as string) }}</span>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input
-                  v-model="notificationPrefs.email[key as keyof typeof notificationPrefs.email]"
-                  type="checkbox"
-                  class="sr-only peer"
-                />
-                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-              </label>
+          <h2 class="text-lg font-semibold text-gray-900 mb-1">Notifications</h2>
+          <p class="text-sm text-gray-600 mb-5">Choose which events reach you over email and which appear in-app.</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
+            <div>
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-2">Email</h3>
+              <div class="divide-y divide-gray-100">
+                <div
+                  v-for="(_value, key) in notificationPrefs.email"
+                  :key="'email-' + key"
+                  class="flex items-center justify-between py-2.5"
+                >
+                  <span class="text-gray-700">{{ formatKey(key as string) }}</span>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input
+                      v-model="notificationPrefs.email[key as keyof typeof notificationPrefs.email]"
+                      type="checkbox"
+                      class="sr-only peer"
+                    />
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">In-App Notifications</h2>
-          <div class="space-y-3">
-            <div
-              v-for="(_value, key) in notificationPrefs.inApp"
-              :key="'inApp-' + key"
-              class="flex items-center justify-between py-2"
-            >
-              <span class="text-gray-700">{{ formatKey(key as string) }}</span>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input
-                  v-model="notificationPrefs.inApp[key as keyof typeof notificationPrefs.inApp]"
-                  type="checkbox"
-                  class="sr-only peer"
-                />
-                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-              </label>
+            <div>
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-2">In-App</h3>
+              <div class="divide-y divide-gray-100">
+                <div
+                  v-for="(_value, key) in notificationPrefs.inApp"
+                  :key="'inApp-' + key"
+                  class="flex items-center justify-between py-2.5"
+                >
+                  <span class="text-gray-700">{{ formatKey(key as string) }}</span>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input
+                      v-model="notificationPrefs.inApp[key as keyof typeof notificationPrefs.inApp]"
+                      type="checkbox"
+                      class="sr-only peer"
+                    />
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
