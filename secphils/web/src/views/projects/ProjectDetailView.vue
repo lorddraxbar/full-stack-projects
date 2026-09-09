@@ -15,10 +15,11 @@ import {
   useUpdateCompany, useGetCompanyTeamFor, useInviteCustomerRep, useSetAuthorizedRep,
 } from '@/services/api'
 import {
-  projectStatusLabel, fileTypeLabel,
-  PROJECT_STATUS_COLORS, FILE_TYPE_COLORS,
+  fileTypeLabel,
+  FILE_TYPE_COLORS,
   formatDate, formatDateTime, formatPhp, formatFileSize,
 } from '@/lib/labels'
+import { useDropdownOptions } from '@/composables/useDropdownOptions'
 
 const { isClient, isAdmin } = useRole()
 const isUser = computed(() => !isClient.value && !isAdmin.value)
@@ -420,7 +421,13 @@ const adminForm = ref({
   notes: '',
 })
 const adminReady = ref(false)
-const projectStatusCodes = ['NOT_STARTED', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'ARCHIVED']
+// V35: status codes + labels come from Admin -> Project Config (project_status),
+// lib/labels is the offline fallback. Lifecycle logic still keys on the CODEs
+// ('COMPLETED' stamps completed_at, 'ARCHIVED' drives the archive flow).
+const statusOpts = useDropdownOptions('project_status')
+const projectStatusLabel = statusOpts.label
+const projectStatusColor = statusOpts.color
+const projectStatusCodes = computed(() => statusOpts.options.value)
 
 function initAdminForm() {
   if (!project.value) return
@@ -916,7 +923,7 @@ async function saveProductionEdit() {
               {{ project.companyName || company?.name || '—' }} &middot; {{ project.serviceName || '—' }}
             </p>
           </div>
-          <span :class="['px-3 py-1 text-sm font-medium rounded-full', PROJECT_STATUS_COLORS[projectStatusLabel(project.status)]]">
+          <span :class="['px-3 py-1 text-sm font-medium rounded-full', projectStatusColor(project.status)]">
             {{ projectStatusLabel(project.status) }}
           </span>
         </div>
@@ -1854,7 +1861,7 @@ async function saveProductionEdit() {
               v-model="adminForm.status"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option v-for="s in projectStatusCodes" :key="s" :value="s">{{ projectStatusLabel(s) }}</option>
+              <option v-for="s in projectStatusCodes" :key="s.value" :value="s.value">{{ s.label }}</option>
             </select>
           </div>
           </div>

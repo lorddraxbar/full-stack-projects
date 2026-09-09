@@ -10,7 +10,14 @@ import type { WizardData } from '@/components/NewProjectWizard.vue'
 import Pagination from '@/components/Pagination.vue'
 import { useRole } from '@/composables/useRole'
 import { useGetMe, useGetProjects, useCreateProject, useUpdateProject, useCreateCompany, useUpdateCompany, useUploadDocument, useGetApiHealth, useGetLanding } from '@/services/api'
-import { projectStatusLabel, PROJECT_STATUS_COLORS, formatPhp, formatDate, formatDateTime, timeAgo } from '@/lib/labels'
+import { useDropdownOptions } from '@/composables/useDropdownOptions'
+import { formatPhp, formatDate, formatDateTime, timeAgo } from '@/lib/labels'
+
+// V35: project statuses come from Admin -> Project Config (project_status),
+// with lib/labels as the offline fallback.
+const statusOpts = useDropdownOptions('project_status')
+const statusLabel = statusOpts.label
+const statusColor = statusOpts.color
 
 const { isClient } = useRole()
 const router = useRouter()
@@ -57,7 +64,7 @@ interface ProjectRow {
   name: string
   client: string
   serviceType: string
-  status: string
+  statusCode: string
   progress: number
   totalCost: number | null
   latestUpdate: string | null
@@ -76,7 +83,7 @@ function mapProject(p: any): ProjectRow {
     name: p.name,
     client: p.companyName || '—',
     serviceType: p.serviceName || '—',
-    status: projectStatusLabel(p.status),
+    statusCode: p.status || 'NOT_STARTED',
     progress: p.progress ?? 0,
     totalCost: p.totalCost != null ? Number(p.totalCost) : null,
     latestUpdate: p.latestUpdateBody || null,
@@ -130,16 +137,10 @@ async function init() {
   await loadProjects()
 }
 
-const statusOptions = [
+const statusOptions = computed(() => [
   { value: 'ALL', label: 'All Status' },
-  { value: 'NOT_STARTED', label: 'Not Started' },
-  { value: 'IN_PROGRESS', label: 'In Progress' },
-  { value: 'ON_HOLD', label: 'On Hold' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'ARCHIVED', label: 'Archived' },
-]
-
-const statusColors: Record<string, string> = PROJECT_STATUS_COLORS
+  ...statusOpts.options.value,
+])
 
 const subheading = computed(() =>
   isClient.value
@@ -151,7 +152,7 @@ const filteredProjects = computed(() => {
   let result = projects.value
 
   if (selectedStatus.value !== 'ALL') {
-    result = result.filter(p => p.status === projectStatusLabel(selectedStatus.value))
+    result = result.filter(p => p.statusCode === selectedStatus.value)
   }
 
   // Standard search: every space-separated term must appear somewhere in the
@@ -165,7 +166,7 @@ const filteredProjects = computed(() => {
         p.name,
         p.client,
         p.serviceType,
-        p.status,
+        statusLabel(p.statusCode),
         formatPhp(p.totalCost),
         p.latestUpdate || '',
         formatDate(p.createdAt),
@@ -412,8 +413,8 @@ onBeforeUnmount(() => {
               </div>
             </div>
             <div class="col-start-2 row-start-2 sm:col-start-3 sm:row-start-1 flex flex-row flex-wrap items-center justify-between gap-2 sm:gap-2.5 sm:flex-col sm:items-end">
-              <Badge :class="statusColors[project.status]">
-                {{ project.status }}
+              <Badge :class="statusColor(project.statusCode)">
+                {{ statusLabel(project.statusCode) }}
               </Badge>
               <div class="flex flex-row sm:flex-col items-center gap-3 sm:gap-1 text-xs text-gray-400">
                 <span>

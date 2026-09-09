@@ -9,8 +9,11 @@ import {
 import {
   formatDate, formatFileSize,
 } from '@/lib/labels'
+import { useDropdownOptions } from '@/composables/useDropdownOptions'
 
 const { isAdmin } = useRole()
+// V35: donut legend labels follow the live project_status vocabulary.
+const dropdownStatus = useDropdownOptions('project_status')
 
 interface ProjectRow {
   id: number
@@ -163,11 +166,13 @@ const projectStats = computed(() => ({
 const RING_R = 45
 const RING_C = 2 * Math.PI * RING_R
 const projectRing = computed(() => {
+  // Segment geometry is fixed (these four locked codes); the legend text
+  // follows the live project_status vocabulary (V35 wiring).
   const defs = [
-    { key: 'inProgress' as const, label: 'In progress', color: '#059669' },
-    { key: 'notStarted' as const, label: 'Not started', color: '#d1d5db' },
-    { key: 'completed' as const, label: 'Completed', color: '#5eead4' },
-    { key: 'archived' as const, label: 'Archived', color: '#f43f5e' },
+    { key: 'inProgress' as const, label: dropdownStatus.label('IN_PROGRESS'), color: '#059669' },
+    { key: 'notStarted' as const, label: dropdownStatus.label('NOT_STARTED'), color: '#d1d5db' },
+    { key: 'completed' as const, label: dropdownStatus.label('COMPLETED'), color: '#5eead4' },
+    { key: 'archived' as const, label: dropdownStatus.label('ARCHIVED'), color: '#f43f5e' },
   ]
   const total = projectStats.value.total || 1
   let acc = 0

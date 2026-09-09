@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useTestSmtp, useTestDocuSign, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownCategory, useUpdateDropdownCategory, useDeleteDropdownCategory, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
+import { invalidateDropdownOptions, useDropdownOptions } from '../../composables/useDropdownOptions'
 import { applyBrandTheme } from '../../composables/useBrandTheme'
 import Pagination from '../../components/Pagination.vue'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
@@ -905,6 +906,11 @@ const loadDropdowns = async () => {
     dropdownLoading.value = false
   }
 }
+// Every successful CRUD here also drops the composable's cache so the wired
+// forms (Projects filter, announcement selects, badges) refetch their options.
+const invalidateAllDropdowns = () => {
+  dropdownCategories.value.forEach(c => invalidateDropdownOptions(c.name))
+}
 
 // ---------- Project Config search (covers the Dropdown Value Management list) ----------
 const configSearch = ref('')
@@ -957,6 +963,7 @@ const removeDropdownCategory = async (category: DropdownCategoryItem) => {
   try {
     await useDeleteDropdownCategory(category.id)
     await loadDropdowns()
+    invalidateAllDropdowns()
   } catch (e) {
     alert('Failed to delete category: ' + ((e as any)?.response?.data?.message || (e as Error).message))
   }
@@ -967,6 +974,7 @@ const addDropdownValue = async (category: DropdownCategoryItem, value: string) =
   try {
     await useCreateDropdownValue({ categoryId: category.id, value: v, sortOrder: (category.values?.length ?? 0) })
     await loadDropdowns()
+    invalidateAllDropdowns()
   } catch (e) {
     alert('Failed to add value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
   }
@@ -975,6 +983,7 @@ const removeDropdownValue = async (_category: DropdownCategoryItem, dv: Dropdown
   try {
     await useDeleteDropdownValue(dv.id)
     await loadDropdowns()
+    invalidateAllDropdowns()
   } catch (e) {
     alert('Failed to delete value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
   }
@@ -986,16 +995,22 @@ const renameDropdownCategory = async (cat: DropdownCategoryItem) => {
   try {
     await useUpdateDropdownCategory(cat.id, { name })
     await loadDropdowns()
+    invalidateAllDropdowns()
   } catch (e) {
     alert('Failed to rename category: ' + ((e as any)?.response?.data?.message || (e as Error).message))
   }
 }
+// Renames the DISPLAY LABEL — the stored code is load-bearing (projects,
+// announcements and the auth layer key on it), so the panel only ever offers
+// the label surface. Locked codes reject even that? No: label edits are always
+// safe; the server refuses code edits and deletes on locked values.
 const renameDropdownValue = async (v: DropdownValueItem) => {
-  const value = prompt('Rename value', v.displayLabel || v.value)?.trim()
-  if (!value) return
+  const label = prompt('Rename label (the stored code stays unchanged)', v.displayLabel || v.value)?.trim()
+  if (!label) return
   try {
-    await useUpdateDropdownValue(v.id, { value })
+    await useUpdateDropdownValue(v.id, { displayLabel: label })
     await loadDropdowns()
+    invalidateAllDropdowns()
   } catch (e) {
     alert('Failed to rename value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
   }
@@ -1014,6 +1029,8 @@ interface AnnouncementRow {
   projectId: number | null
 }
 const announcementForm = ref({ title: '', body: '', audience: 'COMPANY', category: 'PROJECT_UPDATE', projectId: null as number | null })
+const audienceOptions = useDropdownOptions('audience')
+const annCategoryOptions = useDropdownOptions('announcement_category')
 const publishing = ref(false)
 const communicationLogs = ref<AnnouncementRow[]>([])
 const communicationLoading = ref(false)
@@ -1049,11 +1066,8 @@ const fmtAnnDate = (s: string | null | undefined) => {
   return isNaN(d.getTime()) ? String(s).slice(0, 10)
     : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
-const audienceDisplay = (a: string | null | undefined) => {
-  if (a === 'COMPANY') return 'Company'
-  if (a === 'PROJECT') return 'Project'
-  return a || 'Company'
-}
+// Delegates to the live Project Config vocabulary (V35 wiring).
+const audienceDisplay = (a: string | null | undefined) => audienceOptions.label(a)
 
 const loadProjects = async () => {
   try {
@@ -2539,7 +2553,7 @@ const isActiveTab = (tab: string) => activeTab.value === tab
       <!-- Dropdown Value Management -->
       <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-2">Dropdown Value Management</h2>
-        <p class="text-sm text-gray-600 mb-3">The portal's canonical value vocabulary. Until forms are wired to read from here, they run on built-in copies of these lists — edits persist, but take effect once a form is connected.</p>
+        <p class="text-sm text-gray-600 mb-3">The portal's canonical value vocabulary. Project statuses, announcement categories, and announcement audiences are read live by their forms — changes here show up on the next page load. Locked items (🔒) are structural codes the system's behavior keys on: rename their label, but they can't be deleted or re-coded.</p>
         <div class="relative max-w-md mb-4">
           <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
           <input
@@ -2589,8 +2603,11 @@ const isActiveTab = (tab: string) => activeTab.value === tab
           </div>
           <div v-for="category in filteredDropdownCategories" :key="category.id" class="border border-gray-200 rounded-lg p-4">
             <div class="flex items-start justify-between mb-1">
-              <h3 class="font-semibold text-gray-900 text-sm">{{ category.name }}</h3>
-              <div class="flex items-center gap-2">
+              <h3 class="font-semibold text-gray-900 text-sm">
+                {{ category.name }}
+                <span v-if="category.protectedCategory" class="ml-1 text-gray-400" title="Protected: enforced by the system, not editable here"><i class="fas fa-lock" /></span>
+              </h3>
+              <div v-if="!category.protectedCategory" class="flex items-center gap-2">
                 <button @click="renameDropdownCategory(category)" class="text-emerald-600 hover:text-emerald-800 text-xs" title="Rename category">
                   <i class="fas fa-pen" />
                 </button>
@@ -2598,23 +2615,29 @@ const isActiveTab = (tab: string) => activeTab.value === tab
                   <i class="fas fa-trash" />
                 </button>
               </div>
+              <div v-else class="flex items-center gap-2">
+                <span class="text-xs text-gray-400">read-only</span>
+              </div>
             </div>
             <p v-if="category.description" class="text-xs text-gray-500 mb-2">{{ category.description }}</p>
             <div class="space-y-2 mt-2">
               <div v-if="!category.values || category.values.length === 0" class="text-xs text-gray-400 py-1">No values yet.</div>
               <div v-for="value in category.values" :key="value.id" class="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded">
-                <span class="text-sm text-gray-700">{{ value.displayLabel || value.value }}</span>
+                <span class="text-sm text-gray-700">
+                  {{ value.displayLabel || value.value }}
+                  <span v-if="value.protectedValue" class="ml-1 text-gray-300 text-[10px]" title="Structural code — label editable, delete/rename locked"><i class="fas fa-lock" /></span>
+                </span>
                 <div class="flex items-center gap-1.5">
-                  <button @click="renameDropdownValue(value)" class="text-emerald-600 hover:text-emerald-800 text-xs" title="Rename value">
+                  <button v-if="!category.protectedCategory" @click="renameDropdownValue(value)" class="text-emerald-600 hover:text-emerald-800 text-xs" title="Rename label">
                     <i class="fas fa-pen" />
                   </button>
-                  <button @click="removeDropdownValue(category, value)" class="text-red-500 hover:text-red-700 text-xs" title="Delete value">
+                  <button v-if="!category.protectedCategory && !value.protectedValue" @click="removeDropdownValue(category, value)" class="text-red-500 hover:text-red-700 text-xs" title="Delete value">
                     <i class="fas fa-times" />
                   </button>
                 </div>
               </div>
             </div>
-            <div class="mt-3 flex gap-2">
+            <div v-if="!category.protectedCategory" class="mt-3 flex gap-2">
               <input
                 :value="newDropdownValues[category.id] || ''"
                 @input="newDropdownValues[category.id] = ($event.target as HTMLInputElement).value"
@@ -2653,16 +2676,13 @@ const isActiveTab = (tab: string) => activeTab.value === tab
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Audience</label>
               <select v-model="announcementForm.audience" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                <option value="COMPANY">Company-wide</option>
-                <option value="PROJECT">Project</option>
+                <option v-for="opt in audienceOptions.options.value" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
               <select v-model="announcementForm.category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                <option value="PROJECT_UPDATE">Project Update</option>
-                <option value="COMPANY_NEWS">Company News</option>
-                <option value="MAINTENANCE">Maintenance</option>
+                <option v-for="opt in annCategoryOptions.options.value" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
             </div>
           </div>

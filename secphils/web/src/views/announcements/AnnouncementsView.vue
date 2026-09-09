@@ -11,10 +11,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import {
-  ANNOUNCEMENT_CATEGORY_LABELS, ANNOUNCEMENT_CATEGORY_COLORS,
-  ANNOUNCEMENT_AUDIENCE_LABELS,
-} from '@/lib/labels'
+import { useDropdownOptions } from '@/composables/useDropdownOptions'
+
+// V35: announcement vocabulary comes from Admin -> Project Config, with the
+// lib/labels maps as the offline fallback.
+const categoryOpts = useDropdownOptions('announcement_category')
+const audienceOpts = useDropdownOptions('audience')
 
 const { isClient } = useRole()
 const isUser = computed(() => !isClient.value)
@@ -35,7 +37,7 @@ interface Announcement {
 }
 
 function categoryLabel(c: string) {
-  return ANNOUNCEMENT_CATEGORY_LABELS[c] || (c ? c.replace('_', ' ') : 'General')
+  return categoryOpts.label(c) === '—' ? 'General' : categoryOpts.label(c)
 }
 
 function formatDate(d: string) {
@@ -86,7 +88,7 @@ const visibleAnnouncements = computed(() => {
         a.title,
         a.body,
         categoryLabel(a.category),
-        ANNOUNCEMENT_AUDIENCE_LABELS[a.audience] || a.audience,
+        audienceOpts.label(a.audience),
         a.isPublished ? 'published' : 'draft',
         projName,
         a.createdByName || '',
@@ -237,7 +239,7 @@ const canDelete = (a: Announcement) =>
   isUser.value && (currentUserId.value > 0 && a.createdById === currentUserId.value)
 
 function categoryColor(c: string) {
-  return ANNOUNCEMENT_CATEGORY_COLORS[c] || 'bg-gray-100 text-gray-800'
+  return categoryOpts.color(c)
 }
 </script>
 
@@ -295,7 +297,7 @@ function categoryColor(c: string) {
                 :class="['px-2 py-0.5 text-xs font-medium rounded-full',
                   announcement.audience === 'COMPANY' ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800']"
               >
-                {{ ANNOUNCEMENT_AUDIENCE_LABELS[announcement.audience] || announcement.audience }}
+                {{ audienceOpts.label(announcement.audience) }}
               </span>
               <span
                 v-if="isUser && !announcement.isPublished"
@@ -394,9 +396,7 @@ function categoryColor(c: string) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="PROJECT_UPDATE">Project Update</SelectItem>
-                    <SelectItem value="COMPANY_NEWS">Company News</SelectItem>
-                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                    <SelectItem v-for="opt in categoryOpts.options.value" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -410,8 +410,7 @@ function categoryColor(c: string) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="COMPANY">Company-wide</SelectItem>
-                    <SelectItem value="PROJECT">Project</SelectItem>
+                    <SelectItem v-for="opt in audienceOpts.options.value" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>

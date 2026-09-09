@@ -80,11 +80,6 @@ export function formatPhp(value: number | null | undefined): string {
   }).format(value)
 }
 
-export function projectStatusLabel(code: string | null | undefined): string {
-  if (!code) return 'Unknown'
-  return PROJECT_STATUS_LABELS[code] || code
-}
-
 export function formatDate(d: string | null | undefined): string {
   if (!d) return '—'
   // Date-only values (e.g. "2026-09-30") are parsed as UTC by `new Date()`,

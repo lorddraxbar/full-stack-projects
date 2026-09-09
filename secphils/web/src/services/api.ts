@@ -869,12 +869,16 @@ export interface DropdownValueItem {
   value: string
   displayLabel: string
   sortOrder: number
+  /** V35: structural code the backend keys on — rename label only. */
+  protectedValue?: boolean
 }
 
 export interface DropdownCategoryItem {
   id: number
   name: string
   description?: string | null
+  /** V35: system-enforced vocabulary (user_role) — read-only in the panel. */
+  protectedCategory?: boolean
   values?: DropdownValueItem[]
 }
 

@@ -2,6 +2,7 @@ package com.secphils.controller;
 
 import com.secphils.common.AuditService;
 import com.secphils.common.ApiException;
+import com.secphils.common.DropdownProtection;
 import com.secphils.dto.DropdownCategoryResponse;
 import com.secphils.entity.DropdownCategory;
 import com.secphils.entity.DropdownValue;
@@ -32,6 +33,23 @@ public class DropdownController {
         this.categoryRepository = categoryRepository;
         this.valueRepository = valueRepository;
         this.auditService = auditService;
+    }
+
+    /** Refuse writes to protected categories (V35): their row is documentation
+     *  of a vocabulary enforced elsewhere (auth roles), not editable data. */
+    private static void requireEditable(DropdownCategory category) {
+        if (Boolean.TRUE.equals(category.getProtectedFlag())) {
+            throw ApiException.badRequest(
+                    "'" + category.getName() + "' is a protected category — its values are enforced by the system and cannot be edited here.");
+        }
+    }
+
+    private static void requireEditableCode(DropdownCategory category, String code, String action) {
+        requireEditable(category);
+        if (DropdownProtection.isLockedValue(category.getName(), code)) {
+            throw ApiException.badRequest(
+                    "'" + code + "' is a protected " + category.getName() + " value — the portal's behavior keys on it, so it cannot be " + action + ". Rename its display label instead if you want a different name.");
+        }
     }
 
     @GetMapping
@@ -85,6 +103,10 @@ public class DropdownController {
         Long categoryId = Long.valueOf(String.valueOf(categoryIdRaw));
         DropdownCategory category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> ApiException.notFound("Dropdown category"));
+        requireEditable(category); // adding brand-new values stays allowed
+        if (DropdownProtection.isLockedValue(category.getName(), value.trim())) {
+            throw ApiException.badRequest("'" + value.trim() + "' is a reserved code in this category.");
+        }
         DropdownValue dv = new DropdownValue();
         dv.setCategory(category);
         dv.setValue(value);
@@ -107,6 +129,13 @@ public class DropdownController {
         AuthUser actor = CurrentUser.require();
         DropdownCategory category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> ApiException.notFound("Dropdown category"));
+        requireEditable(category);
+        if (body.containsKey("name") && body.get("name") != null && !body.get("name").isBlank()
+                && !body.get("name").equals(category.getName())
+                && DropdownProtection.isWiredCategory(category.getName())) {
+            throw ApiException.badRequest("'" + category.getName()
+                    + "' is wired to portal forms by name — renaming it would silently disconnect them.");
+        }
         if (body.containsKey("name") && body.get("name") != null && !body.get("name").isBlank()) {
             String name = body.get("name");
             Long selfId = category.getId();
@@ -130,6 +159,11 @@ public class DropdownController {
         AuthUser actor = CurrentUser.require();
         DropdownCategory category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> ApiException.notFound("Dropdown category"));
+        requireEditable(category);
+        if (DropdownProtection.isWiredCategory(category.getName())) {
+            throw ApiException.badRequest("'" + category.getName()
+                    + "' is wired to portal forms — delete its unneeded values instead of the category.");
+        }
         categoryRepository.delete(category); // cascades to its values
         auditService.audit(actor, "DROPDOWN_CATEGORY_DELETE", "DropdownCategory", categoryId,
                 "Name: " + category.getName(), http);
@@ -146,6 +180,19 @@ public class DropdownController {
                 .orElseThrow(() -> ApiException.notFound("Dropdown value"));
         String value = (String) body.get("value");
         if (value != null && !value.isBlank()) {
+            requireEditable(dv.getCategory());
+            // Locked structural codes may never be renamed (displayLabel is
+            // the rename surface); a non-locked value may not be renamed INTO
+            // a locked code either.
+            if (!dv.getValue().equals(value)) {
+                if (DropdownProtection.isLockedValue(dv.getCategory().getName(), dv.getValue())) {
+                    throw ApiException.badRequest("'" + dv.getValue()
+                            + "' is a protected value — the portal's behavior keys on it, so its code cannot be renamed. Use the display label to change how it reads.");
+                }
+                if (DropdownProtection.isLockedValue(dv.getCategory().getName(), value)) {
+                    throw ApiException.badRequest("'" + value + "' is a reserved code in this category.");
+                }
+            }
             Long selfId = dv.getId();
             Long categoryId = dv.getCategory().getId();
             valueRepository.findByCategoryIdAndValue(categoryId, value)
@@ -172,6 +219,7 @@ public class DropdownController {
         AuthUser actor = CurrentUser.require();
         DropdownValue dv = valueRepository.findById(valueId)
                 .orElseThrow(() -> ApiException.notFound("Dropdown value"));
+        requireEditableCode(dv.getCategory(), dv.getValue(), "deleted");
         valueRepository.delete(dv);
         auditService.audit(actor, "DROPDOWN_VALUE_DELETE", "DropdownValue", valueId,
                 "Category: " + dv.getCategory().getId() + ", value: " + dv.getValue(), http);

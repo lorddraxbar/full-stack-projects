@@ -24,6 +24,16 @@ public class DropdownCategory {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    /**
+     * Protected categories are structural vocabulary the auth/system layer
+     * depends on (user_role) or which the backend maps to lifecycle behavior
+     * (project_status -> ARCHIVED). V35; writes are refused by
+     * DropdownController.requireEditable(). Column name "protected" is a
+     * Java keyword clash -> field is protectedFlag.
+     */
+    @Column(name = "is_protected", nullable = false)
+    private Boolean protectedFlag = false;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
