@@ -10,9 +10,4 @@ import java.util.List;
 @Repository
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long>, JpaSpecificationExecutor<AuditLog> {
 
-    List<AuditLog> findByUserIdOrderByCreatedAtDesc(Long userId);
-
-    List<AuditLog> findByEntityTypeAndEntityId(String entityType, Long entityId);
-
-    List<AuditLog> findByAction(String action);
 }

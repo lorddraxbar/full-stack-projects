@@ -10,10 +10,6 @@ import java.util.List;
 @Repository
 public interface CompanyRepository extends JpaRepository<Company, Long> {
 
-    List<Company> findByAuthorizedRepId(Long userId);
-
-    List<Company> findByNameContainingIgnoreCase(String name);
-
     @Query("select c from Company c left join fetch c.authorizedRep")
     List<Company> findWithRep();
 }

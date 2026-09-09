@@ -13,11 +13,7 @@ import java.util.List;
 @Repository
 public interface ProjectTeamMemberRepository extends JpaRepository<ProjectTeamMember, ProjectTeamMemberId> {
 
-    List<ProjectTeamMember> findByProject(Project project);
-
     List<ProjectTeamMember> findByProjectId(Long projectId);
-
-    List<ProjectTeamMember> findByUser(User user);
 
     boolean existsByProjectIdAndUserId(Long projectId, Long userId);
 

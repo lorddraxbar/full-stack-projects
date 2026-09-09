@@ -13,10 +13,6 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     List<Document> findByProjectId(Long projectId);
 
-    List<Document> findByProjectIdIn(Iterable<Long> projectIds);
-
-    List<Document> findByUploaderId(Long userId);
-
     List<Document> findByFileUrl(String fileUrl);
 
     List<Document> findByDeletedAtIsNotNull();

@@ -13,8 +13,6 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     Optional<Review> findByProjectId(Long projectId);
 
-    List<Review> findByCustomerUserId(Long reviewerId);
-
     List<Review> findByStatus(String status);
 
     @Query("select r from Review r left join fetch r.project left join fetch r.customerUser")

@@ -14,11 +14,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long>, JpaSpec
 
     List<Project> findByCompanyId(Long companyId);
 
-    List<Project> findByCompanyIdAndStatus(Long companyId, String status);
-
     List<Project> findByStatus(String status);
-
-    long countByCompanyId(Long companyId);
 
     @Query("select p from Project p left join fetch p.company left join fetch p.service where p.id in :ids")
     List<Project> findByPageIds(@org.springframework.data.repository.query.Param("ids") java.util.Collection<Long> ids);

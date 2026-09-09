@@ -190,12 +190,6 @@ public class AuthController {
         return ResponseEntity.ok(TokenResponse.of(access, newRefresh, 900, UserResponse.from(user)));
     }
 
-    @PostMapping("/logout")
-    @Transactional
-    public ResponseEntity<Map<String, String>> logout() {
-        // Stateless JWT: client discards tokens. Hook for a denylist goes here if needed.
-        return ResponseEntity.ok(Map.of("message", "Logged out"));
-    }
 
     // ------------------------------------------------------------------
     // Google SSO — OAuth 2.0 authorization-code flow (id_token + JWKS).

@@ -45,7 +45,7 @@ public class SecurityConfig {
                 // audit-log READS are staff+admin — the staff dashboard mirrors the
                 // admin one and needs the Recent Activity feed. MUST sit BEFORE the
                 // /api/v1/admin/** catch-all (first-match-wins) — everything else
-                // under /admin/** (writes, settings, stats, roles, …) stays admin-only.
+                // under /admin/** (writes, settings, roles, …) stays admin-only.
                 .requestMatchers(HttpMethod.GET, "/api/v1/admin/audit-logs").hasAnyRole("ADMIN", "USER")
                 // admin-only
                 .requestMatchers("/api/v1/admin/**", "/api/v1/roles/**", "/api/v1/permissions/**", "/api/v1/settings/**").hasRole("ADMIN")

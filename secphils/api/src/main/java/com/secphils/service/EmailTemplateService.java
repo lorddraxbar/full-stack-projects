@@ -250,18 +250,6 @@ public class EmailTemplateService {
         }
     }
 
-    /**
-     * Raw list of the admin's stored templates (for the Admin Settings UI
-     * round-trip) — stored entries as-is, defaults for any known type the
-     * admin has not saved yet, so the UI always shows the complete catalog.
-     */
-    public Map<String, EmailTemplate> catalog() {
-        Map<String, EmailTemplate> out = new LinkedHashMap<>();
-        for (String name : DEFAULTS.keySet()) {
-            out.put(name, resolve(name));
-        }
-        return out;
-    }
 
     // ------------------------------------------------------------ rendering
 

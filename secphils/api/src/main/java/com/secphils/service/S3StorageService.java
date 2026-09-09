@@ -333,27 +333,9 @@ public class S3StorageService {
     }
 
     /** Hard delete of one object key. Throws on failure (unlike {@link #deleteQuietly}). */
-    public void deleteObject(StorageConfig cfg, String key) {
-        try {
-            client(cfg).deleteObject(DeleteObjectRequest.builder().bucket(cfg.bucket()).key(key).build());
-        } catch (S3Exception e) {
-            throw storageFailure(e, "delete a storage object");
-        } catch (SdkClientException e) {
-            throw transportFailure(e, "delete a storage object");
-        }
-    }
-
+    
     /** If a public base URL is configured, direct links point there; otherwise null (use the API proxy). */
-    public String publicUrl(StorageConfig cfg, String s3Uri) {
-        if (s3Uri == null || !s3Uri.startsWith("s3://") || cfg.publicBaseUrl() == null || cfg.publicBaseUrl().isBlank()) {
-            return null;
-        }
-        S3Ref ref = parse(s3Uri);
-        String base = cfg.publicBaseUrl().trim();
-        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
-        return base + "/" + ref.key();
-    }
-
+    
     /**
      * Verifies reachability of the configured (or candidate) storage with a
      * throwaway client: head-bucket + list-bucket. Never touches the live

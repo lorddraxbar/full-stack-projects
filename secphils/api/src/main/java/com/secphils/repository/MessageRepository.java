@@ -11,10 +11,6 @@ import java.util.List;
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
-    List<Message> findByProjectIdOrderByCreatedAtAsc(Long projectId);
-
-    List<Message> findBySenderId(Long senderId);
-
     /** Messages still referencing the given object URLs (attachments share their
       * S3 object with the auto-created document row). */
     List<Message> findByAttachmentUrlIn(Iterable<String> urls);

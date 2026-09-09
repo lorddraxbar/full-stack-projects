@@ -13,8 +13,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     List<Notification> findByRecipientIdAndIsReadFalseOrderByCreatedAtDesc(Long recipientId);
 
-    long countByRecipientIdAndIsReadFalse(Long recipientId);
-
     /** Message-trash (V33): a trashed message's bell rows die with it — the
      *  notification body carries the message text, so stale rows would keep
      *  the content readable. */

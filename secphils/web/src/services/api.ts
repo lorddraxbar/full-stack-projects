@@ -90,10 +90,6 @@ api.interceptors.response.use(
 export { api }
 
 // ---------- Auth ----------
-export async function useLogin(credentials: { email: string; password: string }) {
-  const response = await api.post('/auth/login', credentials)
-  return response.data as LoginResult
-}
 
 export interface LoginResult {
   requires2fa?: boolean
@@ -110,10 +106,6 @@ export interface LoginResult {
   } | null
 }
 
-export async function useVerify2faLogin(pendingToken: string, code: string) {
-  const response = await api.post('/auth/2fa/verify', { pendingToken, code })
-  return response.data as LoginResult
-}
 
 export async function useEnable2fa() {
   const response = await api.post('/auth/2fa/enable')
@@ -227,12 +219,7 @@ export async function useUpdateProject(id: number, data: Record<string, unknown>
   return response.data
 }
 
-export async function useDeleteProject(id: number) {
-  const response = await api.delete(`/projects/${id}`)
-  return response.data
-}
 
-/** Soft-delete / archive a project (staff only). */
 export async function useArchiveProject(id: number) {
   const response = await api.delete(`/projects/${id}`)
   return response.data
@@ -255,20 +242,8 @@ export async function useHardDeleteProject(id: number, password?: string) {
 }
 
 // ---------- Project team ----------
-export async function useGetProjectTeam(projectId: number) {
-  const response = await api.get(`/projects/${projectId}/team`)
-  return response.data
-}
 
-export async function useAddProjectTeamMember(projectId: number, userId: number) {
-  const response = await api.post(`/projects/${projectId}/team`, { userId })
-  return response.data
-}
 
-export async function useRemoveProjectTeamMember(projectId: number, userId: number) {
-  const response = await api.delete(`/projects/${projectId}/team/${userId}`)
-  return response.data
-}
 
 // ---------- Companies ----------
 export async function useGetCompanies() {
@@ -513,10 +488,6 @@ export async function useCreateDocument(data: Record<string, unknown>) {
   return response.data
 }
 
-export async function useUpdateDocument(id: number, data: Record<string, unknown>) {
-  const response = await api.put(`/documents/${id}`, data)
-  return response.data
-}
 
 export async function useDeleteDocument(id: number) {
   const response = await api.delete(`/documents/${id}`)
@@ -697,22 +668,6 @@ export async function useUpdateCommunicationSettings(data: Partial<Communication
 }
 
 // ---------- Admin ----------
-export interface AdminStats {
-  totalClients: number
-  activeProjects: number
-  completedProjects: number
-  totalRevenue: number
-  pendingReviews: number
-  backendStatus: string
-  database?: { status: string; detail?: string }
-  lastSettingsUpdate?: string | null
-}
-
-export async function useGetAdminStats(): Promise<AdminStats> {
-  const response = await api.get('/admin/stats')
-  return response.data
-}
-
 export async function useGetAuditLogs(params?: { action?: string; userId?: number; search?: string; page?: number; size?: number }) {
   const response = await api.get('/admin/audit-logs', { params })
   return response.data
@@ -928,10 +883,6 @@ export async function useGetDropdowns(): Promise<DropdownCategoryItem[]> {
   return response.data
 }
 
-export async function useGetDropdownValues(categoryId?: number): Promise<DropdownValueItem[]> {
-  const response = await api.get('/dropdowns/values', { params: categoryId ? { categoryId } : {} })
-  return response.data
-}
 
 export async function useCreateDropdownCategory(data: { name: string; description?: string }): Promise<DropdownCategoryItem> {
   const response = await api.post('/dropdowns', data)

@@ -59,38 +59,6 @@ export const ANNOUNCEMENT_AUDIENCE_LABELS: Record<string, string> = {
   COMPANY: 'Company-wide',
 }
 
-export const AUDIENCE_LABELS: Record<string, string> = {
-  PROJECT: 'Project',
-  COMPANY: 'Company',
-}
-
-export const REVIEW_STATUS_LABELS: Record<string, string> = {
-  PENDING: 'Pending',
-  APPROVED: 'Approved',
-  REJECTED: 'Rejected',
-}
-
-export const REVIEW_STATUS_COLORS: Record<string, string> = {
-  'Pending': 'bg-yellow-100 text-yellow-800',
-  'Approved': 'bg-green-100 text-green-800',
-  'Rejected': 'bg-red-100 text-red-800',
-}
-
-export function announcementCategoryLabel(code: string | null | undefined): string {
-  if (!code) return 'General'
-  return ANNOUNCEMENT_CATEGORY_LABELS[code] || code
-}
-
-export function audienceLabel(code: string | null | undefined): string {
-  if (!code) return 'Company'
-  return AUDIENCE_LABELS[code] || code
-}
-
-export function reviewStatusLabel(code: string | null | undefined): string {
-  if (!code) return 'Pending'
-  return REVIEW_STATUS_LABELS[code] || code
-}
-
 export function formatFileSize(bytes: number | null | undefined): string {
   if (bytes == null) return '—'
   if (bytes < 1024) return `${bytes} B`
@@ -109,15 +77,6 @@ export function formatPhp(value: number | null | undefined): string {
   return new Intl.NumberFormat('en-PH', {
     style: 'currency', currency: 'PHP',
     minimumFractionDigits: 0, maximumFractionDigits: 0,
-  }).format(value)
-}
-
-/** Compact peso for stat cards, e.g. 2500000 → "₱2.5M", 500000 → "₱500.0K". */
-export function formatPhpCompact(value: number | null | undefined): string {
-  if (value == null || isNaN(value)) return '—'
-  return new Intl.NumberFormat('en-PH', {
-    style: 'currency', currency: 'PHP',
-    notation: 'compact', maximumFractionDigits: 1,
   }).format(value)
 }
 
