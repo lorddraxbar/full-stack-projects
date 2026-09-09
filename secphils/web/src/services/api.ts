@@ -382,28 +382,23 @@ export async function useSetAuthorizedRep(companyId: number, data: { repUserId: 
   return response.data
 }
 
-// ---------- Roles & Permissions (ADMIN) ----------
-export async function useGetRoles() {
+// ---------- Roles (ADMIN, read-only) ----------
+// Theater cut 2026-09-09: the stored permission matrix was never enforced
+// (auth is hardcoded ROLE_CLIENT/USER/ADMIN in SecurityConfig + per-row
+// controller checks), so role CRUD and the /permissions vocabulary endpoint
+// are gone server-side. GET /roles remains for the honest read-only inventory.
+export interface RoleItem {
+  id: number
+  name: string
+  description: string
+  userType: string
+  isSystem: boolean
+  permissionIds: number[]
+  assignedUserCount: number
+}
+
+export async function useGetRoles(): Promise<RoleItem[]> {
   const response = await api.get('/roles')
-  return response.data
-}
-
-export async function useCreateRole(data: { name: string; userType: string; description?: string; permissionIds?: number[] }) {
-  const response = await api.post('/roles', data)
-  return response.data
-}
-
-export async function useUpdateRole(id: number, data: { name: string; userType: string; description?: string; permissionIds?: number[] }) {
-  const response = await api.put(`/roles/${id}`, data)
-  return response.data
-}
-
-export async function useDeleteRole(id: number) {
-  await api.delete(`/roles/${id}`)
-}
-
-export async function useGetPermissions() {
-  const response = await api.get('/permissions')
   return response.data
 }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useTestSmtp, useTestDocuSign, useGetMe, useUpdateMe, useGetRoles, useCreateRole, useUpdateRole, useDeleteRole, useGetPermissions, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useTestSmtp, useTestDocuSign, useGetMe, useUpdateMe, useGetRoles, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type RoleItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
 import { invalidateDropdownOptions, useDropdownOptions } from '../../composables/useDropdownOptions'
@@ -476,18 +476,12 @@ const saveCompanyProfile = async () => {
   }
 }
 
-// ---------- Company Settings: Role & Permission Management ----------
-interface RoleItem {
-  id: number
-  name: string
-  description: string
-  userType: string
-  isSystem: boolean
-  permissionIds: number[]
-  assignedUserCount: number
-}
+// ---------- Company Settings: Roles (read-only inventory) ----------
+// Theater cut 2026-09-09: the stored permission matrix was never read by any
+// authorization check (SecurityConfig + controllers gate on the closed
+// users.role set). Role CRUD and the permission-matrix UI are gone; this panel
+// just reports which fixed roles exist and how many accounts use each.
 const roles = ref<RoleItem[]>([])
-const permissions = ref<{ id: number; name: string; description: string }[]>([])
 const rolesLoading = ref(false)
 const rolesError = ref('')
 
@@ -495,137 +489,17 @@ const loadRoles = async () => {
   rolesLoading.value = true
   rolesError.value = ''
   try {
-    const [r, p] = await Promise.all([useGetRoles(), useGetPermissions()])
-    roles.value = r as RoleItem[]
-    permissions.value = p as { id: number; name: string; description: string }[]
+    roles.value = await useGetRoles()
   } catch {
-    rolesError.value = 'Could not load roles and permissions.'
+    rolesError.value = 'Could not load roles.'
   } finally {
     rolesLoading.value = false
   }
 }
 
-// Table filter (same convention as User Management: space-separated terms, all must match)
-const roleFilter = ref('')
+// (roleFilter/filteredRoles/pagedRoles removed with the theater cut: a fixed
+// three-row inventory needs neither filter nor pagination.)
 
-const userTypeOptions = ['CLIENT', 'USER', 'ADMIN']
-const filteredRoles = computed(() => {
-  const query = roleFilter.value.trim().toLowerCase()
-  if (!query) return roles.value
-  const terms = query.split(/\s+/)
-  return roles.value.filter((r) => {
-    const hayPerms = permissions.value.filter((p) => r.permissionIds.includes(p.id)).map((p) => p.name)
-    const haystack = [
-      r.name,
-      r.userType,
-      r.description || '',
-      ...hayPerms,
-      r.assignedUserCount > 0 ? `in use ${r.assignedUserCount}` : 'available',
-    ].join(' ').toLowerCase()
-    return terms.every((t) => haystack.includes(t))
-  })
-})
-
-// Role modal (shared by Add / Edit)
-const showRoleModal = ref(false)
-const roleModalMode = ref<'create' | 'edit'>('create')
-const roleModalTarget = ref<RoleItem | null>(null)
-const roleForm = ref({ name: '', userType: 'USER', description: '', permissionIds: [] as number[] })
-const roleSaving = ref(false)
-const roleMessage = ref<{ ok: boolean; text: string } | null>(null)
-
-const resetRoleForm = () => {
-  roleForm.value = { name: '', userType: 'USER', description: '', permissionIds: [] }
-}
-
-const openCreateRole = () => {
-  roleModalMode.value = 'create'
-  roleModalTarget.value = null
-  resetRoleForm()
-  roleMessage.value = null
-  showRoleModal.value = true
-}
-
-const openEditRole = (role: RoleItem) => {
-  roleModalMode.value = 'edit'
-  roleModalTarget.value = role
-  roleForm.value = {
-    name: role.name,
-    userType: role.userType,
-    description: role.description || '',
-    permissionIds: [...role.permissionIds],
-  }
-  roleMessage.value = null
-  showRoleModal.value = true
-}
-
-const closeRoleModal = () => {
-  showRoleModal.value = false
-  roleMessage.value = null
-  resetRoleForm()
-}
-
-const toggleRolePermission = (permId: number) => {
-  const i = roleForm.value.permissionIds.indexOf(permId)
-  if (i === -1) roleForm.value.permissionIds.push(permId)
-  else roleForm.value.permissionIds.splice(i, 1)
-}
-
-const saveRole = async () => {
-  const f = roleForm.value
-  if (roleSaving.value) return
-  if (!f.name.trim()) return
-  roleSaving.value = true
-  roleMessage.value = null
-  try {
-    const payload = {
-      name: f.name.trim(),
-      userType: f.userType,
-      description: f.description.trim(),
-      permissionIds: f.permissionIds,
-    }
-    if (roleModalMode.value === 'edit' && roleModalTarget.value) {
-      await useUpdateRole(roleModalTarget.value.id, payload)
-    } else {
-      await useCreateRole(payload)
-    }
-    await loadRoles()
-    closeRoleModal()
-  } catch (e: any) {
-    roleMessage.value = { ok: false, text: e?.response?.data?.message || 'Failed to save role.' }
-  } finally {
-    roleSaving.value = false
-  }
-}
-
-const deleteRole = async (role: RoleItem) => {
-  if (!confirm(`Delete role "${role.name}"? This cannot be undone.`)) return
-  try {
-    await useDeleteRole(role.id)
-    await loadRoles()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to delete role.')
-  }
-}
-
-const roleRowActions = (role: RoleItem): RowAction[] => {
-  const inUse = role.assignedUserCount > 0
-  const actions: RowAction[] = [{ label: 'Edit', onClick: () => openEditRole(role) }]
-  actions.push({ divider: true, label: '', onClick: () => {} })
-  if (role.isSystem) {
-    actions.push({ label: 'Delete', disabled: true, disabledHint: 'System roles cannot be deleted', onClick: () => {} })
-  } else if (inUse) {
-    actions.push({
-      label: 'Delete',
-      disabled: true,
-      disabledHint: `In use by ${role.assignedUserCount} account${role.assignedUserCount === 1 ? '' : 's'} — reassign them first`,
-      onClick: () => {},
-    })
-  } else {
-    actions.push({ label: 'Delete', color: 'text-red-700 hover:text-red-800 hover:bg-red-50', onClick: () => deleteRole(role) })
-  }
-  return actions
-}
 
 // ---------- Service Catalog (wired to the backend) ----------
 const services = ref<ServiceItem[]>([])
@@ -1738,12 +1612,10 @@ const tabItems = [
 // lands the user on an empty view.
 const page = ref(1)
 const pageSize = 20
-watch([userFilter, roleFilter, serviceSearchQuery], () => { page.value = 1 })
+watch([userFilter, serviceSearchQuery], () => { page.value = 1 })
 watch(activeTab, () => { page.value = 1 })
 const pagedUsers = computed(() =>
   filteredUsers.value.slice((page.value - 1) * pageSize, page.value * pageSize))
-const pagedRoles = computed(() =>
-  filteredRoles.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 const pagedServices = computed(() =>
   filteredServices.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 const pagedCategories = computed(() =>
@@ -1986,190 +1858,52 @@ const isActiveTab = (tab: string) => activeTab.value === tab
         </div>
       </div>
 
-      <!-- Role & Permission Management (mirrors User Management) -->
+      <!-- Roles: read-only inventory (the theater cut 2026-09-09) -->
       <div class="bg-white rounded-lg shadow">
         <div class="p-6 border-b border-gray-200 flex items-center justify-between">
           <div>
-            <h2 class="text-lg font-semibold text-gray-900">Role &amp; Permission Management</h2>
-            <p class="text-sm text-gray-600 mt-1">Which permissions each role carries. System roles cannot be deleted and their names are locked.</p>
+            <h2 class="text-lg font-semibold text-gray-900">Roles</h2>
+            <p class="text-sm text-gray-600 mt-1">
+              The portal's three fixed roles. What each role can do is defined in code
+              (SecurityConfig + per-resource checks), not configurable here — assign accounts
+              in User Management.
+            </p>
           </div>
-          <div class="flex items-center gap-3">
-            <button
-              @click="openCreateRole"
-              class="px-3 py-1.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors"
-            >
-              <i class="fas fa-plus mr-1" />Add Role
-            </button>
-            <button @click="loadRoles" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
-              <i class="fas fa-rotate mr-1" />Refresh
-            </button>
-          </div>
-        </div>
-        <div class="px-6 py-4">
-          <div class="relative">
-            <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
-            <input
-              v-model="roleFilter"
-              type="text"
-              placeholder="Filter roles — type one or more terms separated by spaces (e.g. admin system)"
-              class="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-            />
-            <button
-              v-if="roleFilter"
-              @click="roleFilter = ''"
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              aria-label="Clear filter"
-            >
-              <i class="fas fa-xmark"></i>
-            </button>
-          </div>
+          <button @click="loadRoles" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+            <i class="fas fa-rotate mr-1" />Refresh
+          </button>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead class="bg-gray-50">
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Type</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Permissions</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account type</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Accounts</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
               <tr v-if="rolesLoading && roles.length === 0">
-                <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">Loading roles…</td>
+                <td colspan="3" class="px-6 py-8 text-center text-sm text-gray-500">Loading roles…</td>
               </tr>
               <tr v-else-if="rolesError">
-                <td colspan="5" class="px-6 py-8 text-center text-sm text-red-600">{{ rolesError }}</td>
+                <td colspan="3" class="px-6 py-8 text-center text-sm text-red-600">{{ rolesError }}</td>
               </tr>
               <tr v-else-if="roles.length === 0">
-                <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">No roles found.</td>
+                <td colspan="3" class="px-6 py-8 text-center text-sm text-gray-500">No roles found.</td>
               </tr>
-              <tr v-else-if="filteredRoles.length === 0">
-                <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">No roles match your filter.</td>
-              </tr>
-              <tr v-for="role in pagedRoles" :key="role.id" class="hover:bg-gray-50 align-top">
+              <tr v-for="role in roles" :key="role.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4">
-                  <div class="flex items-center gap-2">
-                    <span class="font-medium text-gray-900">{{ role.name }}</span>
-                    <span v-if="role.isSystem" class="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">System</span>
-                  </div>
+                  <span class="font-medium text-gray-900">{{ role.name }}</span>
                   <p class="text-xs text-gray-500 mt-1">{{ role.description || '—' }}</p>
                 </td>
                 <td class="px-6 py-4">
                   <span class="px-2 py-1 bg-emerald-100 text-emerald-800 text-xs font-medium rounded">{{ role.userType }}</span>
                 </td>
-                <td class="px-6 py-4">
-                  <div class="flex flex-wrap gap-1.5 max-w-md">
-                    <template v-for="perm in permissions" :key="perm.id">
-                      <span
-                        v-if="role.permissionIds.includes(perm.id)"
-                        :title="perm.description"
-                        class="px-2 py-0.5 bg-green-100 border border-green-300 text-green-800 text-xs font-medium rounded-full"
-                      >
-                        {{ perm.name }}
-                      </span>
-                    </template>
-                    <span v-if="role.permissionIds.length === 0" class="text-xs text-gray-400">No permissions</span>
-                  </div>
-                </td>
-                <td class="px-6 py-4">
-                  <span
-                    :class="[
-                      'px-2 py-0.5 text-xs font-medium rounded-full',
-                      role.isSystem
-                        ? 'bg-purple-100 text-purple-800'
-                        : role.assignedUserCount > 0
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-green-100 text-green-800',
-                    ]"
-                  >
-                    {{ role.isSystem ? 'System' : role.assignedUserCount > 0 ? `In Use (${role.assignedUserCount})` : 'Available' }}
-                  </span>
-                </td>
-                <td class="px-6 py-4 text-right whitespace-nowrap">
-                  <RowActionsMenu :actions="roleRowActions(role)" />
-                </td>
+                <td class="px-6 py-4 text-right text-sm text-gray-700">{{ role.assignedUserCount }}</td>
               </tr>
             </tbody>
           </table>
-          <Pagination v-if="!rolesLoading && filteredRoles.length > 0" v-model:page="page" :total="filteredRoles.length" :page-size="pageSize" />
-        </div>
-      </div>
-
-      <!-- Create / Edit Role Modal (mirrors User Management modals) -->
-      <div v-if="showRoleModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" @click.self="closeRoleModal">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col">
-          <div class="p-6 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-900">{{ roleModalMode === 'create' ? 'Create New Role' : 'Edit Role' }}</h3>
-            <p class="text-sm text-gray-500 mt-1">
-              {{ roleModalMode === 'create' ? 'Define a new role and the permissions it carries.' : `Edit "${roleForm.name}" and its permissions.` }}
-              <template v-if="roleModalMode === 'edit' && roleModalTarget?.isSystem"> Names on system roles are locked.</template>
-            </p>
-          </div>
-          <div class="p-6 space-y-4 overflow-y-auto">
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Role Name <span class="text-red-500">*</span></label>
-                <input
-                  v-model="roleForm.name"
-                  type="text"
-                  :disabled="roleModalMode === 'edit' && roleModalTarget?.isSystem"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-100 disabled:text-gray-500"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">User Type</label>
-                <select v-model="roleForm.userType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                  <option v-for="t in userTypeOptions" :key="t" :value="t">{{ t }}</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <input
-                v-model="roleForm.description"
-                type="text"
-                placeholder="What is this role used for?"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div>
-              <div class="flex items-center justify-between mb-2">
-                <label class="block text-sm font-medium text-gray-700">Permissions</label>
-                <span class="text-xs text-gray-500">{{ roleForm.permissionIds.length }} selected</span>
-              </div>
-              <div class="border border-gray-200 rounded-lg p-3 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
-                <button
-                  v-for="perm in permissions"
-                  :key="perm.id"
-                  @click="toggleRolePermission(perm.id)"
-                  :title="perm.description"
-                  :class="[
-                    'px-2 py-0.5 text-xs font-medium rounded-full border transition-colors',
-                    roleForm.permissionIds.includes(perm.id)
-                      ? 'bg-green-100 border-green-300 text-green-800'
-                      : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100',
-                  ]"
-                >
-                  {{ perm.name }}
-                </button>
-              </div>
-            </div>
-            <div v-if="roleMessage" class="text-sm" :class="roleMessage.ok ? 'text-green-600' : 'text-red-600'">{{ roleMessage.text }}</div>
-          </div>
-          <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
-            <button @click="closeRoleModal" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-              Cancel
-            </button>
-            <button
-              @click="saveRole"
-              :disabled="roleSaving || !roleForm.name.trim()"
-              class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
-            >
-              {{ roleSaving ? 'Saving…' : roleModalMode === 'create' ? 'Create Role' : 'Save Changes' }}
-            </button>
-          </div>
         </div>
       </div>
     </div>
