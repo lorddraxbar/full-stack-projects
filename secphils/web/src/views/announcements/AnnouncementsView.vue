@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDropdownOptions } from '@/composables/useDropdownOptions'
-import { suggestAudienceForCategory } from '@/lib/labels'
+import { suggestAudienceForCategory, DEFAULT_ANNOUNCEMENT_CATEGORY, defaultAnnouncementAudience } from '@/lib/labels'
 
 // V35: announcement vocabulary comes from Admin -> Project Config, with the
 // lib/labels maps as the offline fallback.
@@ -146,8 +146,8 @@ const editingId = ref<number | null>(null)
 const form = ref({
   title: '',
   body: '',
-  category: 'PROJECT_UPDATE',
-  audience: 'COMPANY',
+  category: DEFAULT_ANNOUNCEMENT_CATEGORY as string,
+  audience: defaultAnnouncementAudience() as string,
   projectId: '' as string,
   isPublished: true,
 })
@@ -157,7 +157,7 @@ const saveError = ref('')
 const isEditing = computed(() => editingId.value != null)
 
 function openForm() {
-  form.value = { title: '', body: '', category: 'PROJECT_UPDATE', audience: 'COMPANY', projectId: '', isPublished: true }
+  form.value = { title: '', body: '', category: DEFAULT_ANNOUNCEMENT_CATEGORY, audience: defaultAnnouncementAudience(), projectId: '', isPublished: true }
   editingId.value = null
   saveError.value = ''
   showForm.value = true

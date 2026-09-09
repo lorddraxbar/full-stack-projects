@@ -4,7 +4,7 @@ import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHard
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
 import { invalidateDropdownOptions, useDropdownOptions } from '../../composables/useDropdownOptions'
-import { suggestAudienceForCategory } from '../../lib/labels'
+import { suggestAudienceForCategory, DEFAULT_ANNOUNCEMENT_CATEGORY, defaultAnnouncementAudience } from '../../lib/labels'
 import { applyBrandTheme } from '../../composables/useBrandTheme'
 import Pagination from '../../components/Pagination.vue'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
@@ -992,7 +992,7 @@ interface AnnouncementRow {
   isPublished: boolean
   projectId: number | null
 }
-const announcementForm = ref({ title: '', body: '', audience: 'COMPANY', category: 'PROJECT_UPDATE', projectId: null as number | null })
+const announcementForm = ref({ title: '', body: '', audience: defaultAnnouncementAudience(), category: DEFAULT_ANNOUNCEMENT_CATEGORY, projectId: null as number | null })
 const audienceOptions = useDropdownOptions('audience')
 const annCategoryOptions = useDropdownOptions('announcement_category')
 const publishing = ref(false)
@@ -1083,7 +1083,7 @@ const publishAnnouncement = async () => {
       ...(audience === 'PROJECT' ? { projectId } : {}),
       isPublished: true,
     })
-    announcementForm.value = { title: '', body: '', audience: 'COMPANY', category: 'PROJECT_UPDATE', projectId: null }
+    announcementForm.value = { title: '', body: '', audience: defaultAnnouncementAudience(), category: DEFAULT_ANNOUNCEMENT_CATEGORY, projectId: null }
     await loadAnnouncements()
   } catch (e) {
     alert('Failed to publish announcement: ' + ((e as any)?.response?.data?.message || (e as Error).message))

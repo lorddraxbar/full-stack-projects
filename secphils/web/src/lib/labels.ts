@@ -73,6 +73,15 @@ export function suggestAudienceForCategory(code: string | null | undefined): 'PR
   return null
 }
 
+/** The announcement form's default category (both surfaces). */
+export const DEFAULT_ANNOUNCEMENT_CATEGORY = 'PROJECT_UPDATE'
+/** Form-open audience, derived from the default category through the same
+ *  heuristic — so the form is internally consistent at FIRST RENDER, not just
+ *  after the first pick (Jaybar: open state said Project Update + Company-wide). */
+export function defaultAnnouncementAudience(): 'PROJECT' | 'COMPANY' {
+  return suggestAudienceForCategory(DEFAULT_ANNOUNCEMENT_CATEGORY) ?? 'COMPANY'
+}
+
 export function formatFileSize(bytes: number | null | undefined): string {
   if (bytes == null) return '—'
   if (bytes < 1024) return `${bytes} B`
