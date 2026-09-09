@@ -404,7 +404,7 @@ const statusPill = computed(() => {
                 <i class="fa-solid fa-file-lines"></i>
               </div>
               <div>
-                <p class="text-[22px] font-extrabold leading-none text-gray-900">{{ documentStats.total }}</p>
+                <p class="text-[26px] font-extrabold leading-none text-gray-900">{{ documentStats.total }}</p>
                 <p class="mt-1 text-xs font-medium text-gray-500">Total files</p>
               </div>
             </div>
@@ -413,7 +413,7 @@ const statusPill = computed(() => {
                 <i class="fa-solid fa-trash-can"></i>
               </div>
               <div>
-                <p class="text-[22px] font-extrabold leading-none text-gray-900">{{ documentStats.trashed }}</p>
+                <p class="text-[26px] font-extrabold leading-none text-gray-900">{{ documentStats.trashed }}</p>
                 <p class="mt-1 text-xs font-medium text-gray-500">In trash</p>
               </div>
             </div>
@@ -422,7 +422,7 @@ const statusPill = computed(() => {
                 <i class="fa-solid fa-database"></i>
               </div>
               <div>
-                <p class="text-[22px] font-extrabold leading-none text-gray-900">{{ documentStats.storage }}</p>
+                <p class="text-[26px] font-extrabold leading-none text-gray-900">{{ documentStats.storage }}</p>
                 <p class="mt-1 text-xs font-medium text-gray-500">Storage used</p>
               </div>
             </div>
@@ -430,7 +430,7 @@ const statusPill = computed(() => {
         </div>
 
         <div class="bg-white rounded-lg shadow">
-          <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+          <div class="p-5 border-b border-gray-200 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900">Users</h2>
             <RouterLink v-if="isAdmin" to="/admin" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View</RouterLink>
           </div>
