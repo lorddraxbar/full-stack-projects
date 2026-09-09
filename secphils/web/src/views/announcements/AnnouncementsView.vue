@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDropdownOptions } from '@/composables/useDropdownOptions'
+import { suggestAudienceForCategory } from '@/lib/labels'
 
 // V35: announcement vocabulary comes from Admin -> Project Config, with the
 // lib/labels maps as the offline fallback.
@@ -105,6 +106,14 @@ const paginatedAnnouncements = computed(() =>
 )
 
 const isCustomer = computed(() => isClient.value)
+
+/** UI-only hint: picking a category whose name implies an audience
+ * (PROJECT_UPDATE -> Project, COMPANY_NEWS -> Company-wide) pre-selects that
+ * audience; author can still override. Visibility logic never reads category. */
+function onCategoryPick(code: unknown) {
+  const suggested = suggestAudienceForCategory(typeof code === 'string' ? code : null)
+  if (suggested) form.value.audience = suggested
+}
 
 /** reka-ui Select items are string-typed; bridge the boolean isPublished flag. */
 const formPublished = computed({
@@ -390,7 +399,7 @@ function categoryColor(c: string) {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="space-y-2">
               <Label for="annCategory">Category</Label>
-              <Select v-model="form.category">
+              <Select v-model="form.category" @update:model-value="onCategoryPick">
                 <SelectTrigger id="annCategory">
                   <SelectValue />
                 </SelectTrigger>

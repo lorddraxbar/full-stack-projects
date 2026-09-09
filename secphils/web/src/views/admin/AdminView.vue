@@ -4,6 +4,7 @@ import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHard
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
 import { invalidateDropdownOptions, useDropdownOptions } from '../../composables/useDropdownOptions'
+import { suggestAudienceForCategory } from '../../lib/labels'
 import { applyBrandTheme } from '../../composables/useBrandTheme'
 import Pagination from '../../components/Pagination.vue'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
@@ -2608,7 +2609,7 @@ const isActiveTab = (tab: string) => activeTab.value === tab
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <select v-model="announcementForm.category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <select v-model="announcementForm.category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" @change="announcementForm.audience = suggestAudienceForCategory(announcementForm.category) ?? announcementForm.audience">
                 <option v-for="opt in annCategoryOptions.options.value" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
             </div>

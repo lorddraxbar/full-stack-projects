@@ -59,6 +59,20 @@ export const ANNOUNCEMENT_AUDIENCE_LABELS: Record<string, string> = {
   COMPANY: 'Company-wide',
 }
 
+/**
+ * UI-only heuristic (Jaybar 2026-09-09): a category whose CODE implies an
+ * audience ('*_PROJECT*'-style names — e.g. PROJECT_UPDATE, COMPANY_NEWS)
+ * pre-selects that audience in the announcement form. The author can still
+ * override; nothing on the server derives visibility from category — audience
+ * remains the single source of truth for who sees an announcement.
+ */
+export function suggestAudienceForCategory(code: string | null | undefined): 'PROJECT' | 'COMPANY' | null {
+  if (!code) return null
+  if (code.includes('PROJECT')) return 'PROJECT'
+  if (code.includes('COMPANY')) return 'COMPANY'
+  return null
+}
+
 export function formatFileSize(bytes: number | null | undefined): string {
   if (bytes == null) return '—'
   if (bytes < 1024) return `${bytes} B`
