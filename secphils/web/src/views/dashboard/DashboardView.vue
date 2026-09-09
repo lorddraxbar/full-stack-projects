@@ -350,7 +350,7 @@ const statusPill = computed(() => {
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div class="bg-white rounded-lg shadow p-5 flex flex-col">
           <div class="flex items-center justify-between">
-            <p class="text-sm font-semibold text-gray-600">Client Companies</p>
+            <p class="text-lg font-semibold text-gray-900">Client Companies</p>
             <div class="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center">
               <i class="fas fa-building text-emerald-600"></i>
             </div>
@@ -365,7 +365,7 @@ const statusPill = computed(() => {
              the chart reflects every project, not the first page's length. -->
         <div class="bg-white rounded-lg shadow p-5 sm:col-span-2">
           <div class="flex items-center justify-between">
-            <h2 class="text-base font-semibold text-gray-900">Projects</h2>
+            <h2 class="text-lg font-semibold text-gray-900">Projects</h2>
             <RouterLink to="/projects" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View all</RouterLink>
           </div>
           <div class="flex items-center gap-6 mt-3">
@@ -395,7 +395,7 @@ const statusPill = computed(() => {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div class="bg-white rounded-lg shadow">
           <div class="p-5 border-b border-gray-200 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-gray-900">Documents</h2>
+            <h2 class="text-lg font-semibold text-gray-900">Documents</h2>
             <RouterLink to="/documents" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View</RouterLink>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-5">
@@ -505,7 +505,7 @@ const statusPill = computed(() => {
 
         <div class="bg-white rounded-lg shadow">
           <div class="p-5 border-b border-gray-200 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-gray-900">Recent Activity</h2>
+            <h2 class="text-lg font-semibold text-gray-900">Recent Activity</h2>
             <RouterLink v-if="isAdmin" to="/admin" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">Audit logs</RouterLink>
           </div>
           <div class="divide-y divide-gray-100">
