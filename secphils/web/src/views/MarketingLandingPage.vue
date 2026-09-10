@@ -837,7 +837,7 @@ onBeforeUnmount(() => {
     <!-- ================= FOOTER ================= -->
     <footer class="py-10 text-center" style="background: #ffffff; border-top: 1px solid #ececec">
       <p class="text-sm" style="color: #757575">
-        Copyright &copy; {{ year }}
+        Copyright &copy; 2020&ndash;{{ year }}
         <a href="#home" class="transition-colors hover:text-[color:var(--bsp)]" style="color: #202020" @click.prevent="scrollTo('home')">{{ c.name }}</a>
         <span class="mx-1">|</span>
         <a href="/legal/terms" target="_blank" rel="noopener" class="transition-colors hover:text-[color:var(--bsp)]" style="color: #202020">Terms</a>

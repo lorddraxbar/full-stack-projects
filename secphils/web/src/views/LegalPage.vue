@@ -38,7 +38,7 @@ const contactEmail = computed(() => {
 const isTerms = computed(() => props.kind === 'terms')
 const pageTitle = computed(() => (isTerms.value ? 'Terms of Service' : 'Privacy Policy'))
 
-// Footer copyright year — auto-updates, matching the landing page footer.
+// Footer copyright range — SECPhils founded 2020; end year auto-updates.
 const year = new Date().getFullYear()
 
 onMounted(async () => {
@@ -300,7 +300,7 @@ onMounted(async () => {
         </div>
 
         <p class="legal-copy">
-          Copyright &copy; {{ year }} Strategic Engineering Consultancy
+          Copyright &copy; 2020&ndash;{{ year }} Strategic Engineering Consultancy
         </p>
       </div>
     </main>
