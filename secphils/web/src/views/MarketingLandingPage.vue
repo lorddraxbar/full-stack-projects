@@ -592,7 +592,7 @@ onBeforeUnmount(() => {
         <div class="pb-10">
           <p class="section-eyebrow">The SECPhils portal</p>
           <h1 class="font-light text-3xl sm:text-4xl md:text-[3em]" style="color: #202020">
-            Your Project. <span style="color: var(--bsp)">Live. Secured.</span>
+            Your Project. <span style="color: var(--bsp)">In Plain Sight.</span>
           </h1>
           <p class="mt-3 max-w-2xl text-sm leading-6" style="color: #757575">
             Every engagement runs on our private client portal — a secure workspace where you watch
