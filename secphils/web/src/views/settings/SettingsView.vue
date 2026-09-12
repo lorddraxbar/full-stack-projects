@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import QRCode from 'qrcode'
 import { useRole } from '@/composables/useRole'
 import { useRetention } from '@/composables/useRetention'
 import {
@@ -299,6 +300,7 @@ const show2faSetup = ref(false)
 const show2faDisable = ref(false)
 const twoFactorSecret = ref('')
 const twoFactorOtpauthUri = ref('')
+const twoFactorQrDataUrl = ref('')
 const twoFactorCode = ref('')
 const twoFactorBusy = ref(false)
 const twoFactorError = ref('')
@@ -311,6 +313,11 @@ async function start2faSetup() {
     const res = await useEnable2fa()
     twoFactorSecret.value = res.secret
     twoFactorOtpauthUri.value = res.otpauthUri
+    twoFactorQrDataUrl.value = await QRCode.toDataURL(res.otpauthUri, {
+      width: 416,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+    })
     show2faSetup.value = true
   } catch (e: any) {
     twoFactorError.value = e?.response?.data?.message ?? 'Failed to start 2FA setup'
@@ -330,6 +337,9 @@ async function confirm2faEnable() {
     await useVerify2faEnable(twoFactorSecret.value, twoFactorCode.value)
     profile.value.twoFactorEnabled = true
     show2faSetup.value = false
+    twoFactorQrDataUrl.value = ''
+    twoFactorSecret.value = ''
+    twoFactorOtpauthUri.value = ''
     twoFactorCode.value = ''
     flash('success', 'Two-factor authentication enabled')
   } catch (e: any) {
@@ -362,6 +372,7 @@ async function confirm2faDisable() {
 function cancel2fa() {
   show2faSetup.value = false
   show2faDisable.value = false
+  twoFactorQrDataUrl.value = ''
   twoFactorCode.value = ''
   twoFactorError.value = ''
 }
@@ -943,13 +954,19 @@ onMounted(async () => {
             </button>
           </div>
 
-          <!-- Enabling: show secret + code -->
+          <!-- Enabling: QR to scan + manual key + code -->
           <div v-else-if="!twoFactorEnabled && show2faSetup" class="space-y-3">
             <p class="text-sm text-gray-600">
-              Add this account to your authenticator app using the key below (or scan the URI):
+              Scan this QR code with your authenticator app (Google Authenticator, Authy, 1Password…),
+              or enter the manual key below.
             </p>
-            <div class="bg-gray-50 rounded p-3 font-mono text-xs break-all select-all border border-gray-200">
-              {{ twoFactorOtpauthUri }}
+            <div class="flex justify-center py-2">
+              <img
+                v-if="twoFactorQrDataUrl"
+                :src="twoFactorQrDataUrl"
+                alt="QR code for authenticator app"
+                class="w-52 h-52 rounded-lg border border-gray-200 bg-white p-2"
+              />
             </div>
             <div>
               <p class="text-xs font-medium text-gray-500 mb-1">Manual key</p>

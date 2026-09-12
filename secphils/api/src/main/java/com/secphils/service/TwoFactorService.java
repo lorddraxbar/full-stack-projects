@@ -9,7 +9,6 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
-import java.util.Base64;
 
 /**
  * RFC 6238 TOTP (time-based one-time password) with a base32 secret, ready for
@@ -126,8 +125,9 @@ public class TwoFactorService {
     }
 
     private static String urlEncode(String s) {
-        return s == null ? "" : Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(s.getBytes(java.nio.charset.StandardCharsets.UTF_8))
-                .replace("_", "");
+        // Proper percent-encoding (RFC 3986-style) — authenticator apps parse the
+        // label/issuer literally, so base64 here would render as garbage in the app.
+        return s == null ? "" : java.net.URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
     }
 }
