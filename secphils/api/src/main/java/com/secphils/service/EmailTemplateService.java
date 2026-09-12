@@ -292,10 +292,8 @@ public class EmailTemplateService {
     public String brandedCard(String kickerText, String headingText, String bodyHtml,
                               String ctaLabel, String ctaLink, String footerText) {
         StringBuilder sb = new StringBuilder();
-        sb.append("<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f4f5f7;\">")
-          .append("font-family:Arial,Helvetica,sans-serif;color:#1f2937;\">")
-          .append("<div style=\"max-width:560px;margin:32px auto;padding:32px;background:#ffffff;\">")
-          .append("border-radius:12px;border:1px solid #e5e7eb;\">");
+        sb.append("<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937;\">")
+          .append("<div style=\"max-width:560px;margin:32px auto;padding:32px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;\">");
         if (!kickerText.isEmpty()) {
             sb.append("<p style=\"margin:0 0 8px;font-size:13px;color:#059669;font-weight:bold;\">")
               .append(kickerText).append("</p>");
@@ -310,8 +308,7 @@ public class EmailTemplateService {
         }
         if (!ctaLabel.isEmpty() && ctaLink != null && !ctaLink.isEmpty()) {
             sb.append("<p style=\"margin:16px 0 0;\"><a href=\"").append(esc(ctaLink))
-              .append("\" style=\"display:inline-block;background:#059669;color:#ffffff;\">")
-              .append("padding:10px 18px;border-radius:8px;font-weight:bold;text-decoration:none;\">")
+              .append("\" style=\"display:inline-block;background:#059669;color:#ffffff;padding:10px 18px;border-radius:8px;font-weight:bold;text-decoration:none;\">")
               .append(ctaLabel).append("</a></p>");
         }
         if (!footerText.isEmpty()) {

@@ -147,10 +147,15 @@ public class MailService {
     /**
      * Invite email subject. Prefers the admin-editable "invite" template
      * subject; the default is the historical "Your SECPhils Portal access is
-     * ready" line (the template has no variables, so it's resolved once here).
+     * ready" line. {@code company} fills {{company}} — the subject is NOT
+     * variable-free once an admin-stored template carries the placeholder,
+     * so the company must be plumbed here (blank/null falls back to the
+     * portal wording).
      */
-    public String inviteSubject() {
-        return templateService.subject(EmailTemplateService.INVITE, java.util.Map.of());
+    public String inviteSubject(String company) {
+        return templateService.subject(EmailTemplateService.INVITE,
+                java.util.Map.of("company", company != null && !company.isBlank()
+                        ? company : "the SECPhils Portal"));
     }
 
     /**

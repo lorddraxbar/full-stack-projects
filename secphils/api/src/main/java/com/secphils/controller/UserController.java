@@ -9,6 +9,7 @@ import com.secphils.dto.UserResponse;
 import com.secphils.entity.Company;
 import com.secphils.entity.SystemSettings;
 import com.secphils.entity.User;
+import com.secphils.policy.DisplayNamePolicy;
 import com.secphils.policy.RetentionPolicy;
 import com.secphils.repository.CompanyRepository;
 import com.secphils.repository.SystemSettingsRepository;
@@ -256,8 +257,16 @@ public class UserController {
         user.setPasswordResetRequestedAt(LocalDateTime.now());
         userRepository.save(user);
         String link = resolveInviteBaseUrl(http) + "/auth/set-password?token=" + token;
-        mailService.sendHtml(user.getEmail(), mailService.inviteSubject(),
-                mailService.inviteEmail(user.getFirstName(), user.getFullName(), link), link);
+        // Same template variables the team-invite path fills: without these the
+        // body reads "A member has invited you to join the SECPhils Portal on
+        // the SECPhils Portal." — inviter and company fall back to defaults.
+        String inviter = userRepository.findById(actor.id())
+                .map(DisplayNamePolicy::nameFor).orElse("A member");
+        String company = user.getCompanyId() != null
+                ? companyRepository.findById(user.getCompanyId()).map(Company::getName).orElse(null)
+                : null;
+        mailService.sendHtml(user.getEmail(), mailService.inviteSubject(company),
+                mailService.inviteEmail(user.getFirstName(), user.getFullName(), link, inviter, company), link);
         auditService.audit(actor, "USER_INVITE_SENT", "User", user.getId(), "Email: " + user.getEmail(), http);
     }
 

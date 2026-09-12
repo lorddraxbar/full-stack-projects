@@ -434,7 +434,7 @@ public class CompanyController {
         invitee.setPasswordResetRequestedAt(LocalDateTime.now());
         userRepository.save(invitee);
         String link = resolveInviteBaseUrl(http) + "/auth/set-password?token=" + token;
-        mailService.sendHtml(invitee.getEmail(), mailService.inviteSubject(),
+        mailService.sendHtml(invitee.getEmail(), mailService.inviteSubject(company.getName()),
                 mailService.inviteEmail(invitee.getFirstName(), invitee.getFullName(), link,
                         DisplayNamePolicy.nameFor(actorUser), company.getName()),
                 link);
