@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useTestSmtp, useTestDocuSign, useGetMe, useUpdateMe, useGetRoles, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetDropdowns, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type RoleItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useTestSmtp, useTestDocuSign, useGetMe, useUpdateMe, useGetRoles, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetDropdowns, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type RoleItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
-import { invalidateDropdownOptions, useDropdownOptions } from '../../composables/useDropdownOptions'
-import { suggestAudienceForCategory, DEFAULT_ANNOUNCEMENT_CATEGORY, defaultAnnouncementAudience } from '../../lib/labels'
+import { invalidateDropdownOptions } from '../../composables/useDropdownOptions'
 import { applyBrandTheme } from '../../composables/useBrandTheme'
 import Pagination from '../../components/Pagination.vue'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
@@ -345,8 +344,6 @@ onMounted(async () => {
   loadServices()
   loadServiceCategories()
   loadAuditLogs()
-  loadAnnouncements()
-  loadProjects()
   loadDropdowns()
 })
 
@@ -851,128 +848,6 @@ const renameDropdownValue = async (v: DropdownValueItem) => {
     invalidateAllDropdowns()
   } catch (e) {
     alert('Failed to rename value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
-  }
-}
-
-// ---------- Communication Center ----------
-interface AnnouncementRow {
-  id: number
-  title: string
-  audience: string
-  date: string
-  author: string
-  channel: string
-  category: string
-  isPublished: boolean
-  projectId: number | null
-}
-const announcementForm = ref({ title: '', body: '', audience: defaultAnnouncementAudience(), category: DEFAULT_ANNOUNCEMENT_CATEGORY, projectId: null as number | null })
-const audienceOptions = useDropdownOptions('audience')
-const annCategoryOptions = useDropdownOptions('announcement_category')
-const publishing = ref(false)
-const communicationLogs = ref<AnnouncementRow[]>([])
-const communicationLoading = ref(false)
-const projectOptions = ref<{ id: number; name: string }[]>([])
-const commLogSearch = ref('')
-
-// Standard search over the Communication Logs: every space-separated term must
-// appear somewhere in the row's displayed fields (date, title, audience,
-// project, author, channel).
-const filteredCommunicationLogs = computed(() => {
-  const terms = commLogSearch.value.trim().toLowerCase().split(/\s+/).filter(Boolean)
-  if (!terms.length) return communicationLogs.value
-  return communicationLogs.value.filter(log => {
-    const projName = log.projectId
-      ? (projectOptions.value.find(p => p.id === log.projectId)?.name || '')
-      : ''
-    const haystack = [
-      log.date,
-      log.title,
-      audienceDisplay(log.audience),
-      projName,
-      log.author,
-      log.channel,
-      log.category || '',
-    ].join(' ').toLowerCase()
-    return terms.every(t => haystack.includes(t))
-  })
-})
-
-const fmtAnnDate = (s: string | null | undefined) => {
-  if (!s) return '—'
-  const d = new Date(s)
-  return isNaN(d.getTime()) ? String(s).slice(0, 10)
-    : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-// Delegates to the live Project Config vocabulary (V35 wiring).
-const audienceDisplay = (a: string | null | undefined) => audienceOptions.label(a)
-
-const loadProjects = async () => {
-  try {
-    // Full list — a page-capped fetch would leave older projects out of the
-    // announcement-target picker and the audit-log project names.
-    const data = (await useGetProjects({ size: 10000 })) as any[]
-    projectOptions.value = (data || []).map((p) => ({ id: Number(p.id), name: p.name || `Project #${p.id}` }))
-  } catch {
-    projectOptions.value = []
-  }
-}
-
-const loadAnnouncements = async () => {
-  communicationLoading.value = true
-  try {
-    const raw = (await useGetAnnouncements()) as any[]
-    communicationLogs.value = (raw || []).map((a) => ({
-      id: Number(a.id),
-      title: a.title || '',
-      audience: a.audience || 'COMPANY',
-      date: fmtAnnDate(a.createdAt),
-      author: a.createdByName || '—',
-      channel: a.isPublished === false ? 'Draft' : 'Email + In-App',
-      category: a.category || '',
-      isPublished: a.isPublished !== false,
-      projectId: a.projectId ? Number(a.projectId) : null,
-    })).sort((x, y) => y.id - x.id)
-  } catch {
-    communicationLogs.value = []
-  } finally {
-    communicationLoading.value = false
-  }
-}
-
-const publishAnnouncement = async () => {
-  const { title, body, audience, category, projectId } = announcementForm.value
-  if (!title.trim() || !body.trim()) return
-  if (audience === 'PROJECT' && !projectId) {
-    alert('Please select a project for a project announcement.')
-    return
-  }
-  publishing.value = true
-  try {
-    await useCreateAnnouncement({
-      title: title.trim(),
-      body: body.trim(),
-      audience,
-      category,
-      ...(audience === 'PROJECT' ? { projectId } : {}),
-      isPublished: true,
-    })
-    announcementForm.value = { title: '', body: '', audience: defaultAnnouncementAudience(), category: DEFAULT_ANNOUNCEMENT_CATEGORY, projectId: null }
-    await loadAnnouncements()
-  } catch (e) {
-    alert('Failed to publish announcement: ' + ((e as any)?.response?.data?.message || (e as Error).message))
-  } finally {
-    publishing.value = false
-  }
-}
-
-const deleteAnnouncement = async (log: AnnouncementRow) => {
-  if (!confirm(`Delete announcement "${log.title}"? This cannot be undone.`)) return
-  try {
-    await useDeleteAnnouncement(log.id)
-    await loadAnnouncements()
-  } catch (e) {
-    alert('Failed to delete announcement: ' + ((e as any)?.response?.data?.message || (e as Error).message))
   }
 }
 
@@ -1602,7 +1477,6 @@ const tabItems = [
   { id: 'company', label: 'Company Settings' },
   { id: 'services', label: 'Service Catalog' },
   { id: 'projectConfig', label: 'Project Config' },
-  { id: 'communications', label: 'Communications' },
   { id: 'system', label: 'System' },
   { id: 'audit', label: 'Audit Logs' },
 ]
@@ -2320,112 +2194,6 @@ const isActiveTab = (tab: string) => activeTab.value === tab
       </div>
     </div>
 
-
-    <!-- ================= COMMUNICATION CENTER ================= -->
-    <div v-if="isActiveTab('communications')" class="space-y-6">
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Publish Announcement</h2>
-        <div class="space-y-4 max-w-2xl">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
-            <input v-model="announcementForm.title" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Body</label>
-            <textarea v-model="announcementForm.body" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Audience</label>
-              <select v-model="announcementForm.audience" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                <option v-for="opt in audienceOptions.options.value" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <select v-model="announcementForm.category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" @change="announcementForm.audience = suggestAudienceForCategory(announcementForm.category) ?? announcementForm.audience">
-                <option v-for="opt in annCategoryOptions.options.value" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-              </select>
-            </div>
-          </div>
-          <div v-if="announcementForm.audience === 'PROJECT'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Project</label>
-            <select v-model="announcementForm.projectId" class="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-              <option :value="null" disabled>Select a project…</option>
-              <option v-for="p in projectOptions" :key="p.id" :value="p.id">{{ p.name }}</option>
-            </select>
-          </div>
-          <div class="flex justify-end">
-            <button :disabled="publishing" @click="publishAnnouncement" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50">
-              <i class="fas fa-bullhorn mr-1" /> {{ publishing ? 'Publishing…' : 'Publish' }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-lg shadow">
-        <div class="p-6 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-900 mb-3">Communication Logs</h2>
-          <div class="relative max-w-md">
-            <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
-            <input
-              v-model="commLogSearch"
-              type="text"
-              placeholder="Search logs — date, title, audience, project, author, channel"
-              class="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-300 bg-white text-sm text-gray-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
-            />
-            <button
-              v-if="commLogSearch"
-              @click="commLogSearch = ''"
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              aria-label="Clear search"
-            >
-              <i class="fas fa-xmark text-sm"></i>
-            </button>
-          </div>
-        </div>
-        <div class="overflow-x-auto">
-          <p v-if="filteredCommunicationLogs.length === 0" class="px-6 py-6 text-sm text-gray-500">
-            {{ commLogSearch && communicationLogs.length > 0
-              ? 'No communication logs match your search.'
-              : (communicationLoading ? 'Loading announcements…' : 'No announcements yet. Publish one above.') }}
-          </p>
-          <table v-else class="w-full">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Audience</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Author</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Channel</th>
-                <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-              <tr v-for="log in filteredCommunicationLogs" :key="log.id" class="hover:bg-gray-50">
-                <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ log.date }}</td>
-                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ log.title }}</td>
-                <td class="px-6 py-4 text-sm text-gray-600">
-                  <span :class="['px-2 py-1 text-xs font-medium rounded-full', log.audience === 'COMPANY' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800']">
-                    {{ audienceDisplay(log.audience) }}
-                  </span>
-                  <span v-if="log.audience === 'PROJECT' && log.projectId" class="ml-1 text-xs text-gray-500">
-                    ({{ projectOptions.find(p => p.id === log.projectId)?.name || `Project #${log.projectId}` }})
-                  </span>
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ log.author }}</td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ log.channel }}</td>
-                <td class="px-3 py-4 text-right whitespace-nowrap">
-                  <button @click="deleteAnnouncement(log)" class="text-red-500 hover:text-red-700 text-xs" title="Delete announcement">
-                    <i class="fas fa-trash" />
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
 
     <!-- ================= SYSTEM SETTINGS ================= -->
     <div v-if="isActiveTab('system')" class="space-y-6">
