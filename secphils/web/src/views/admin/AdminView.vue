@@ -1208,8 +1208,10 @@ const saveGeneralSettings = async () => {
 const saveEmailTemplates = async () => {
   systemSettingsMessage.value = null
   try {
-    // Persist only the backend-consumed fields per template.
+    // Persist only the backend-consumed fields per template. The landing-page
+    // recipient input lives on this tab's card footer, so it travels here.
     await useUpdateSystemSettings({
+      landingContactEmail: systemSettings.value.landingContactEmail.trim(),
       emailTemplates: JSON.stringify(emailTemplates.value.map(({ name, subject, kicker, heading, body, cta, footer }) =>
         ({ name, subject, kicker, heading, body, cta, footer }))),
     })
@@ -1478,6 +1480,7 @@ const tabItems = [
   { id: 'services', label: 'Service Catalog' },
   { id: 'projectConfig', label: 'Project Config' },
   { id: 'system', label: 'System' },
+  { id: 'emailTemplates', label: 'Email Templates' },
   { id: 'audit', label: 'Audit Logs' },
 ]
 // ---------- List pagination (shared across the admin tables) ----------
@@ -2521,104 +2524,6 @@ const isActiveTab = (tab: string) => activeTab.value === tab
         </div>
       </div>
 
-      <!-- Email Templates -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-2">Email Templates</h2>
-        <p class="text-sm text-gray-600 mb-1">Every transactional email the app sends. Edit the subject, kicker, heading, body, button label, and footer — a blank field keeps the built-in default, and each recipient's own notification preferences still gate delivery.</p>
-        <p class="text-sm text-gray-500 mb-4">The placeholders shown inside each card are the variables that template can use.</p>
-        <div class="space-y-4">
-          <div v-for="template in emailTemplates" :key="template.name" class="border border-gray-200 rounded-lg p-4">
-            <div class="flex flex-wrap items-baseline gap-x-2 mb-1">
-              <h3 class="font-semibold text-gray-900">{{ template.title }}</h3>
-              <span class="text-xs text-gray-400 font-mono">{{ template.name }}</span>
-            </div>
-            <p class="text-sm text-gray-600 mb-3">{{ template.hint }}</p>
-            <div class="flex flex-wrap gap-1.5 mb-3">
-              <span v-for="v in template.vars" :key="v" class="px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-xs font-mono text-gray-600">{{ v }}</span>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <label class="block md:col-span-2">
-                <span class="text-xs font-medium text-gray-500">Subject</span>
-                <input
-                  v-model="template.subject"
-                  type="text"
-                  class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                  placeholder="Blank = default"
-                />
-              </label>
-              <label class="block">
-                <span class="text-xs font-medium text-gray-500">Kicker (small teal line above the heading)</span>
-                <input
-                  v-model="template.kicker"
-                  type="text"
-                  class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                  placeholder="Blank = default"
-                />
-              </label>
-              <label class="block">
-                <span class="text-xs font-medium text-gray-500">Heading (card title)</span>
-                <input
-                  v-model="template.heading"
-                  type="text"
-                  class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                  placeholder="Blank = default"
-                />
-              </label>
-              <label class="block md:col-span-2">
-                <span class="text-xs font-medium text-gray-500">
-                  Body<span v-if="template.name !== 'landing'"> (plain text; **bold** supported)</span>
-                  <span v-else> (full HTML)</span>
-                </span>
-                <textarea
-                  v-model="template.body"
-                  :rows="template.name === 'landing' ? 12 : 5"
-                  class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono"
-                />
-              </label>
-              <label class="block">
-                <span class="text-xs font-medium text-gray-500">Button label (the link target is set by the app)</span>
-                <input
-                  v-model="template.cta"
-                  type="text"
-                  class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                  placeholder="Blank = no button"
-                />
-              </label>
-              <label class="block">
-                <span class="text-xs font-medium text-gray-500">Footer note</span>
-                <input
-                  v-model="template.footer"
-                  type="text"
-                  class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                  placeholder="Blank = default"
-                />
-              </label>
-            </div>
-          </div>
-        </div>
-        <div class="mt-4 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-          <label class="block md:max-w-sm">
-            <span class="text-xs font-medium text-gray-500">
-              Default landing-page recipient <span class="text-gray-400">(used when the company profile has no email address)</span>
-            </span>
-            <input
-              v-model="systemSettings.landingContactEmail"
-              type="email"
-              class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-              placeholder="manager@secphils.com"
-            />
-          </label>
-          <div class="flex items-center justify-end gap-3">
-            <p v-if="systemSettingsMessage" :class="['text-sm', systemSettingsMessage.ok ? 'text-green-700' : 'text-red-600']">
-              {{ systemSettingsMessage.text }}
-            </p>
-            <button @click="saveEmailTemplates" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
-              Save Templates
-            </button>
-          </div>
-        </div>
-      </div>
-
       <!-- SMTP Relay -->
       <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-2">SMTP Settings</h2>
@@ -2703,6 +2608,106 @@ const isActiveTab = (tab: string) => activeTab.value === tab
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- ================= EMAIL TEMPLATES ================= -->
+    <div v-if="isActiveTab('emailTemplates')" class="space-y-6">
+    <div class="bg-white rounded-lg shadow p-6">
+      <h2 class="text-lg font-semibold text-gray-900 mb-2">Email Templates</h2>
+      <p class="text-sm text-gray-600 mb-1">Every transactional email the app sends. Edit the subject, kicker, heading, body, button label, and footer — a blank field keeps the built-in default, and each recipient's own notification preferences still gate delivery.</p>
+      <p class="text-sm text-gray-500 mb-4">The placeholders shown inside each card are the variables that template can use.</p>
+      <div class="space-y-4">
+        <div v-for="template in emailTemplates" :key="template.name" class="border border-gray-200 rounded-lg p-4">
+          <div class="flex flex-wrap items-baseline gap-x-2 mb-1">
+            <h3 class="font-semibold text-gray-900">{{ template.title }}</h3>
+            <span class="text-xs text-gray-400 font-mono">{{ template.name }}</span>
+          </div>
+          <p class="text-sm text-gray-600 mb-3">{{ template.hint }}</p>
+          <div class="flex flex-wrap gap-1.5 mb-3">
+            <span v-for="v in template.vars" :key="v" class="px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-xs font-mono text-gray-600">{{ v }}</span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label class="block md:col-span-2">
+              <span class="text-xs font-medium text-gray-500">Subject</span>
+              <input
+                v-model="template.subject"
+                type="text"
+                class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                placeholder="Blank = default"
+              />
+            </label>
+            <label class="block">
+              <span class="text-xs font-medium text-gray-500">Kicker (small teal line above the heading)</span>
+              <input
+                v-model="template.kicker"
+                type="text"
+                class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                placeholder="Blank = default"
+              />
+            </label>
+            <label class="block">
+              <span class="text-xs font-medium text-gray-500">Heading (card title)</span>
+              <input
+                v-model="template.heading"
+                type="text"
+                class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                placeholder="Blank = default"
+              />
+            </label>
+            <label class="block md:col-span-2">
+              <span class="text-xs font-medium text-gray-500">
+                Body<span v-if="template.name !== 'landing'"> (plain text; **bold** supported)</span>
+                <span v-else> (full HTML)</span>
+              </span>
+              <textarea
+                v-model="template.body"
+                :rows="template.name === 'landing' ? 12 : 5"
+                class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono"
+              />
+            </label>
+            <label class="block">
+              <span class="text-xs font-medium text-gray-500">Button label (the link target is set by the app)</span>
+              <input
+                v-model="template.cta"
+                type="text"
+                class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                placeholder="Blank = no button"
+              />
+            </label>
+            <label class="block">
+              <span class="text-xs font-medium text-gray-500">Footer note</span>
+              <input
+                v-model="template.footer"
+                type="text"
+                class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                placeholder="Blank = default"
+              />
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <label class="block md:max-w-sm">
+          <span class="text-xs font-medium text-gray-500">
+            Default landing-page recipient <span class="text-gray-400">(used when the company profile has no email address)</span>
+          </span>
+          <input
+            v-model="systemSettings.landingContactEmail"
+            type="email"
+            class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            placeholder="manager@secphils.com"
+          />
+        </label>
+        <div class="flex items-center justify-end gap-3">
+          <p v-if="systemSettingsMessage" :class="['text-sm', systemSettingsMessage.ok ? 'text-green-700' : 'text-red-600']">
+            {{ systemSettingsMessage.text }}
+          </p>
+          <button @click="saveEmailTemplates" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium">
+            Save Templates
+          </button>
+        </div>
+      </div>
+    </div>
     </div>
 
     <!-- ================= AUDIT LOGS ================= -->
