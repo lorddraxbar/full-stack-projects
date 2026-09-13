@@ -47,11 +47,9 @@ public class MessageTrashController {
     public ResponseEntity<List<MessageTrashResponse>> listTrash() {
         AuthUser actor = CurrentUser.require();
         if (actor.isClient()) throw ApiException.forbidden("Message trash is staff-only");
-        List<Message> rows = messages.findWithRefsDeleted().stream()
-                .filter(m -> actor.isAdmin()
-                        || (m.getProject() != null && m.getProject().getCompany() != null
-                            && m.getProject().getCompany().getId().equals(actor.getCompanyId())))
-                .toList();
+        // Provider staff (USER) see every company's trashed messages — they
+        // manage the whole portal (requireStaff gate above; 2026-09-13).
+        List<Message> rows = messages.findWithRefsDeleted();
         return ResponseEntity.ok(rows.stream().map(MessageTrashResponse::from).toList());
     }
 

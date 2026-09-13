@@ -117,20 +117,28 @@ public class AnnouncementController {
                 throw ApiException.forbidden("Your account is not associated with a company");
             }
         }
+        // Provider staff (USER) post to ANY company — the announcements page
+        // is provider-wide (cross-company by the 2026-09 access doctrine; the
+        // old equality lock rejected every client-company target from staff).
+        // Clients reach only their own company: an explicit companyId is
+        // staff-only above, and the no-target default is their own row.
         Company company = companyRepository.findById(target)
                 .orElseThrow(() -> ApiException.notFound("Company"));
-        if (!actor.isAdmin() && !target.equals(actor.getCompanyId())) {
-            throw ApiException.forbidden("You can only manage announcements for your own company");
+        if (actor.isClient() && !target.equals(actor.getCompanyId())) {
+            throw ApiException.forbidden("Clients can only post announcements for their own company");
         }
         return company;
     }
 
-    /** Loads the target announcement, treating out-of-company rows as 404 (admins: any company). */
+    /** Loads the target announcement. Clients: out-of-company rows are 404
+      *  (don't leak); provider staff (USER) act cross-company like admin —
+      *  they manage every company's announcements (update/delete/delete are
+      *  requireStaff-gated anyway). (2026-09-13 staff scope fix.) */
     private Announcement loadInScope(AuthUser actor, Long id) {
         Announcement a = announcementRepository.findById(id)
                 .filter(x -> x.getCompany() != null)
                 .orElseThrow(() -> ApiException.notFound("Announcement"));
-        if (!actor.isAdmin()) {
+        if (actor.isClient()) {
             Long mine = actor.getCompanyId();
             if (mine == null || !mine.equals(a.getCompany().getId())) {
                 throw ApiException.notFound("Announcement");
@@ -247,22 +255,26 @@ public class AnnouncementController {
             @RequestParam(required = false) Long companyId,
             @RequestParam(required = false) String audience) {
         AuthUser actor = CurrentUser.require();
-        Long effective;
-        if (companyId != null) {
-            if (actor.isClient()) {
-                throw ApiException.forbidden("Clients can only view announcements of their own company");
-            }
-            if (!actor.isAdmin() && !companyId.equals(actor.getCompanyId())) {
+        List<Announcement> items;
+        if (actor.isClient()) {
+            Long mine = actor.getCompanyId();
+            if (companyId != null && !companyId.equals(mine)) {
                 throw ApiException.forbidden("You can only view announcements of your own company");
             }
-            effective = companyId;
-        } else {
-            effective = actor.getCompanyId();
-            if (effective == null) {
+            if (mine == null) {
                 throw ApiException.forbidden("Your account is not associated with a company");
             }
+            items = new ArrayList<>(announcementRepository.findWithRefsByCompanyId(companyId != null ? companyId : mine));
+        } else if (companyId != null) {
+            // provider actor narrowed the view to one company
+            items = new ArrayList<>(announcementRepository.findWithRefsByCompanyId(companyId));
+        } else {
+            // provider staff/admin see every company's announcements (the page
+            // is provider-wide with its own search + project filter). The old
+            // default silently showed only the provider company's own rows —
+            // staff couldn't even SEE client-company announcements. (2026-09-13)
+            items = new ArrayList<>(announcementRepository.findWithRefsAll());
         }
-        List<Announcement> items = new ArrayList<>(announcementRepository.findWithRefsByCompanyId(effective));
         if (audience != null && !audience.isBlank()) {
             items.removeIf(x -> !audience.equals(x.getAudience()));
         }

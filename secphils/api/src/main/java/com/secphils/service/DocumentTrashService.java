@@ -8,7 +8,6 @@ import com.secphils.entity.User;
 import com.secphils.repository.DocumentCommentRepository;
 import com.secphils.repository.DocumentRepository;
 import com.secphils.repository.MessageRepository;
-import com.secphils.repository.ProjectRepository;
 import com.secphils.repository.UserRepository;
 import com.secphils.policy.RetentionPolicy;
 import com.secphils.security.AuthUser;
@@ -61,7 +60,6 @@ public class DocumentTrashService {
     private final DocumentRepository documents;
     private final DocumentCommentRepository comments;
     private final MessageRepository messages;
-    private final ProjectRepository projects;
     private final UserRepository users;
     private final S3StorageService s3;
     private final AuditService auditService;
@@ -71,7 +69,6 @@ public class DocumentTrashService {
     public DocumentTrashService(DocumentRepository documents,
                                 DocumentCommentRepository comments,
                                 MessageRepository messages,
-                                ProjectRepository projects,
                                 UserRepository users,
                                 S3StorageService s3,
                                 AuditService auditService,
@@ -80,7 +77,6 @@ public class DocumentTrashService {
         this.documents = documents;
         this.comments = comments;
         this.messages = messages;
-        this.projects = projects;
         this.users = users;
         this.s3 = s3;
         this.auditService = auditService;
@@ -139,18 +135,10 @@ public class DocumentTrashService {
     public int hardDeleteAll(AuthUser actor, String password) {
         requireStaff(actor);
         requirePassword(actor, password);
-        List<Document> trashed;
-        if (actor.isAdmin()) {
-            trashed = documents.findByDeletedAtIsNotNull();
-        } else if (actor.getCompanyId() == null) {
-            return 0;
-        } else {
-            java.util.Set<Long> projectIds = projects.findByCompanyId(actor.getCompanyId()).stream()
-                    .map(Project::getId).collect(java.util.stream.Collectors.toSet());
-            trashed = projectIds.isEmpty()
-                    ? List.of()
-                    : documents.findByDeletedAtIsNotNullAndProjectIdIn(projectIds);
-        }
+        // Provider staff empty the whole portal trash (requireStaff above has
+        // already excluded CLIENT) — consistent with the cross-company trash
+        // LIST the Documents page shows them. (2026-09-13 staff scope fix.)
+        List<Document> trashed = documents.findByDeletedAtIsNotNull();
         int purged = 0;
         for (Document doc : trashed) {
             if (hardDeleteOne(actor, doc, false)) purged++;
@@ -220,16 +208,13 @@ public class DocumentTrashService {
         }
     }
 
-    /** Staff may only touch their company's trash; admin sees everything.
-      *  Non-admins get a 404 for other companies — don't leak. */
+    /** Trash is provider-only (requireStaff at every call site): CLIENT can
+      *  never reach it, so provider STAFF (USER) act cross-company like admin —
+      *  they manage EVERY client company's trash (the Documents page lists it
+      *  all). The old company-equality clause locked staff out of trashing or
+      *  restoring client-project documents — removed 2026-09-13. */
     private Document loadVisible(AuthUser actor, Long id) {
-        Document doc = documents.findById(id).orElseThrow(() -> ApiException.notFound("Document"));
-        Long companyId = doc.getProject() != null && doc.getProject().getCompany() != null
-                ? doc.getProject().getCompany().getId() : null;
-        if (!actor.isAdmin() && (companyId == null || !companyId.equals(actor.getCompanyId()))) {
-            throw ApiException.notFound("Document");
-        }
-        return doc;
+        return documents.findById(id).orElseThrow(() -> ApiException.notFound("Document"));
     }
 
     /** True when the object is also referenced by a live message row — message

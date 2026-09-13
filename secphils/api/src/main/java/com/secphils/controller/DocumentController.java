@@ -272,8 +272,11 @@ public class DocumentController {
 
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> ApiException.notFound("Project"));
-        if (!actor.isAdmin() && !project.getCompany().getId().equals(actor.getCompanyId())) {
-            throw ApiException.forbidden("You can only add documents to projects of your own company");
+        // Every active client of the project's company may submit files
+        // (16069c8); cross-company CLIENTs 403. Provider staff/admin are the
+        // provider — cross-company by design (staff document client projects).
+        if (actor.isClient() && !project.getCompany().getId().equals(actor.getCompanyId())) {
+            throw ApiException.forbidden("You can only add documents to your company's projects");
         }
 
         S3StorageService.StorageConfig cfg = storageService.currentConfig();
@@ -317,9 +320,9 @@ public class DocumentController {
         }
         Project target = projectRepository.findById(req.projectId())
                 .orElseThrow(() -> ApiException.notFound("Project"));
-        if (!actor.isAdmin() && !target.getCompany().getId().equals(actor.getCompanyId())) {
-            throw ApiException.forbidden("You can only edit documents of your own company");
-        }
+        // requireStaff() above already restricts this to the provider; staff
+        // edit client-project documents cross-company (the old company-
+        // equality check locked them out — removed 2026-09-13).
         requireVisibleTo(actor, target.getCompany().getId());
 
         String previousUrl = doc.getFileUrl();
@@ -421,11 +424,9 @@ public class DocumentController {
         if (doc.getDeletedAt() == null) {
             throw ApiException.badRequest("Document is not in the trash");
         }
-        Long companyId = doc.getProject() != null && doc.getProject().getCompany() != null
-                ? doc.getProject().getCompany().getId() : null;
-        if (!actor.isAdmin() && (companyId == null || !companyId.equals(actor.getCompanyId()))) {
-            throw ApiException.notFound("Document");
-        }
+        // Provider-only (requireStaff); staff act cross-company on trash
+        // writes like admin — the password gate is the safeguard, not company
+        // membership. (Removed company-equality lock 2026-09-13.)
         trashService.hardDeleteOnePublic(actor, doc, req.password()); // service writes the per-doc audit
         return ResponseEntity.noContent().build();
     }
@@ -472,11 +473,10 @@ public class DocumentController {
         AuthUser actor = CurrentUser.require();
         requireStaff(actor);
         Document doc = documentRepository.findById(id).orElseThrow(() -> ApiException.notFound("Document"));
-        // Comments are a WRITE: stays company-scoped (own company or admin),
-        // unlike the widened cross-company reads.
-        if (!actor.isAdmin() && !doc.getProject().getCompany().getId().equals(actor.getCompanyId())) {
-            throw ApiException.forbidden("You can only comment on documents of your own company");
-        }
+        // Comments are provider-only (requireStaff); the company-equality
+        // clause locked provider staff out of commenting on client-project
+        // documents — removed 2026-09-13 with the rest of the staff scope fix.
+        
         if (doc.getDeletedAt() != null) {
             throw ApiException.conflict("Document is in the trash — restore it before commenting");
         }

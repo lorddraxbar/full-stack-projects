@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public record AnnouncementResponse(
         Long id,
         Long companyId,
+        String companyName,
         Long projectId,
         String projectName,
         String title,
@@ -22,6 +23,7 @@ public record AnnouncementResponse(
     public static AnnouncementResponse from(Announcement a) {
         return new AnnouncementResponse(a.getId(),
                 a.getCompany() != null ? a.getCompany().getId() : null,
+                a.getCompany() != null ? a.getCompany().getName() : null,
                 a.getProject() != null ? a.getProject().getId() : null,
                 a.getProject() != null ? a.getProject().getName() : null,
                 a.getTitle(), a.getBody(), a.getCategory(), a.getAudience(),

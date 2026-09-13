@@ -9,7 +9,6 @@ import com.secphils.policy.RetentionPolicy;
 import com.secphils.repository.DocumentRepository;
 import com.secphils.repository.MessageRepository;
 import com.secphils.repository.NotificationRepository;
-import com.secphils.repository.ProjectRepository;
 import com.secphils.repository.UserRepository;
 import com.secphils.security.AuthUser;
 import org.slf4j.Logger;
@@ -20,8 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Provider-only message trash (the supported erasure path). A provider staff
@@ -57,7 +54,6 @@ public class MessageTrashService {
 
     private final MessageRepository messages;
     private final DocumentRepository documents;
-    private final ProjectRepository projects;
     private final UserRepository users;
     private final NotificationRepository notifications;
     private final S3StorageService s3;
@@ -67,7 +63,6 @@ public class MessageTrashService {
 
     public MessageTrashService(MessageRepository messages,
                                DocumentRepository documents,
-                               ProjectRepository projects,
                                UserRepository users,
                                NotificationRepository notifications,
                                S3StorageService s3,
@@ -76,7 +71,6 @@ public class MessageTrashService {
                                RetentionPolicy retention) {
         this.messages = messages;
         this.documents = documents;
-        this.projects = projects;
         this.users = users;
         this.notifications = notifications;
         this.s3 = s3;
@@ -149,10 +143,8 @@ public class MessageTrashService {
     public void hardDeleteOnePublic(AuthUser actor, Message msg, String password) {
         requireStaff(actor);
         requirePassword(actor, password);
-        Long companyId = companyId(msg);
-        if (!actor.isAdmin() && (companyId == null || !companyId.equals(actor.getCompanyId()))) {
-            throw ApiException.notFound("Message");
-        }
+        // Provider staff purge any company's trashed message (2026-09-13 staff
+        // scope fix — requireStaff already excludes CLIENT).
         hardDeleteOne(actor, msg, false);
     }
 
@@ -160,20 +152,9 @@ public class MessageTrashService {
     public int hardDeleteAll(AuthUser actor, String password) {
         requireStaff(actor);
         requirePassword(actor, password);
-        List<Message> trashed;
-        if (actor.isAdmin()) {
-            trashed = messages.findWithRefsDeleted();
-        } else if (actor.getCompanyId() == null) {
-            return 0;
-        } else {
-            Set<Long> projectIds = projects.findByCompanyId(actor.getCompanyId()).stream()
-                    .map(Project::getId).collect(Collectors.toSet());
-            trashed = projectIds.isEmpty()
-                    ? List.of()
-                    : messages.findWithRefsDeleted().stream()
-                            .filter(m -> m.getProject() != null && projectIds.contains(m.getProject().getId()))
-                            .toList();
-        }
+        // Provider staff empty the whole portal message trash (requireStaff
+        // excludes CLIENT; mirrors the cross-company trash LIST staff see).
+        List<Message> trashed = messages.findWithRefsDeleted();
         int purged = 0;
         for (Message m : trashed) {
             if (hardDeleteOne(actor, m, false)) purged++;
@@ -233,22 +214,15 @@ public class MessageTrashService {
         }
     }
 
-    /** Staff may only touch their company's messages; admin sees everything.
-     *  Non-admins get a 404 for other companies — don't leak. */
+    /** Trash is provider-only (requireStaff at every call site): staff act
+      *  cross-company like admin — the Messages trash pane must list every
+      *  company's rows for them. (2026-09-13 staff scope fix.) */
     private Message loadVisible(AuthUser actor, Long id) {
-        Message msg = messages.findWithRefsById(id)
+        return messages.findWithRefsById(id)
                 .orElseThrow(() -> ApiException.notFound("Message"));
-        Long companyId = companyId(msg);
-        if (!actor.isAdmin() && (companyId == null || !companyId.equals(actor.getCompanyId()))) {
-            throw ApiException.notFound("Message");
-        }
-        return msg;
     }
 
-    private Long companyId(Message msg) {
-        return msg.getProject() != null && msg.getProject().getCompany() != null
-                ? msg.getProject().getCompany().getId() : null;
-    }
+
 
     private String projectName(Message msg) {
         return msg.getProject() == null ? "?" : msg.getProject().getName();

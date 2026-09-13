@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRole } from '@/composables/useRole'
 import {
-  useGetAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement, useGetProjects,
+  useGetAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetCompanies,
 } from '@/services/api'
 import Pagination from '@/components/Pagination.vue'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,7 @@ const isUser = computed(() => !isClient.value)
 interface Announcement {
   id: number
   companyId: number | null
+  companyName: string | null
   title: string
   body: string
   category: string
@@ -53,7 +54,8 @@ const page = ref(1)
 const pageSize = 20
 watch(searchQuery, () => { page.value = 1 })
 
-const projects = ref<{ id: number; name: string }[]>([])
+const projects = ref<{ id: number; name: string; companyId: number | null }[]>([])
+const companies = ref<{ id: number; name: string }[]>([])
 
 const projectById = (id: number | null) =>
   projects.value.find(p => p.id === id)
@@ -93,6 +95,7 @@ const visibleAnnouncements = computed(() => {
         a.isPublished ? 'published' : 'draft',
         projName,
         a.createdByName || '',
+        a.companyName || '',
         formatDate(a.createdAt),
       ].join(' ').toLowerCase()
       return terms.every(t => haystack.includes(t))
@@ -126,10 +129,17 @@ async function load() {
   error.value = ''
   try {
     // Full list — a page-capped fetch would hide older projects from the filter.
-    const [annRes, projRes] = await Promise.all([useGetAnnouncements(), useGetProjects({ size: 10000 })])
+    const [annRes, projRes, compRes] = await Promise.all([
+      useGetAnnouncements(), useGetProjects({ size: 10000 }),
+      isUser.value ? useGetCompanies().catch(() => []) : Promise.resolve([]),
+    ])
     announcements.value = (annRes as Announcement[]) || []
     const projList = Array.isArray(projRes) ? projRes : ((projRes as any)?.content ?? [])
-    projects.value = (projList as { id: number; name: string }[]).map(p => ({ id: p.id, name: p.name }))
+    projects.value = (projList as { id: number; name: string; companyId: number | null }[])
+      .map(p => ({ id: p.id, name: p.name, companyId: p.companyId ?? null }))
+    companies.value = ((compRes as any[]) || [])
+      .filter(c => c != null && c.id != null)
+      .map(c => ({ id: c.id, name: c.name }))
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } }; message?: string }
     error.value = err.response?.data?.message || err.message || 'Failed to load announcements'
@@ -148,6 +158,7 @@ const form = ref({
   body: '',
   category: DEFAULT_ANNOUNCEMENT_CATEGORY as string,
   audience: defaultAnnouncementAudience() as string,
+  companyId: '' as string,
   projectId: '' as string,
   isPublished: true,
 })
@@ -157,7 +168,7 @@ const saveError = ref('')
 const isEditing = computed(() => editingId.value != null)
 
 function openForm() {
-  form.value = { title: '', body: '', category: DEFAULT_ANNOUNCEMENT_CATEGORY, audience: defaultAnnouncementAudience(), projectId: '', isPublished: true }
+  form.value = { title: '', body: '', category: DEFAULT_ANNOUNCEMENT_CATEGORY, audience: defaultAnnouncementAudience(), companyId: '', projectId: '', isPublished: true }
   editingId.value = null
   saveError.value = ''
   showForm.value = true
@@ -169,6 +180,7 @@ function openEdit(a: Announcement) {
     body: a.body,
     category: a.category || 'PROJECT_UPDATE',
     audience: a.audience || 'COMPANY',
+    companyId: a.companyId != null ? String(a.companyId) : '',
     projectId: a.audience === 'PROJECT' && a.projectId != null ? String(a.projectId) : '',
     isPublished: a.isPublished,
   }
@@ -179,9 +191,38 @@ function openEdit(a: Announcement) {
 
 const currentUserId = computed(() => Number(localStorage.getItem('userId') || 0))
 
+/** Projects narrowed to the picked company (the backend validates the pair). */
+const formProjects = computed(() => {
+  const cid = Number(form.value.companyId)
+  return cid ? projects.value.filter(p => p.companyId === cid) : projects.value
+})
+
+/** Picking a project pins the company to that project's company. */
+watch(() => form.value.projectId, (pid) => {
+  if (form.value.audience !== 'PROJECT' || !pid) return
+  const p = projects.value.find(x => x.id === Number(pid))
+  if (p && p.companyId != null) form.value.companyId = String(p.companyId)
+})
+
+/** Switching company clears a project that no longer belongs. */
+watch(() => form.value.companyId, (cid) => {
+  if (!form.value.projectId) return
+  const p = projects.value.find(x => x.id === Number(form.value.projectId))
+  if (p && p.companyId !== Number(cid)) form.value.projectId = ''
+})
+
+/** Switching to COMPANY-wide clears the project choice (server nulls it). */
+watch(() => form.value.audience, (aud) => {
+  if (aud === 'COMPANY') form.value.projectId = ''
+})
+
 async function submit() {
   if (!form.value.title.trim() || !form.value.body.trim()) {
     saveError.value = 'Title and body are required.'
+    return
+  }
+  if (!form.value.companyId) {
+    saveError.value = 'Select the company this announcement is for.'
     return
   }
   if (form.value.audience === 'PROJECT' && !form.value.projectId) {
@@ -195,6 +236,7 @@ async function submit() {
     body: form.value.body.trim(),
     category: form.value.category,
     audience: form.value.audience,
+    companyId: Number(form.value.companyId),
     projectId: form.value.audience === 'PROJECT' ? Number(form.value.projectId) : null,
     isPublished: form.value.isPublished,
   }
@@ -222,6 +264,7 @@ async function togglePublish(a: Announcement) {
       body: a.body,
       category: a.category,
       audience: a.audience,
+      companyId: a.companyId,
       projectId: a.audience === 'PROJECT' ? a.projectId : null,
       isPublished: !a.isPublished,
     })
@@ -322,6 +365,7 @@ function categoryColor(c: string) {
         <div class="flex items-center justify-between text-sm text-gray-500 pt-3 border-t border-gray-100">
           <div class="flex items-center gap-4 flex-wrap">
             <span>By: {{ announcement.createdByName || '—' }}</span>
+            <span v-if="isUser && announcement.companyName">Company: {{ announcement.companyName }}</span>
             <span>{{ announcement.isPublished ? 'Published' : 'Drafted' }}: {{ formatDate(announcement.createdAt) }}</span>
             <span v-if="announcement.audience === 'PROJECT' && announcement.projectId" class="text-emerald-600">
               Project: {{ projectById(announcement.projectId)?.name || announcement.projectName || 'N/A' }}
@@ -412,6 +456,20 @@ function categoryColor(c: string) {
             </div>
 
             <div class="space-y-2">
+              <Label for="annCompany">Company</Label>
+              <Select v-model="form.companyId">
+                <SelectTrigger id="annCompany">
+                  <SelectValue placeholder="Select company…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem v-for="c in companies" :key="c.id" :value="String(c.id)">{{ c.name }}</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="space-y-2">
               <Label for="annAudience">Audience</Label>
               <Select v-model="form.audience">
                 <SelectTrigger id="annAudience">
@@ -434,7 +492,7 @@ function categoryColor(c: string) {
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem
-                      v-for="p in projects"
+                      v-for="p in formProjects"
                       :key="p.id"
                       :value="String(p.id)"
                     >

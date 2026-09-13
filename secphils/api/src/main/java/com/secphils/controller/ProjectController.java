@@ -179,9 +179,13 @@ public class ProjectController {
         if (req.serviceId() == null) {
             throw ApiException.badRequest("Service type is required");
         }
-        if (!actor.isAdmin() && (req.companyId() == null || !req.companyId().equals(actor.getCompanyId()))) {
-            throw ApiException.forbidden("You can only create projects for your own company");
-        }
+        // (Company target is validated in apply(); @NotNull on the DTO.)
+        // No company-equality gate here: provider staff (USER) file projects
+        // FOR CLIENT COMPANIES — that is the wizard's whole job. The earlier
+        // `!isAdmin` company-equality check locked staff out of every client
+        // create (staff belong to the provider company row), reported live
+        // 2026-09-13 as "You can only create projects for your own company".
+        // CLIENT is rejected above; USER/ADMIN are the provider.
         Project project = new Project();
         apply(project, req);
         if (req.status() == null || req.status().isBlank()) {
@@ -211,7 +215,7 @@ public class ProjectController {
                                                   HttpServletRequest http) {
         AuthUser actor = CurrentUser.require();
         Project project = projectRepository.findById(id).orElseThrow(() -> ApiException.notFound("Project"));
-        requireVisibleTo(actor, project.getCompany().getId());
+        requireReadableBy(actor, project.getCompany().getId());
         // Clients are READ-only on projects with one exception: their company's
         // authorized representative, who reviews production details and marks
         // completion. The UI only ever showed those controls to the rep — this
@@ -222,8 +226,16 @@ public class ProjectController {
             throw ApiException.forbidden(
                     "Only the company's authorized representative can update this project");
         }
-        if (!actor.isAdmin() && (req.companyId() == null || !req.companyId().equals(actor.getCompanyId()))) {
-            throw ApiException.forbidden("You can only update projects of your own company");
+        // A CLIENT (incl. their company's rep, who passed the gate above) may
+        // only ever echo their OWN company on the PUT — no project relocation.
+        // Provider staff/admin may reassign (provider-wide editing is the
+        // ruled design, same as companies). The old check compared against
+        // actor.companyId, which also locked provider STAFF out of editing
+        // any client project — removed 2026-09-13.
+        if (actor.isClient()
+                && (req.companyId() == null
+                    || !req.companyId().equals(project.getCompany().getId()))) {
+            throw ApiException.forbidden("You cannot move a project to another company");
         }
         String oldStatus = project.getStatus();
         apply(project, req);
@@ -317,17 +329,6 @@ public class ProjectController {
     private boolean isRepOf(AuthUser actor, Company company) {
         User rep = company == null ? null : company.getAuthorizedRep();
         return rep != null && rep.getId().equals(actor.id());
-    }
-
-    /** Clients/staff may only touch projects of their own company; admin is
-     *  unrestricted. The customer company's authorized representative is an
-     *  exception: they must be able to open the project (review link) and
-     *  mark it complete — that's the whole point of the submission email. */
-    private void requireVisibleTo(AuthUser actor, Long companyId) {
-        if (actor.isAdmin()) return;
-        if (companyId.equals(actor.getCompanyId())) return;
-        if (isRepOf(actor, companyRepository.findById(companyId).orElse(null))) return;
-        throw ApiException.notFound("Project"); // 404, not 403 — don't reveal other companies' data
     }
 
     /** READ-level gate: admin + staff (USER) can read every project (the staff

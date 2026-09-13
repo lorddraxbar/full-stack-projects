@@ -201,11 +201,12 @@ public class ProjectArchiveService {
             throw ApiException.forbidden("Clients cannot manage project lifecycle");
         }
         Project p = projects.findById(id).orElseThrow(() -> ApiException.notFound("Project"));
-        if (!actor.isAdmin() && p.getCompany() != null
-                && p.getCompany().getId() != null
-                && !p.getCompany().getId().equals(actor.getCompanyId())) {
-            throw ApiException.notFound("Project");
-        }
+        // Provider staff (USER) manage lifecycle for EVERY company — the
+        // Administration tab (Archive/Restore) is staff UI, and the 2026-09
+        // access model widened staff to cross-company project management.
+        // CLIENT is rejected above; hardDelete enforces ADMIN separately.
+        // (The old non-admin company-equality clause locked staff out of
+        // archiving/restoring any client project — removed 2026-09-13.)
         return p;
     }
 
