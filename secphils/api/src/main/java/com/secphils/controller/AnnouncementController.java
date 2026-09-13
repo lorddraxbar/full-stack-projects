@@ -136,11 +136,12 @@ public class AnnouncementController {
       *  requireStaff-gated anyway). (2026-09-13 staff scope fix.) */
     private Announcement loadInScope(AuthUser actor, Long id) {
         Announcement a = announcementRepository.findById(id)
-                .filter(x -> x.getCompany() != null)
                 .orElseThrow(() -> ApiException.notFound("Announcement"));
         if (actor.isClient()) {
             Long mine = actor.getCompanyId();
-            if (mine == null || !mine.equals(a.getCompany().getId())) {
+            // Orphan rows (company cleared by a company erasure, V39) are
+            // provider-wide history — invisible to clients, manageable by staff.
+            if (a.getCompany() == null || mine == null || !mine.equals(a.getCompany().getId())) {
                 throw ApiException.notFound("Announcement");
             }
         }

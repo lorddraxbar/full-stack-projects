@@ -6,6 +6,8 @@ import com.secphils.dto.*;
 import com.secphils.entity.Company;
 import com.secphils.entity.SystemSettings;
 import com.secphils.entity.User;
+import com.secphils.policy.RetentionPolicy;
+import com.secphils.repository.ProjectRepository;
 import com.secphils.policy.DisplayNamePolicy;
 import com.secphils.repository.CompanyRepository;
 import com.secphils.repository.SystemSettingsRepository;
@@ -42,6 +44,9 @@ public class CompanyController {
     private final PasswordEncoder passwordEncoder;
     private final RepChangeNotificationService repChangeNotifications;
     private final TeamRemovalNotificationService teamRemovalNotifications;
+    private final com.secphils.repository.NotificationRepository notificationRows;
+    private final ProjectRepository projectRepository;
+    private final RetentionPolicy retention;
     private final String inviteBaseUrl;
     private final Duration inviteTtl;
 
@@ -50,6 +55,9 @@ public class CompanyController {
                              SystemSettingsRepository settingsRepository, PasswordEncoder passwordEncoder,
                              RepChangeNotificationService repChangeNotifications,
                              TeamRemovalNotificationService teamRemovalNotifications,
+                             com.secphils.repository.NotificationRepository notificationRows,
+                             ProjectRepository projectRepository,
+                             RetentionPolicy retention,
                              @Value("${app.invite.base-url}") String inviteBaseUrl,
                              @Value("${app.invite.token-ttl:24h}") Duration inviteTtl) {
         this.companyRepository = companyRepository;
@@ -60,6 +68,9 @@ public class CompanyController {
         this.passwordEncoder = passwordEncoder;
         this.repChangeNotifications = repChangeNotifications;
         this.teamRemovalNotifications = teamRemovalNotifications;
+        this.notificationRows = notificationRows;
+        this.projectRepository = projectRepository;
+        this.retention = retention;
         this.inviteBaseUrl = inviteBaseUrl;
         this.inviteTtl = inviteTtl;
     }
@@ -67,6 +78,9 @@ public class CompanyController {
     @GetMapping
     @Transactional(readOnly = true)
     public ResponseEntity<List<CompanyResponse>> list() {
+        // Includes paused companies (isActive=false) — the Clients tab shows them
+        // for resume/erasure. Every PICKER (wizard, announcements, dashboard)
+        // filters on isActive; the DTO carries the flag.
         return ResponseEntity.ok(companyRepository.findWithRep().stream().map(CompanyResponse::from).toList());
     }
 
@@ -163,6 +177,115 @@ public class CompanyController {
             repChangeNotifications.onRepChanged(company, previousRepId, company.getAuthorizedRep(), actor.id());
         }
         return ResponseEntity.ok(CompanyResponse.from(company));
+    }
+
+    // ---- Client-company lifecycle (V39): pause / resume / hard delete ----
+    // Mirrors the user + service lifecycle doctrine exactly: soft "pause"
+    // (is_active=false + deactivated_at), the admin-configurable retention
+    // window (RetentionPolicy, V31) drives the gate, and an early hard delete
+    // demands the acting admin's own password re-auth. CLIENT companies only —
+    // the company an ADMIN belongs to IS SECPhils (the landing page, mail
+    // identity, staff rows): pausing or deleting it is refused outright.
+
+    private Company clientCompany(Long id) {
+        AuthUser actor = CurrentUser.require();
+        if (!actor.isUserOrAdmin()) {
+            throw ApiException.forbidden("Only provider staff can manage client companies");
+        }
+        Company company = companyRepository.findById(id).orElseThrow(() -> ApiException.notFound("Company"));
+        if (userRepository.existsByCompanyIdAndRole(company.getId(), "ADMIN")) {
+            throw ApiException.conflict("This is SECPhils' own provider company — it cannot be paused or deleted");
+        }
+        return company;
+    }
+
+    @PostMapping("/{id}/deactivate")
+    @Transactional
+    public ResponseEntity<CompanyResponse> pause(@PathVariable Long id, HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        Company company = clientCompany(id);
+        if (Boolean.FALSE.equals(company.getIsActive())) {
+            throw ApiException.conflict("This company is already paused");
+        }
+        java.time.LocalDateTime stamp = LocalDateTime.now();
+        company.setIsActive(false);
+        company.setDeactivatedAt(stamp);
+        companyRepository.save(company);
+        // Pause reaches the members: their CLIENT accounts lose sign-in (same
+        // isActive gate every login/refresh path already honors). Members the
+        // rep removed earlier keep their own removal stamp — only the pause
+        // cohort is touched, so resume won't resurrect removed people.
+        int paused = userRepository.pauseClientsOfCompany(company.getId(), stamp);
+        auditService.audit(actor, "COMPANY_PAUSE", "Company", company.getId(),
+                "Name: " + company.getName() + " (paused " + paused + " members)", http);
+        return ResponseEntity.ok(CompanyResponse.from(company));
+    }
+
+    @PostMapping("/{id}/activate")
+    @Transactional
+    public ResponseEntity<CompanyResponse> resume(@PathVariable Long id, HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        Company company = clientCompany(id);
+        if (Boolean.TRUE.equals(company.getIsActive())) {
+            throw ApiException.conflict("This company is already active");
+        }
+        int resumed = userRepository.resumeClientsOfCompany(company.getId(), company.getDeactivatedAt());
+        company.setIsActive(true);
+        company.setDeactivatedAt(null);
+        companyRepository.save(company);
+        auditService.audit(actor, "COMPANY_RESUME", "Company", company.getId(),
+                "Name: " + company.getName() + " (resumed " + resumed + " members)", http);
+        return ResponseEntity.ok(CompanyResponse.from(company));
+    }
+
+    @DeleteMapping("/{id}/hard")
+    @Transactional
+    public ResponseEntity<Void> hardDelete(@PathVariable Long id,
+                                           @Valid @RequestBody HardDeleteUserRequest req,
+                                           HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        if (!actor.isAdmin()) {
+            throw ApiException.forbidden("Only admins can permanently delete a company");
+        }
+        Company company = clientCompany(id);
+        // Project data must be erased THROUGH the project lifecycle (archive ->
+        // hard delete), which relocates and purges its S3 objects. Refusing
+        // here is what keeps file erasure from silently bypassing storage.
+        long projects = projectRepository.countByCompanyId(company.getId());
+        if (projects > 0) {
+            throw ApiException.conflict("Cannot delete: " + company.getName() + " still has " + projects
+                    + " project" + (projects == 1 ? "" : "s")
+                    + " — delete them first from Admin → Projects (archive, then permanent delete), then delete this company.");
+        }
+        boolean eligible = Boolean.TRUE.equals(company.getIsActive())
+                ? false
+                : company.getDeactivatedAt() != null
+                    && company.getDeactivatedAt().plusDays(retention.getDays()).isBefore(LocalDateTime.now());
+        if (!eligible) {
+            // Immediate delete (paused < window; an ACTIVE company can only be
+            // deleted immediately) requires the acting admin's own password.
+            User actorRow = userRepository.findById(actor.id())
+                    .orElseThrow(() -> ApiException.notFound("User"));
+            if (!passwordEncoder.matches(req.password(), actorRow.getPasswordHash())) {
+                throw ApiException.forbidden("Password confirmation failed");
+            }
+        }
+        // Members: released, never destroyed (V38 doctrine — a person survives
+        // their company; their account rows and personal history persist, just
+        // unlinked and deactivated).
+        userRepository.killPendingInvites(company.getId());
+        userRepository.releaseMembersOfCompany(company.getId(), LocalDateTime.now());
+        // Rep pointer + rep-change/team-removal bell rows: SET NULL / cleared.
+        // Announcements detach via V39 SET NULL (content survives as provider-wide).
+        company.setAuthorizedRep(null);
+        companyRepository.saveAndFlush(company);
+        userRepository.flush();
+        notificationRows.deleteByEntityTypeAndEntityId("Company", company.getId());
+        companyRepository.delete(company);
+        companyRepository.flush();
+        auditService.audit(actor, "COMPANY_HARD_DELETE", "Company", id,
+                "Name: " + company.getName(), http);
+        return ResponseEntity.noContent().build();
     }
 
     // ---- Client Settings: own company ----

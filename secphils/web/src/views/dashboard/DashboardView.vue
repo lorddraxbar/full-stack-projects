@@ -97,7 +97,8 @@ async function load() {
       // just the first default page (20).
       useGetProjects({ size: 10000 }).catch(() => []),
     ])
-    companies.value = (Array.isArray(compRes) ? compRes : []).map((c: any) => ({ id: c.id, name: c.name }))
+    // Paused client companies (V39) stay off the pickers and the headline count.
+    companies.value = (Array.isArray(compRes) ? compRes : []).filter((c: any) => c.isActive !== false).map((c: any) => ({ id: c.id, name: c.name }))
     // Audit endpoint now returns a paged envelope { content, total, page, size }.
     auditLogs.value = (auditRes as any)?.content ?? []
     const userList = Array.isArray(usersRes) ? usersRes : []

@@ -13,6 +13,7 @@ import java.util.List;
 public interface ProjectRepository extends JpaRepository<Project, Long>, JpaSpecificationExecutor<Project> {
 
     List<Project> findByCompanyId(Long companyId);
+    long countByCompanyId(Long companyId);
 
     List<Project> findByStatus(String status);
 

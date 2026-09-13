@@ -33,7 +33,10 @@ public record CompanyResponse(
         String authorizedRepPhone,
         String authorizedRepEmail,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        // Client-company lifecycle (V39). Pickers must hide paused companies.
+        Boolean isActive,
+        LocalDateTime deactivatedAt
 ) {
     public static CompanyResponse from(Company c) {
         User rep = c.getAuthorizedRep();
@@ -46,6 +49,7 @@ public record CompanyResponse(
                 DisplayNamePolicy.nameFor(rep),
                 rep != null ? rep.getPhone() : null,
                 rep != null ? rep.getEmail() : null,
-                c.getCreatedAt(), c.getUpdatedAt());
+                c.getCreatedAt(), c.getUpdatedAt(),
+                c.getIsActive() == null || c.getIsActive(), c.getDeactivatedAt());
     }
 }

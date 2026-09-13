@@ -76,6 +76,15 @@ public class Company {
     @Column(name = "contact_details", length = 500)
     private String contactDetails;
 
+    /** Client-company lifecycle (V39): false = paused — members cannot sign
+     *  in; the retention window (deactivated_at + RetentionPolicy days) drives
+     *  the immediate vs. window-elapsed hard-delete gate, mirroring users. */
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+
+    @Column(name = "deactivated_at")
+    private LocalDateTime deactivatedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "authorized_rep_user_id")
     private User authorizedRep;

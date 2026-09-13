@@ -138,7 +138,7 @@ async function load() {
     projects.value = (projList as { id: number; name: string; companyId: number | null }[])
       .map(p => ({ id: p.id, name: p.name, companyId: p.companyId ?? null }))
     companies.value = ((compRes as any[]) || [])
-      .filter(c => c != null && c.id != null)
+      .filter(c => c != null && c.id != null && (c.isActive !== false))
       .map(c => ({ id: c.id, name: c.name }))
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } }; message?: string }

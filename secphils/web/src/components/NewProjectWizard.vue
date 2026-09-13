@@ -285,8 +285,10 @@ async function loadLookups() {
   loadError.value = ''
   try {
     const [comps, svcs] = await Promise.all([useGetCompanies(), useGetServices()])
+    // Paused (deactivated) companies are not valid project targets — same
+    // isActive gate the services picker already applies (V39 lifecycle).
     existingCompanies.value = (comps as any[])
-      .filter(c => c != null && c.id != null)
+      .filter(c => c != null && c.id != null && (c.isActive !== false))
       .map(c => ({
         id: c.id,
         name: c.name,

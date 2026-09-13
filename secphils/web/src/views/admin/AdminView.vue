@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useTestSmtp, useTestDocuSign, useGetMe, useUpdateMe, useGetRoles, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetDropdowns, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, type DropdownCategoryItem, type DropdownValueItem, type RoleItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useTestSmtp, useTestDocuSign, useGetMe, useUpdateMe, useGetRoles, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetDropdowns, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, usePauseCompany, useResumeCompany, useHardDeleteCompany, useGetProjects, type DropdownCategoryItem, type DropdownValueItem, type RoleItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
 import { invalidateDropdownOptions } from '../../composables/useDropdownOptions'
@@ -113,13 +113,113 @@ const usersLoading = ref(false)
 const usersError = ref('')
 
 // Companies (for assigning a client/staff member to a company)
-const companies = ref<{ id: number; name: string }[]>([])
+interface ClientCompany {
+  id: number
+  name: string
+  isActive: boolean
+  deactivatedAt: string | null
+  authorizedRepName: string | null
+}
+const companies = ref<ClientCompany[]>([])
 const loadCompanies = async () => {
   try {
     const data = await useGetCompanies()
-    companies.value = data.map((c: any) => ({ id: c.id, name: c.name }))
+    companies.value = (data as any[]).map((c) => ({
+      id: c.id,
+      name: c.name,
+      isActive: c.isActive !== false,
+      deactivatedAt: c.deactivatedAt ?? null,
+      authorizedRepName: c.authorizedRepName ?? null,
+    }))
   } catch {
     companies.value = []
+  }
+}
+
+// ---------- Clients tab (client-company lifecycle, V39) ----------
+// Same doctrine as Users/Services: pause (soft) -> retention window -> hard
+// delete, with password re-auth for anything before the window closes.
+const clientFilter = ref('')
+const showPausedClients = ref(false)
+const clientCompanies = computed(() => {
+  // The provider company never appears here (it has no CLIENT members, and the
+  // API refuses to pause/delete it). Filtered defensively off our own companyId.
+  let list = companies.value.filter((c) => (c.isActive || showPausedClients.value) && c.id !== providerCompanyId.value)
+  const q = clientFilter.value.trim().toLowerCase()
+  if (!q) return list
+  return list.filter((c) => [c.name, c.authorizedRepName || '', c.isActive ? 'active' : 'paused'].join(' ').toLowerCase().includes(q))
+})
+const membersOf = (id: number) =>
+  clientUsers.value.filter((u) => u.role === 'CLIENT' && u.companyId === id).length
+const daysDeactivatedCompany = (c: ClientCompany) => {
+  if (!c.deactivatedAt) return 0
+  return Math.floor((Date.now() - new Date(c.deactivatedAt).getTime()) / 86400000)
+}
+const isCompanyEligibleForHardDelete = (c: ClientCompany) =>
+  !c.isActive && daysDeactivatedCompany(c) >= retentionDays.value
+const allProjectsForClients = ref<{ id: number; companyId: number | null }[]>([])
+const loadClientProjectCounts = async () => {
+  try {
+    const res = await useGetProjects({ size: 10000 })
+    const list = Array.isArray(res) ? res : ((res as any)?.content ?? [])
+    allProjectsForClients.value = (list as any[]).map((p) => ({ id: p.id, companyId: p.companyId ?? null }))
+  } catch {
+    allProjectsForClients.value = []
+  }
+}
+const clientProjectsOf = (id: number) => allProjectsForClients.value.filter((p) => p.companyId === id).length
+
+const clientRowActions = (c: ClientCompany): RowAction[] => {
+  const actions: RowAction[] = []
+  if (c.isActive) {
+    actions.push({ label: 'Pause', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => pauseCompany(c) })
+  } else {
+    actions.push({ label: 'Resume', color: 'text-green-600 hover:text-green-700 hover:bg-green-50', onClick: () => resumeCompany(c) })
+  }
+  actions.push({ divider: true, label: '', onClick: () => {} })
+  actions.push({ label: 'Delete', color: 'text-red-700 hover:text-red-800 hover:bg-red-50', onClick: () => openCompanyHardDelete(c) })
+  return actions
+}
+
+const pauseCompany = async (c: ClientCompany) => {
+  if (!confirm(`Pause ${c.name}? Their team members will not be able to sign in until you resume the company. Projects and history stay intact.`)) return
+  try {
+    await usePauseCompany(c.id)
+    await loadCompanies()
+  } catch (err: any) {
+    alert(err.response?.data?.message || 'Failed to pause company')
+  }
+}
+const resumeCompany = async (c: ClientCompany) => {
+  try {
+    await useResumeCompany(c.id)
+    await loadCompanies()
+  } catch (err: any) {
+    alert(err.response?.data?.message || 'Failed to resume company')
+  }
+}
+const companyHardDeleteTarget = ref<ClientCompany | null>(null)
+const companyHardDeletePassword = ref('')
+const companyHardDeleteBusy = ref(false)
+const companyHardDeleteError = ref('')
+const openCompanyHardDelete = (c: ClientCompany) => {
+  companyHardDeleteTarget.value = c
+  companyHardDeletePassword.value = ''
+  companyHardDeleteError.value = ''
+}
+const confirmCompanyHardDelete = async () => {
+  const c = companyHardDeleteTarget.value
+  if (!c) return
+  companyHardDeleteBusy.value = true
+  companyHardDeleteError.value = ''
+  try {
+    await useHardDeleteCompany(c.id, companyHardDeletePassword.value)
+    companyHardDeleteTarget.value = null
+    await Promise.all([loadCompanies(), loadUsers()])
+  } catch (err: any) {
+    companyHardDeleteError.value = err.response?.data?.message || 'Failed to delete company'
+  } finally {
+    companyHardDeleteBusy.value = false
   }
 }
 
@@ -338,6 +438,7 @@ onMounted(async () => {
   await loadProviderCompany()
   loadUsers()
   loadCompanies()
+  loadClientProjectCounts()
   loadSystemSettings()
   loadProviderCompanyProfile()
   loadRoles()
@@ -1476,6 +1577,7 @@ const emailTemplates = ref<any[]>(EMAIL_TEMPLATE_DEFAULTS.map(t => ({ ...t })))
 // ---------- Tabs ----------
 const tabItems = [
   { id: 'users', label: 'Users' },
+  { id: 'clients', label: 'Clients' },
   { id: 'company', label: 'Company Settings' },
   { id: 'services', label: 'Service Catalog' },
   { id: 'projectConfig', label: 'Project Config' },
@@ -1630,6 +1732,77 @@ const isActiveTab = (tab: string) => activeTab.value === tab
           </table>
           <Pagination v-if="!usersLoading && filteredUsers.length > 0" v-model:page="page" :total="filteredUsers.length" :page-size="pageSize" />
         </div>
+      </div>
+    </div>
+
+    <!-- ================= CLIENTS (client-company lifecycle) ================= -->
+    <div v-if="isActiveTab('clients')" class="space-y-6">
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-6 border-b border-gray-200 flex items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Client Companies</h2>
+            <p class="text-sm text-gray-600 mt-1">Customer organizations on file. Pausing blocks their members from signing in; permanent deletion follows the same {{ retentionDays }}-day window as users and services.</p>
+          </div>
+          <label class="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap shrink-0">
+            <input v-model="showPausedClients" type="checkbox" class="rounded border-gray-300" />
+            Show paused
+          </label>
+        </div>
+        <div class="px-6 py-4">
+          <div class="relative">
+            <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+            <input
+              v-model="clientFilter"
+              type="text"
+              placeholder="Filter companies — name or authorized representative…"
+              class="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            />
+            <button
+              v-if="clientFilter"
+              @click="clientFilter = ''"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Clear filter"
+            >
+              <i class="fas fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+              <tr>
+                <th class="px-6 py-3">Company</th>
+                <th class="px-6 py-3">Authorized Rep</th>
+                <th class="px-6 py-3">Members</th>
+                <th class="px-6 py-3">Projects</th>
+                <th class="px-6 py-3">Status</th>
+                <th class="px-3 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <tr v-if="clientCompanies.length === 0">
+                <td colspan="6" class="px-6 py-6 text-center text-gray-500">No client companies match.</td>
+              </tr>
+              <tr v-for="c in clientCompanies" :key="c.id">
+                <td class="px-6 py-4 font-medium text-gray-900">{{ c.name }}</td>
+                <td class="px-6 py-4 text-gray-600">{{ c.authorizedRepName || '—' }}</td>
+                <td class="px-6 py-4 text-gray-600">{{ membersOf(c.id) }}</td>
+                <td class="px-6 py-4 text-gray-600">{{ clientProjectsOf(c.id) }}</td>
+                <td class="px-6 py-4">
+                  <span v-if="c.isActive" class="inline-flex px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">Active</span>
+                  <span v-else class="inline-flex px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">Paused {{ daysDeactivatedCompany(c) }}d</span>
+                </td>
+                <td class="px-3 py-4 text-right whitespace-nowrap">
+                  <RowActionsMenu :actions="clientRowActions(c)" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="px-6 pb-4 text-xs text-gray-400">
+          SECPhils' own provider company is not listed here — it is managed under Company Settings.
+          Permanent deletion requires every project to be deleted first (Admin → Projects), so files never outlive their company.
+        </p>
       </div>
     </div>
 
@@ -2816,6 +2989,56 @@ const isActiveTab = (tab: string) => activeTab.value === tab
             class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ hardDeleteBusy ? 'Deleting…' : 'Delete Permanently' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Company hard delete modal -->
+    <div v-if="companyHardDeleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold text-gray-900">
+          <i class="fas fa-triangle-exclamation text-red-600 mr-2" />Delete {{ companyHardDeleteTarget.name }} permanently?
+        </h3>
+        <p class="mt-2 text-sm text-gray-600">
+          This removes the company record, its team membership links and pending invites from the database. Member accounts themselves are released and deactivated, not destroyed. This action cannot be undone.
+        </p>
+        <div v-if="clientProjectsOf(companyHardDeleteTarget.id) > 0" class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          This company still has {{ clientProjectsOf(companyHardDeleteTarget.id) }} project(s) — delete them first from Admin → Projects (archive, then permanent delete) so their files are purged properly.
+        </div>
+        <div v-else-if="companyHardDeleteTarget.isActive" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          This company is <strong>active</strong> — the retention window does not apply yet. Enter your admin password to delete immediately.
+        </div>
+        <div v-else-if="!isCompanyEligibleForHardDelete(companyHardDeleteTarget)" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          Paused only {{ daysDeactivatedCompany(companyHardDeleteTarget) }} day(s) ago — the {{ retentionDays }}-day window has not elapsed. Enter your admin password to delete immediately.
+        </div>
+        <div v-else class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          Paused {{ daysDeactivatedCompany(companyHardDeleteTarget) }} days ago — eligible for permanent deletion.
+        </div>
+        <div class="mt-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Your admin password</label>
+          <input
+            v-model="companyHardDeletePassword"
+            type="password"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            placeholder="Confirm with your password"
+            @keyup.enter="confirmCompanyHardDelete"
+          />
+          <div v-if="companyHardDeleteError" class="mt-2 text-sm text-red-600">{{ companyHardDeleteError }}</div>
+        </div>
+        <div class="mt-5 flex justify-end gap-3">
+          <button
+            @click="companyHardDeleteTarget = null"
+            class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            @click="confirmCompanyHardDelete"
+            :disabled="companyHardDeleteBusy || !companyHardDeletePassword"
+            class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ companyHardDeleteBusy ? 'Deleting…' : 'Delete Permanently' }}
           </button>
         </div>
       </div>

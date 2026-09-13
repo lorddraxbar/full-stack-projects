@@ -251,6 +251,18 @@ export async function useGetCompanies() {
   return response.data
 }
 
+export async function usePauseCompany(id: number): Promise<void> {
+  await api.post(`/companies/${id}/deactivate`)
+}
+
+export async function useResumeCompany(id: number): Promise<void> {
+  await api.post(`/companies/${id}/activate`)
+}
+
+export async function useHardDeleteCompany(id: number, password: string): Promise<void> {
+  await api.delete(`/companies/${id}/hard`, { data: { password } })
+}
+
 export async function useGetMyCompany() {
   const response = await api.get('/companies/me')
   return response.data
