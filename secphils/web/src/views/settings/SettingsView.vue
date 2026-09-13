@@ -13,15 +13,12 @@ import {
   useRemoveTeamMember,
   useGetNotificationPreferences,
   useUpdateNotificationPreferences,
-  useGetCommunicationSettings,
-  useUpdateCommunicationSettings,
   useChangePassword,
   useEnable2fa,
   useVerify2faEnable,
   useDisable2fa,
   type CompanyTeamMember,
   type NotificationPreferences,
-  type CommunicationSettings,
 } from '@/services/api'
 
 const { isClient, isUser } = useRole()
@@ -219,33 +216,6 @@ async function inviteMember() {
   }
 }
 
-// ---------- Communication (USER only) ----------
-const communication = ref<CommunicationSettings>({
-  emailSignature: true,
-  autoReply: true,
-  autoReplyText: '',
-  callNotifications: true,
-  messageNotifications: true,
-  quietHours: false,
-})
-
-async function loadCommunication() {
-  try {
-    communication.value = await useGetCommunicationSettings()
-  } catch {
-    // keep defaults
-  }
-}
-
-async function saveCommunication() {
-  try {
-    await useUpdateCommunicationSettings({ ...communication.value })
-    flash('success', 'Communication settings saved')
-  } catch (e: any) {
-    flash('error', e?.response?.data?.message ?? 'Failed to save communication settings')
-  }
-}
-
 // ---------- Notifications (all roles) ----------
 const notificationPrefs = ref<NotificationPreferences>({ email: {}, inApp: {} })
 
@@ -391,7 +361,6 @@ const tabs = computed(() => {
   if (isUser.value) {
     return [
       { id: 'profile', label: 'Profile' },
-      { id: 'communication', label: 'Communication' },
       { id: 'notifications', label: 'Notifications' },
       { id: 'security', label: 'Security' },
     ]
@@ -411,7 +380,7 @@ const subheading = computed(() =>
   isClient.value
     ? 'Manage your profile, company information, and team.'
     : isUser.value
-      ? 'Manage your profile and communication preferences.'
+      ? 'Manage your personal account settings.'
       : 'Manage your personal account settings.'
 )
 
@@ -440,13 +409,6 @@ onMounted(async () => {
       await loadTeam()
     } catch {
       /* ignored */
-    }
-  }
-  if (isUser.value) {
-    try {
-      await loadCommunication()
-    } catch {
-      /* keep defaults */
     }
   }
   loading.value = false
@@ -803,85 +765,6 @@ onMounted(async () => {
               </button>
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- Communication Tab (user only) -->
-      <div v-if="activeTab === 'communication'" class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Communication Settings</h2>
-        <div class="space-y-4 max-w-xl">
-          <div class="flex items-center justify-between py-2">
-            <div>
-              <p class="text-gray-700">Email Signature</p>
-              <p class="text-sm text-gray-500">Append your signature to outgoing messages</p>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input v-model="communication.emailSignature" type="checkbox" class="sr-only peer" />
-              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between py-2">
-            <div>
-              <p class="text-gray-700">Auto-Reply</p>
-              <p class="text-sm text-gray-500">Automatically acknowledge new client messages</p>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input v-model="communication.autoReply" type="checkbox" class="sr-only peer" />
-              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-            </label>
-          </div>
-
-          <div v-if="communication.autoReply" class="pl-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Auto-Reply Message</label>
-            <textarea
-              v-model="communication.autoReplyText"
-              rows="2"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-            />
-          </div>
-
-          <div class="flex items-center justify-between py-2">
-            <div>
-              <p class="text-gray-700">Message Notifications</p>
-              <p class="text-sm text-gray-500">Notify me about new project messages</p>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input v-model="communication.messageNotifications" type="checkbox" class="sr-only peer" />
-              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between py-2">
-            <div>
-              <p class="text-gray-700">Call Notifications</p>
-              <p class="text-sm text-gray-500">Notify me about scheduled call reminders</p>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input v-model="communication.callNotifications" type="checkbox" class="sr-only peer" />
-              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between py-2">
-            <div>
-              <p class="text-gray-700">Quiet Hours</p>
-              <p class="text-sm text-gray-500">Mute notifications outside working hours</p>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input v-model="communication.quietHours" type="checkbox" class="sr-only peer" />
-              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-            </label>
-          </div>
-        </div>
-
-        <div class="mt-6 flex justify-end">
-          <button
-            @click="saveCommunication"
-            class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-          >
-            Save Communication Settings
-          </button>
         </div>
       </div>
 

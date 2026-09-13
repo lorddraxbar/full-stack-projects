@@ -637,25 +637,6 @@ export async function useUpdateNotificationPreferences(data: Partial<Notificatio
   return response.data as NotificationPreferences
 }
 
-export interface CommunicationSettings {
-  emailSignature: boolean
-  autoReply: boolean
-  autoReplyText: string
-  callNotifications: boolean
-  messageNotifications: boolean
-  quietHours: boolean
-}
-
-export async function useGetCommunicationSettings() {
-  const response = await api.get('/users/me/communication')
-  return response.data as CommunicationSettings
-}
-
-export async function useUpdateCommunicationSettings(data: Partial<CommunicationSettings>) {
-  const response = await api.put('/users/me/communication', data)
-  return response.data as CommunicationSettings
-}
-
 // ---------- Admin ----------
 export async function useGetAuditLogs(params?: { action?: string; userId?: number; search?: string; page?: number; size?: number }) {
   const response = await api.get('/admin/audit-logs', { params })
