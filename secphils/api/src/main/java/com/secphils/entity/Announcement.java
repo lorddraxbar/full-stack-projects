@@ -40,7 +40,7 @@ public class Announcement {
     private Boolean isPublished = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by", nullable = false)
+    @JoinColumn(name = "created_by")  // V38: SET NULL on user erasure
     private User createdBy;
 
     @Column(name = "created_at", updatable = false)

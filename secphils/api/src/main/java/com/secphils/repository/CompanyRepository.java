@@ -10,6 +10,10 @@ import java.util.List;
 @Repository
 public interface CompanyRepository extends JpaRepository<Company, Long> {
 
+    /** Rep-pointer pre-flight for account erasure (companies RESTRICT stays:
+      *  a rep handoff must be an explicit admin action, never a side effect). */
+    List<Company> findByAuthorizedRepId(Long repUserId);
+
     @Query("select c from Company c left join fetch c.authorizedRep")
     List<Company> findWithRep();
 }

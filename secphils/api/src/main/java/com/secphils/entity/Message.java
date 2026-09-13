@@ -20,8 +20,10 @@ public class Message {
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
 
+    /** V38: nullable — hard-deleting an account clears the author link
+      *  (ON DELETE SET NULL); the message itself is the company's record. */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "sender_id", nullable = false)
+    @JoinColumn(name = "sender_id")
     private User sender;
 
     @Column(nullable = false, columnDefinition = "TEXT")

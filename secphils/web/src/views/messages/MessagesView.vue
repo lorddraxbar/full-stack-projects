@@ -511,7 +511,7 @@ onMounted(async () => {
                 : (isOwn(msg) ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-900')
             ]">
               <p class="text-sm font-medium mb-0.5 flex items-center gap-1.5">
-                {{ msg.senderName }}
+                {{ msg.senderName || 'Deleted account' }}
                 <span
                   v-if="isInternal(msg)"
                   :class="[

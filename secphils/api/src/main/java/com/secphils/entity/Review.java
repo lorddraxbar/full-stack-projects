@@ -17,7 +17,7 @@ public class Review {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_user_id", nullable = false)
+    @JoinColumn(name = "customer_user_id")  // V38: SET NULL on user erasure
     private User customerUser;
 
     @ManyToOne(fetch = FetchType.LAZY)

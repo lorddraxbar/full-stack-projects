@@ -374,11 +374,25 @@ public class UserController {
                 throw ApiException.forbidden("Password confirmation failed");
             }
         }
+        // Actionable pre-flight: the only remaining RESTRICT path into users
+        // is the authorized-rep pointer (V38 made message/review/announcement
+        // author links SET NULL; audit/user_id was always SET NULL — the old
+        // "audit history" copy blamed the wrong table). A rep handoff must be
+        // an explicit admin action, never a silent side effect of erasure.
+        var repOf = companyRepository.findByAuthorizedRepId(user.getId());
+        if (!repOf.isEmpty()) {
+            String names = repOf.stream().map(Company::getName)
+                    .collect(java.util.stream.Collectors.joining(", "));
+            throw ApiException.conflict("Cannot delete: " + user.getFullName()
+                    + " is the authorized representative of " + names
+                    + " — reassign that company's representative first"
+                    + " (Company tab or Admin → Company Settings), then delete again.");
+        }
         try {
             userRepository.delete(user);
             userRepository.flush();
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            throw ApiException.conflict("Cannot delete: this user still has related records (e.g. documents, audit history)");
+            throw ApiException.conflict("Cannot delete: this account is still referenced by records that must be reassigned first");
         }
         auditService.audit(actor, "USER_HARD_DELETE", "User", user.getId(), "Email: " + user.getEmail(), http);
         return ResponseEntity.noContent().build();
