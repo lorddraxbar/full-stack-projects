@@ -324,7 +324,8 @@ public class ProjectArchiveService {
             }
             if (email && u.getEmail() != null && !u.getEmail().isBlank()) {
                 mail.sendHtml(u.getEmail(), subject, card, link,
-                        users.findById(actor.id()).map(DisplayNamePolicy::emailFor).orElse(DisplayNamePolicy.NO_REPLY_EMAIL));
+                        users.findById(actor.id()).map(DisplayNamePolicy::emailFor).orElse(DisplayNamePolicy.NO_REPLY_EMAIL),
+                        PREF_KEY, u);
             }
         }
     }

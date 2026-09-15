@@ -118,7 +118,7 @@ public class ReviewNotificationService {
                                     templateService.cta(EmailTemplateService.REVIEW_SUBMITTED, vars),
                                     link,
                                     templateService.footer(EmailTemplateService.REVIEW_SUBMITTED, vars)),
-                            link);
+                            link, null, PREF_KEY, u);
                 } catch (Exception e) {
                     log.warn("Review email to {} failed: {}", email, e.getMessage());
                 }

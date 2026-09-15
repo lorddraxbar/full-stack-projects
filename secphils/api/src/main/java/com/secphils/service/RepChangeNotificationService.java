@@ -158,7 +158,7 @@ public class RepChangeNotificationService {
                                 templateService.cta(templateName, vars),
                                 link,
                                 templateService.footer(templateName, vars)),
-                        link);
+                        link, null, PREF_KEY, u);
             } catch (Exception e) {
                 log.warn("Rep-change email to {} failed: {}", u.getEmail(), e.getMessage());
             }

@@ -3,8 +3,11 @@ package com.secphils.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.secphils.dto.SmtpConfig;
 import com.secphils.entity.SystemSettings;
+import com.secphils.entity.User;
 import com.secphils.repository.SystemSettingsRepository;
+import com.secphils.repository.UserRepository;
 import jakarta.mail.internet.MimeMessage;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +15,7 @@ import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.util.Properties;
 
 /**
@@ -22,6 +26,21 @@ import java.util.Properties;
  * (spring.mail.*), so a fresh deploy works from .env before anyone opens the
  * admin panel. Mail failures are logged, never thrown — a broken SMTP relay
  * must not block user creation or other API calls.
+ *
+ * <p>Email-preference plumbing (V40), applied in {@link #sendHtml} so EVERY
+ * notification path gets it from one place:
+ * <ul>
+ *   <li><b>Suppression gate</b> — addresses in {@code email_suppressions}
+ *       (hard bounce / complaint / whole-address unsubscribe) never receive
+ *       another email, and a category suppression drops that one category.
+ *       Applies even to the mandatory emails: a hard-bounced mailbox is a
+ *       hard stop for everything.</li>
+ *   <li><b>List-Unsubscribe (RFC 8058)</b> — emails sent with a notification
+ *       {@code category} carry the one-click headers pointing at
+ *       /api/v1/email/unsubscribe; invites, security notices, and landing
+ *       messages send WITHOUT the header (they are transactional, and a
+ *       one-click button on them would be a lie).</li>
+ * </ul>
  */
 @Service
 public class MailService {
@@ -32,16 +51,28 @@ public class MailService {
     private final String envFrom;
     private final SystemSettingsRepository settingsRepository;
     private final EmailTemplateService templateService;
+    private final EmailSuppressionService suppressions;
+    private final UserRepository userRepository;
+    private final NotificationPrefs prefs;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Value("${app.invite.base-url}")
+    private String envBaseUrl;
 
     public MailService(org.springframework.mail.javamail.JavaMailSender mailSender,
                        @Value("${spring.mail.from}") String fromAddress,
                        SystemSettingsRepository settingsRepository,
-                       EmailTemplateService templateService) {
+                       EmailTemplateService templateService,
+                       EmailSuppressionService suppressions,
+                       UserRepository userRepository,
+                       NotificationPrefs prefs) {
         this.envSender = (JavaMailSenderImpl) mailSender;
         this.envFrom = fromAddress;
         this.settingsRepository = settingsRepository;
         this.templateService = templateService;
+        this.suppressions = suppressions;
+        this.userRepository = userRepository;
+        this.prefs = prefs;
     }
 
     /** The DB config if usable, else null (caller falls back to env). A
@@ -90,16 +121,32 @@ public class MailService {
     }
 
     public void sendHtml(String to, String subject, String htmlBody, String link) {
-        sendHtml(to, subject, htmlBody, link, null);
+        sendHtml(to, subject, htmlBody, link, null, null, null);
+    }
+
+    public void sendHtml(String to, String subject, String htmlBody, String link, String replyTo) {
+        sendHtml(to, subject, htmlBody, link, replyTo, null, null);
     }
 
     /**
-     * HTML mail with an optional Reply-To, so recipients can reply straight to
-     * the sender (e.g. a website visitor). {@code replyTo} null = no Reply-To.
+     * HTML mail with an optional Reply-To and optional notification category.
+     * {@code replyTo} null = no Reply-To. {@code category} is the notification
+     * preference key (e.g. {@code newMessage}); null marks a mandatory/
+     * transactional email — no unsubscribe header, only the address-wide
+     * suppression gate applies. {@code recipient} may be null (resolved from
+     * {@code to}) — pass it when the caller already has the User to save a
+     * lookup.
      */
-    public void sendHtml(String to, String subject, String htmlBody, String link, String replyTo) {
+    public void sendHtml(String to, String subject, String htmlBody, String link,
+                         String replyTo, String category, User recipient) {
         SmtpConfig cfg = dbConfig();
         try {
+            User user = recipient != null ? recipient
+                    : userRepository.findByEmailIgnoreCase(to == null ? "" : to.trim()).orElse(null);
+            if (suppressions.isSuppressed(to, category)) {
+                log.info("Mail to {} skipped — suppressed (category: {})", to, category);
+                return;
+            }
             JavaMailSenderImpl sender = senderFor(cfg);
             MimeMessage message = sender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
@@ -109,12 +156,81 @@ public class MailService {
             if (replyTo != null && !replyTo.isBlank()) {
                 helper.setReplyTo(replyTo);
             }
+            if (category != null && !category.isBlank() && user != null) {
+                String url = unsubscribeLink(user);
+                message.setHeader("List-Unsubscribe", "<" + url + ">");
+                message.setHeader("List-Unsubscribe-Post", "List-Unsubscribe=One-Click");
+                // Visible, in-body unsubscribe line too (webmail header buttons
+                // are easy to miss; content reviewers expect a plain link).
+                htmlBody = htmlBody + "<p style=\"margin:16px 0 0;font-size:12px;color:#9ca3af;\">"
+                        + "These emails are notifications for the SECPhils projects you take part in. "
+                        + "<a href=\"" + url + "\" style=\"color:#9ca3af;\">Manage email preferences</a>"
+                        + "</p>";
+            }
             helper.setText(htmlBody, true);
             sender.send(message);
             log.info("Mail sent to {} — {} (link: {})", to, subject, link);
         } catch (Exception e) {
             log.error("Failed to send mail to {} — {}: {}", to, subject, e.getMessage());
         }
+    }
+
+    /**
+     * Portal base URL for email links: admin setting first, then the request's
+     * Origin/Referer (fresh deploys work unconfigured), then env. Package-wide
+     * convention also used by invite links (UserController/CompanyController).
+     */
+    public String resolveBaseUrl(HttpServletRequest http) {
+        String fromSettings = settingsRepository.findAll().stream().findFirst()
+                .map(SystemSettings::getInviteBaseUrl)
+                .filter(s -> s != null && !s.isBlank())
+                .orElse(null);
+        if (fromSettings != null) return fromSettings.replaceAll("/+$", "");
+        if (http != null) {
+            String origin = http.getHeader("Origin");
+            if (origin == null || origin.isBlank()) {
+                String referer = http.getHeader("Referer");
+                if (referer != null && !referer.isBlank()) {
+                    try {
+                        java.net.URI u = java.net.URI.create(referer);
+                        if (u.getScheme() != null && u.getAuthority() != null) {
+                            origin = u.getScheme() + "://" + u.getAuthority();
+                        }
+                    } catch (Exception ignored) {
+                        // malformed referer — fall through
+                    }
+                }
+            }
+            if (origin != null && !origin.isBlank()) return origin.replaceAll("/+$", "");
+        }
+        return envBaseUrl.replaceAll("/+$", "");
+    }
+
+    /** Stable per-user unsubscribe token (V40), minted on first use. */
+    public String tokenFor(User u) {
+        if (u.getUnsubscribeToken() != null && !u.getUnsubscribeToken().isBlank()) {
+            return u.getUnsubscribeToken();
+        }
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) sb.append(String.format("%02x", b));
+        u.setUnsubscribeToken(sb.toString());
+        userRepository.save(u);
+        return u.getUnsubscribeToken();
+    }
+
+    /** The tokenized preferences-link a notification email should carry. */
+    public String unsubscribeLink(User u) {
+        return unsubscribeLink(resolveBaseUrl(null), u);
+    }
+
+    public String unsubscribeLink(HttpServletRequest http, User u) {
+        return unsubscribeLink(resolveBaseUrl(http), u);
+    }
+
+    private String unsubscribeLink(String base, User u) {
+        return base + "/api/v1/email/preferences?t=" + tokenFor(u);
     }
 
     /**

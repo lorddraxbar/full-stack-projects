@@ -51,6 +51,14 @@ public class User {
     @Column(name = "password_reset_requested_at")
     private LocalDateTime passwordResetRequestedAt;
 
+    /**
+     * Stable random token behind the "manage email preferences" link in
+     * notification emails (V40). Never expires and rotates only on explicit
+     * re-issue, so links in old emails keep working.
+     */
+    @Column(name = "unsubscribe_token", unique = true, length = 64)
+    private String unsubscribeToken;
+
     @Column(nullable = false, length = 30)
     private String phone = "";
 

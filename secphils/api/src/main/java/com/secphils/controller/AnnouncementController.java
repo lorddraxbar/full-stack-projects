@@ -230,7 +230,7 @@ public class AnnouncementController {
                 mailService.sendHtml(u.getEmail(),
                         templateService.subject(EmailTemplateService.ANNOUNCEMENT, vars),
                         announcementEmail(EmailTemplateService.ANNOUNCEMENT, vars, link),
-                        link);
+                        link, null, PREF_KEY, u);
             }
         }
         auditService.audit(actor, "ANNOUNCEMENT_PUBLISH", "Announcement", a.getId(),

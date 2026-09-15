@@ -122,7 +122,7 @@ public class DocumentNotificationService {
                                     templateService.footer(EmailTemplateService.DOCUMENT_UPLOADED, perRecipient)),
                             link,
                             // uploads (staff or client submissions) all mail from the brand
-                            DisplayNamePolicy.NO_REPLY_EMAIL);
+                            DisplayNamePolicy.NO_REPLY_EMAIL, PREF_KEY, u);
                 } catch (Exception e) {
                     log.warn("Document-upload email to {} failed: {}", u.getEmail(), e.getMessage());
                 }

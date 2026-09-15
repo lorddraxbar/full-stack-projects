@@ -39,6 +39,12 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/landing").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/landing/contact").permitAll()
                 .requestMatchers("/api/v1/reviews/public").permitAll()
+                // tokenized email-preferences page + SES/SNS event webhook (V40):
+                // both are public by design (email links carry no JWT; SNS cannot
+                // sign requests) — access control is the token / suppression-only
+                // side effect, see EmailPreferencesController & SesEventController.
+                .requestMatchers("/api/v1/email/**").permitAll()
+                .requestMatchers("/api/v1/ses/**").permitAll()
                 // swagger + actuator
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()

@@ -132,7 +132,7 @@ public class DocumentDeletionRequestService {
                             "project", project.getName() == null ? "" : project.getName(),
                             "body", body);
                     sendMail(u, EmailTemplateService.CLIENT_MESSAGE, vars, inboxLink,
-                            replyTo);
+                            replyTo, MESSAGE_PREF_KEY);
                 }
             }
         }
@@ -160,7 +160,7 @@ public class DocumentDeletionRequestService {
             if (prefAllows(pref == null ? null : pref.getEmail(), STAFF_PREF_KEY)
                     && u.getEmail() != null && !u.getEmail().isBlank()) {
                 sendMail(u, EmailTemplateService.DOCUMENT_DELETION_REQUESTED, vars, projectLink,
-                        DisplayNamePolicy.NO_REPLY_EMAIL);
+                        DisplayNamePolicy.NO_REPLY_EMAIL, STAFF_PREF_KEY);
             }
         }
         return m;
@@ -183,7 +183,7 @@ public class DocumentDeletionRequestService {
     }
 
     private void sendMail(User u, String templateName, Map<String, String> vars,
-                          String link, String replyTo) {
+                          String link, String replyTo, String category) {
         try {
             mail.sendHtml(u.getEmail(),
                     templateService.subject(templateName, vars),
@@ -194,7 +194,7 @@ public class DocumentDeletionRequestService {
                             templateService.cta(templateName, vars),
                             link,
                             templateService.footer(templateName, vars)),
-                    link, replyTo);
+                    link, replyTo, category, u);
         } catch (Exception e) {
             log.warn("Deletion-request email to {} failed: {}", u.getEmail(), e.getMessage());
         }

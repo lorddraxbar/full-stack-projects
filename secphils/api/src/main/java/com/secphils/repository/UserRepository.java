@@ -15,6 +15,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmail(String email);
 
+    Optional<User> findByEmailIgnoreCase(String email);
+
+    Optional<User> findByUnsubscribeToken(String unsubscribeToken);
+
     List<User> findByRoleAndIsActive(String role, Boolean isActive);
 
     /** Active members of a company — recipients for company-wide notifications. */

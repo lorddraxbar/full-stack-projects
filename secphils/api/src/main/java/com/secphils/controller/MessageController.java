@@ -402,7 +402,7 @@ public class MessageController {
             }
             if (email && u.getEmail() != null && !u.getEmail().isBlank()) {
                 mailService.sendHtml(u.getEmail(), templateService.subject(templateName, vars),
-                        messageEmail(templateName, vars, link), link, replyToAddr);
+                        messageEmail(templateName, vars, link), link, replyToAddr, PREF_KEY, u);
             }
         }
     }

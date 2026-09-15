@@ -186,7 +186,7 @@ public class ProjectNotificationService {
         if (prefAllows(pref == null ? null : pref.getEmail(), prefKey)
                 && recipient.getEmail() != null && !recipient.getEmail().isBlank()) {
             try {
-                mail.sendHtml(recipient.getEmail(), emailSubject, emailHtml, link);
+                mail.sendHtml(recipient.getEmail(), emailSubject, emailHtml, link, null, prefKey, recipient);
             } catch (Exception e) {
                 log.warn("Project notification email to {} failed: {}", recipient.getEmail(), e.getMessage());
             }
