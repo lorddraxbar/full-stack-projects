@@ -6,8 +6,6 @@ import com.secphils.entity.NotificationPreference;
 import com.secphils.entity.User;
 import com.secphils.repository.NotificationPreferenceRepository;
 import com.secphils.repository.UserRepository;
-import com.secphils.service.EmailSuppressionService;
-import com.secphils.service.MailService;
 import com.secphils.service.NotificationPrefs;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
@@ -42,22 +40,16 @@ public class EmailPreferencesController {
 
     private final UserRepository users;
     private final NotificationPreferenceRepository preferences;
-    private final EmailSuppressionService suppressions;
     private final NotificationPrefs prefs;
-    private final MailService mail;
     private final AuditService auditService;
 
     public EmailPreferencesController(UserRepository users,
                                       NotificationPreferenceRepository preferences,
-                                      EmailSuppressionService suppressions,
                                       NotificationPrefs prefs,
-                                      MailService mail,
                                       AuditService auditService) {
         this.users = users;
         this.preferences = preferences;
-        this.suppressions = suppressions;
         this.prefs = prefs;
-        this.mail = mail;
         this.auditService = auditService;
     }
 

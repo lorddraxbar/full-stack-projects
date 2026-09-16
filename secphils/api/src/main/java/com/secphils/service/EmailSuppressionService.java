@@ -11,15 +11,19 @@ import java.util.List;
 
 /**
  * The suppression ledger behind {@code MailService}'s pre-send gate (V40).
- * Two granularities, per V40: {@code category=""} suppresses the whole
- * address (hard bounce / spam complaint / bulk unsubscribe), a notification
- * key suppresses one category (one-click List-Unsubscribe). Matching is
- * case-insensitive on the address.
+ * Writers: the SES/SNS webhook only — hard bounces and spam complaints add
+ * address-wide rows ({@code category=""}), which stop ALL mail to the
+ * address, even mandatory emails (a dead mailbox is a dead mailbox).
+ * Unsubscribes are NOT stored here: they live in
+ * {@code notification_preferences.email} so the recipient can flip them back
+ * on from their own preferences page (a ledger row would silently override
+ * those toggles — dead-switch theater). Category-granular rows remain
+ * representable ({@code category} = a notification key) for future writers;
+ * none exist today.
  */
 @Service
 public class EmailSuppressionService {
 
-    public static final String REASON_UNSUBSCRIBE = "unsubscribe";
     public static final String REASON_BOUNCE = "bounce";
     public static final String REASON_COMPLAINT = "complaint";
 
@@ -55,13 +59,16 @@ public class EmailSuppressionService {
         suppressions.save(s);
     }
 
-    @Transactional
-    public void remove(String email, String category) {
-        suppressions.findByEmailIgnoreCaseAndCategory(email.trim(), category == null ? "" : category.trim())
-                .ifPresent(suppressions::delete);
+    /** Newest first — backs the Admin → System suppressions panel. */
+    public List<EmailSuppression> listAll() {
+        return suppressions.findAll(org.springframework.data.domain.Sort.by(
+                org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
     }
 
-    public List<EmailSuppression> forAddress(String email) {
-        return suppressions.findByEmailIgnoreCase(email == null ? "" : email.trim());
+    @Transactional
+    public boolean deleteById(Long id) {
+        if (!suppressions.existsById(id)) return false;
+        suppressions.deleteById(id);
+        return true;
     }
 }

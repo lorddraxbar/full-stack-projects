@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useTestSmtp, useTestDocuSign, useGetMe, useUpdateMe, useGetRoles, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetDropdowns, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, usePauseCompany, useResumeCompany, useHardDeleteCompany, useGetProjects, type DropdownCategoryItem, type DropdownValueItem, type RoleItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload } from '../../services/api'
+import { useGetUsers, useCreateUser, useDeactivateUser, useActivateUser, useHardDeleteUser, useResendInvite, useGetCompanies, useGetCompany, useCreateCompany, useUpdateCompany, useUpdateUser, useGetSystemSettings, useUpdateSystemSettings, useTestStorage, useTestSmtp, useTestDocuSign, useGetMe, useUpdateMe, useGetRoles, useGetServices, useCreateService, useUpdateService, useDeactivateService, useActivateService, useHardDeleteService, useGetServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory, useGetAuditLogs, useGetDropdowns, useCreateDropdownValue, useUpdateDropdownValue, useDeleteDropdownValue, usePauseCompany, useResumeCompany, useHardDeleteCompany, useGetProjects, useGetEmailSuppressions, useDeleteEmailSuppression, type DropdownCategoryItem, type DropdownValueItem, type RoleItem, type ServiceItem, type ServicePayload, type ServiceCategoryItem, type ServiceCategoryPayload, type EmailSuppressionItem } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import { useRetention } from '../../composables/useRetention'
 import { invalidateDropdownOptions } from '../../composables/useDropdownOptions'
@@ -440,6 +440,7 @@ onMounted(async () => {
   loadCompanies()
   loadClientProjectCounts()
   loadSystemSettings()
+  loadSuppressions()
   loadProviderCompanyProfile()
   loadRoles()
   loadServices()
@@ -1174,6 +1175,45 @@ const saveSmtpSettings = async () => {
   } catch (err: any) {
     smtpMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to save SMTP settings' }
   }
+}
+
+// ---------- Email suppressions (V40 — app-side bounce/complaint ledger) ----------
+const suppressions = ref<EmailSuppressionItem[]>([])
+const suppressionsLoaded = ref(false)
+const suppressionBusy = ref<number | null>(null)
+const suppressionMessage = ref<{ ok: boolean; text: string } | null>(null)
+
+const loadSuppressions = async () => {
+  try {
+    suppressions.value = await useGetEmailSuppressions()
+  } catch {
+    suppressions.value = []
+  } finally {
+    suppressionsLoaded.value = true
+  }
+}
+
+const removeSuppression = async (s: EmailSuppressionItem) => {
+  suppressionBusy.value = s.id
+  suppressionMessage.value = null
+  try {
+    await useDeleteEmailSuppression(s.id)
+    suppressionMessage.value = { ok: true, text: `Mail re-enabled for ${s.email}.` }
+    await loadSuppressions()
+  } catch (err: any) {
+    suppressionMessage.value = { ok: false, text: err.response?.data?.message || 'Failed to remove suppression' }
+  } finally {
+    suppressionBusy.value = null
+  }
+}
+
+const suppressionReasonLabel = (r: string) =>
+  r === 'bounce' ? 'Hard bounce' : r === 'complaint' ? 'Spam complaint' : r
+
+const suppressionDate = (iso: string) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 // ---------- DocuSign (V34 — staged credentials + live JWT test; no feature ships on it yet) ----------
@@ -2736,6 +2776,50 @@ const isActiveTab = (tab: string) => activeTab.value === tab
             Save SMTP Settings
           </button>
         </div>
+      </div>
+
+      <!-- Email suppressions (V40 — app-side bounce/complaint ledger) -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">Email Suppressions</h2>
+        <p class="text-sm text-gray-600 mb-4">Addresses our relay must <strong>never</strong> receive mail — even invites and security notices. Entries are written automatically when SES reports a hard bounce or spam complaint; they are never added by hand. <strong>Re-enable</strong> removes the block (e.g. when a mailbox was temporarily full or a complaint was accidental) and is audited. Unsubscribes are <em>not</em> listed here — each user manages those under their own notification preferences.</p>
+        <p v-if="!suppressionsLoaded" class="text-sm text-gray-500 py-2">Loading…</p>
+        <p v-else-if="suppressions.length === 0" class="text-sm text-gray-500 py-2">
+          No suppressed addresses — every recipient mailbox we know of is healthy.
+        </p>
+        <table v-else class="w-full">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Detail</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Suppressed</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <tr v-for="s in suppressions" :key="s.id" class="hover:bg-gray-50">
+              <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ s.email }}</td>
+              <td class="px-6 py-4">
+                <span class="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded">
+                  {{ suppressionReasonLabel(s.reason) }}
+                </span>
+                <span v-if="s.category" class="ml-1 text-xs text-gray-500">({{ s.scope }})</span>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600">{{ s.detail || '—' }}</td>
+              <td class="px-6 py-4 text-sm text-gray-600">{{ suppressionDate(s.createdAt) }}</td>
+              <td class="px-6 py-4 text-right">
+                <button
+                  @click="removeSuppression(s)"
+                  :disabled="suppressionBusy === s.id"
+                  class="px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-xs font-medium disabled:opacity-50 whitespace-nowrap"
+                >
+                  {{ suppressionBusy === s.id ? 'Re-enabling…' : 'Re-enable mail' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-if="suppressionMessage" :class="['mt-3 text-sm', suppressionMessage.ok ? 'text-green-700' : 'text-red-600']">{{ suppressionMessage.text }}</p>
       </div>
 
       <!-- DocuSign -->

@@ -683,6 +683,29 @@ export async function useTestSmtp(body: { to: string; config: Record<string, unk
   return response.data as { ok: boolean; message: string }
 }
 
+// ---------- Email suppressions (V40 app-side ledger) ----------
+export interface EmailSuppressionItem {
+  id: number
+  email: string
+  category: string
+  scope: string
+  reason: string
+  detail: string
+  createdAt: string
+}
+
+/** Addresses SES reported as hard-bounced or complaining (app-side ledger). */
+export async function useGetEmailSuppressions() {
+  const response = await api.get('/admin/email/suppressions')
+  return response.data as EmailSuppressionItem[]
+}
+
+/** Re-enable mail to a suppressed address (audited). */
+export async function useDeleteEmailSuppression(id: number) {
+  const response = await api.delete(`/admin/email/suppressions/${id}`)
+  return response.data as { deleted: number }
+}
+
 /** Live DocuSign JWT-grant token exchange using the payload config
  *  (masked or blank private key = stored key). Returns { ok, message }. */
 export async function useTestDocuSign(body: { config: Record<string, unknown> }) {

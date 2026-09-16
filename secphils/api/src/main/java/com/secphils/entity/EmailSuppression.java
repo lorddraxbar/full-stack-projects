@@ -7,9 +7,10 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 /**
- * An address we must not email. {@code category} '' = the whole address
- * (hard bounce / spam complaint); a notification key (e.g. {@code newMessage})
- * = one-click/email-preference unsubscribe for that category only.
+ * An address we must not email ({@code category} '' = the whole address,
+ * e.g. a hard bounce or spam complaint). Category-granular rows are
+ * representable but currently unwritten — unsubscribes live in
+ * notification_preferences instead (see {@code EmailSuppressionService}).
  * See V40. Checked by {@code MailService} before every send.
  */
 @Entity

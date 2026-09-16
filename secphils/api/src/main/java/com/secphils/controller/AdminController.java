@@ -7,6 +7,7 @@ import com.secphils.dto.DocuSignConfig;
 import com.secphils.dto.GoogleSsoConfig;
 import com.secphils.dto.SmtpConfig;
 import com.secphils.entity.AuditLog;
+import com.secphils.entity.EmailSuppression;
 import com.secphils.entity.SystemSettings;
 import com.secphils.policy.DisplayNamePolicy;
 import com.secphils.policy.RetentionPolicy;
@@ -16,7 +17,9 @@ import com.secphils.repository.UserRepository;
 import com.secphils.security.AuthUser;
 import com.secphils.security.CurrentUser;
 import com.secphils.service.DocuSignService;
+import com.secphils.service.EmailSuppressionService;
 import com.secphils.service.MailService;
+import com.secphils.service.NotificationPrefs;
 import com.secphils.service.S3StorageService;
 import com.secphils.service.S3StorageService.StorageConfig;
 import com.secphils.service.SsoService;
@@ -43,6 +46,8 @@ public class AdminController {
     private final RetentionPolicy retentionPolicy;
     private final DocuSignService docuSignService;
     private final MailService mailService;
+    private final EmailSuppressionService suppressionService;
+    private final NotificationPrefs notificationPrefs;
 
     public AdminController(SystemSettingsRepository settingsRepository, AuditService auditService,
                            UserRepository userRepository, CompanyRepository companyRepository,
@@ -50,7 +55,9 @@ public class AdminController {
                            DisplayNamePolicy displayNamePolicy,
                            RetentionPolicy retentionPolicy,
                            DocuSignService docuSignService,
-                           MailService mailService) {
+                           MailService mailService,
+                           EmailSuppressionService suppressionService,
+                           NotificationPrefs notificationPrefs) {
         this.settingsRepository = settingsRepository;
         this.auditService = auditService;
         this.userRepository = userRepository;
@@ -60,6 +67,8 @@ public class AdminController {
         this.retentionPolicy = retentionPolicy;
         this.docuSignService = docuSignService;
         this.mailService = mailService;
+        this.suppressionService = suppressionService;
+        this.notificationPrefs = notificationPrefs;
     }
 
     
@@ -369,6 +378,45 @@ public class AdminController {
         }
         auditService.audit(actor, "SMTP_TEST", "SystemSettings", null, "to: " + to, http);
         return ResponseEntity.ok(mailService.testSend(cfg, to));
+    }
+
+    // ---------- email suppressions ledger (V40) ----------
+
+    /** The app-side suppression list: hard bounces and spam complaints
+     *  reported by SES (via the SNS webhook), which MailService honors
+     *  before every send. View + delete only — entries are written by
+     *  automation, never by hand (a manual add would be a second source of
+     *  truth for something automation owns). Unsubscribes are NOT here:
+     *  they live in each user's notification preferences. Deleting a row
+     *  re-enables mail to that address, audited. */
+    @GetMapping("/email/suppressions")
+    @Transactional(readOnly = true)
+    public ResponseEntity<java.util.List<Map<String, Object>>> listSuppressions() {
+        CurrentUser.require(); // admin-only is enforced by SecurityConfig (/admin/** catch-all)
+        java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (EmailSuppression s : suppressionService.listAll()) {
+            boolean addressWide = s.getCategory() == null || s.getCategory().isBlank();
+            out.add(Map.of(
+                    "id", s.getId(),
+                    "email", s.getEmail(),
+                    "category", addressWide ? "" : s.getCategory(),
+                    "scope", addressWide ? "All mail" : "Category: " + notificationPrefs.label(s.getCategory()),
+                    "reason", s.getReason(),
+                    "detail", s.getDetail() == null ? "" : s.getDetail(),
+                    "createdAt", s.getCreatedAt() == null ? "" : s.getCreatedAt().toString()));
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    @DeleteMapping("/email/suppressions/{id}")
+    public ResponseEntity<Map<String, Object>> deleteSuppression(@PathVariable Long id,
+                                                                 HttpServletRequest http) {
+        AuthUser actor = CurrentUser.require();
+        if (!suppressionService.deleteById(id)) {
+            throw ApiException.notFound("Suppression");
+        }
+        auditService.audit(actor, "EMAIL_SUPPRESSION_DELETE", "EmailSuppression", id, null, http);
+        return ResponseEntity.ok(Map.of("deleted", id));
     }
 
     /** Live DocuSign probe — real JWT-grant token exchange using the payload
