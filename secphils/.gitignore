@@ -7,6 +7,7 @@ dist-ssr/
 
 # Local env
 .env
+.secrets/
 .env.local
 .env.*.local
 

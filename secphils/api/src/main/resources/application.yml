@@ -20,8 +20,8 @@ spring:
     # Placeholder values for V34's SMTP seed (lowercase names — Spring relaxed
     # binding lowercases placeholder keys, so camelCase names would miss).
     placeholders:
-      smtphost: ${SMTP_HOST:smtp.zoho.com}
-      smtpport: ${SMTP_PORT:465}
+      smtphost: ${SMTP_HOST:6jeirqic6tzx.uemp.mail-manager-smtp.amazonaws.com}
+      smtpport: ${SMTP_PORT:587}
       smtpusername: ${SMTP_USERNAME:}
       smtppassword: ${SMTP_PASSWORD:}
       mailfrom: ${MAIL_FROM:notifications@secphils.com}
@@ -31,8 +31,8 @@ spring:
       max-file-size: 25MB
       max-request-size: 25MB
   mail:
-    host: ${SMTP_HOST:smtp.zoho.com}
-    port: ${SMTP_PORT:465}
+    host: ${SMTP_HOST:6jeirqic6tzx.uemp.mail-manager-smtp.amazonaws.com}
+    port: ${SMTP_PORT:587}
     username: ${SMTP_USERNAME:}
     password: ${SMTP_PASSWORD:}
     from: ${MAIL_FROM:notifications@secphils.com}
@@ -40,11 +40,14 @@ spring:
       mail:
         smtp:
           auth: true
+          # AWS SMTP (the default relay) speaks STARTTLS on 587, not implicit
+          # SSL. MailService.senderFor() derives ssl-vs-starttls from the port
+          # for DB configs; this env fallback mirrors the 587 path. If you ever
+          # point SMTP_* at a 465/implicit-SSL relay, flip these two lines.
           ssl:
+            enable: false
+          starttls:
             enable: true
-            socketFactory:
-              port: ${SMTP_PORT:465}
-              class: javax.net.ssl.SSLSocketFactory
           connectiontimeout: 10000
           timeout: 10000
           writetimeout: 10000

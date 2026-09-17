@@ -1121,7 +1121,7 @@ interface SmtpForm {
   password: string   // '********' when a password is already stored (masked by the API)
   from: string
 }
-const DEFAULT_SMTP: SmtpForm = { host: 'smtp.zoho.com', port: 465, username: '', password: '', from: '' }
+const DEFAULT_SMTP: SmtpForm = { host: '6jeirqic6tzx.uemp.mail-manager-smtp.amazonaws.com', port: 587, username: '', password: '', from: '' }
 const smtpForm = ref<SmtpForm>({ ...DEFAULT_SMTP })
 const smtpMessage = ref<{ ok: boolean; text: string } | null>(null)
 const smtpTestTo = ref('')
@@ -2744,11 +2744,11 @@ const isActiveTab = (tab: string) => activeTab.value === tab
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">SMTP Host</label>
-            <input v-model="smtpForm.host" type="text" placeholder="smtp.zoho.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input v-model="smtpForm.host" type="text" placeholder="6jeirqic6tzx.uemp.mail-manager-smtp.amazonaws.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Port</label>
-            <input v-model.number="smtpForm.port" type="number" min="1" max="65535" placeholder="465" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input v-model.number="smtpForm.port" type="number" min="1" max="65535" placeholder="587" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>

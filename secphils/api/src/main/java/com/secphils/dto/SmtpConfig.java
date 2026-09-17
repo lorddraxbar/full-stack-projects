@@ -12,8 +12,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 public class SmtpConfig {
     public static final String SECRET_MASK = "********";
 
-    public String host = "smtp.zoho.com";
-    public int port = 465;
+    public String host = "6jeirqic6tzx.uemp.mail-manager-smtp.amazonaws.com";
+    public int port = 587;
     public String username = "";
     public String password = "";
     /** Default From: header — e.g. notifications@secphils.com. */
