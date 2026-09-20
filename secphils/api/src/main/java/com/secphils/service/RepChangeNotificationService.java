@@ -149,7 +149,7 @@ public class RepChangeNotificationService {
         if (withEmail && templateName != null && u.getEmail() != null && !u.getEmail().isBlank()
                 && prefAllows(pref == null ? null : pref.getEmail())) {
             try {
-                mail.sendHtml(u.getEmail(),
+                mail.sendHtmlAsync(u.getEmail(),
                         templateService.subject(templateName, vars),
                         templateService.brandedCard(
                                 templateService.kicker(templateName, vars),

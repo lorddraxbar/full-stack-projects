@@ -10,6 +10,7 @@ import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -126,6 +127,32 @@ public class MailService {
 
     public void sendHtml(String to, String subject, String htmlBody, String link, String replyTo) {
         sendHtml(to, subject, htmlBody, link, replyTo, null, null);
+    }
+
+    /**
+     * Fire-and-forget notification send (AsyncConfig mailExecutor).
+     *
+     * Portal-wide rule: notification mail NEVER runs on the request thread.
+     * Each send carries a 10s SMTP connect timeout; a fan-out of N recipients
+     * against a slow relay would freeze the creating request for N*10s while
+     * the UI waits on a response that has nothing to do with the mail. The
+     * in-app Notification row is still written synchronously by callers
+     * (inside their transaction); only the SMTP delivery detaches.
+     *
+     * The message payload must be fully built by the caller — strings only.
+     * Never use this for sends whose RESULT is shown to the caller (SMTP
+     * test, invite verdict): those have their own synchronous paths.
+     */
+    @Async("mailExecutor")
+    public void sendHtmlAsync(String to, String subject, String htmlBody, String link,
+                              String replyTo, String category, User recipient) {
+        sendHtml(to, subject, htmlBody, link, replyTo, category, recipient);
+    }
+
+    /** 4-arg async door, mirroring the sync overload (no Reply-To/category). */
+    @Async("mailExecutor")
+    public void sendHtmlAsync(String to, String subject, String htmlBody, String link) {
+        sendHtml(to, subject, htmlBody, link, null, null, null);
     }
 
     /**

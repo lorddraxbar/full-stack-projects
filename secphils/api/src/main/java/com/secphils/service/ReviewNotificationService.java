@@ -109,7 +109,7 @@ public class ReviewNotificationService {
             String email = u.getEmail();
             if (email != null && !email.isBlank() && prefAllows(pref == null ? null : pref.getEmail())) {
                 try {
-                    mail.sendHtml(email,
+                    mail.sendHtmlAsync(email,
                             templateService.subject(EmailTemplateService.REVIEW_SUBMITTED, vars),
                             templateService.brandedCard(
                                     templateService.kicker(EmailTemplateService.REVIEW_SUBMITTED, vars),

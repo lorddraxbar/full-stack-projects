@@ -185,7 +185,7 @@ public class DocumentDeletionRequestService {
     private void sendMail(User u, String templateName, Map<String, String> vars,
                           String link, String replyTo, String category) {
         try {
-            mail.sendHtml(u.getEmail(),
+            mail.sendHtmlAsync(u.getEmail(),
                     templateService.subject(templateName, vars),
                     templateService.brandedCard(
                             templateService.kicker(templateName, vars),

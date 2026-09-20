@@ -227,7 +227,7 @@ public class AnnouncementController {
                                 ? " — " + a.getProject().getName() : "",
                         "body", body,
                         "company", a.getCompany() != null ? a.getCompany().getName() : "your company");
-                mailService.sendHtml(u.getEmail(),
+                mailService.sendHtmlAsync(u.getEmail(),
                         templateService.subject(EmailTemplateService.ANNOUNCEMENT, vars),
                         announcementEmail(EmailTemplateService.ANNOUNCEMENT, vars, link),
                         link, null, PREF_KEY, u);

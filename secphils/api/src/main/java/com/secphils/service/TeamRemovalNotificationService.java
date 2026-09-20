@@ -139,7 +139,7 @@ public class TeamRemovalNotificationService {
         }
         if (withEmail && allowEmail && templateName != null && u.getEmail() != null && !u.getEmail().isBlank()) {
             try {
-                mail.sendHtml(u.getEmail(),
+                mail.sendHtmlAsync(u.getEmail(),
                         templateService.subject(templateName, vars),
                         templateService.brandedCard(
                                 templateService.kicker(templateName, vars),

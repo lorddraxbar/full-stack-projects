@@ -1,6 +1,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { useRole } from '@/composables/useRole'
 import { useUserName } from '@/composables/useUserName'
+import { useBusy } from '@/composables/useBusy'
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -59,12 +60,15 @@ api.interceptors.request.use(config => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  // portal-wide busy counter (BusyBar) — every request the portal makes
+  useBusy().start()
   return config
 })
 
 api.interceptors.response.use(
-  response => response,
+  response => { useBusy().end(); return response },
   async (error: AxiosError) => {
+    useBusy().end()
     const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined
     const status = error.response?.status
     const isAuthPath = (original?.url ?? '').startsWith('/auth/')

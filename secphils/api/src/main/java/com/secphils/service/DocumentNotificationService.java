@@ -111,7 +111,7 @@ public class DocumentNotificationService {
             if (prefAllows(pref == null ? null : pref.getEmail())
                     && u.getEmail() != null && !u.getEmail().isBlank()) {
                 try {
-                    mail.sendHtml(u.getEmail(),
+                    mail.sendHtmlAsync(u.getEmail(),
                             templateService.subject(EmailTemplateService.DOCUMENT_UPLOADED, perRecipient),
                             templateService.brandedCard(
                                     templateService.kicker(EmailTemplateService.DOCUMENT_UPLOADED, perRecipient),
