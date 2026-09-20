@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
+import ToastHub from '@/components/ToastHub.vue'
 import { refreshBrandTheme } from '@/composables/useBrandTheme'
 
 // Apply the admin-configured brand scheme to the whole shell (public /landing
@@ -10,4 +11,6 @@ void refreshBrandTheme()
 
 <template>
   <RouterView />
+  <!-- Portal-wide toast stack (see composables/useToast.ts) -->
+  <ToastHub />
 </template>

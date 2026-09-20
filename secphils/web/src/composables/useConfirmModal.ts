@@ -27,7 +27,12 @@ export interface ConfirmRequest {
    *  passed to `run(password)`. */
   requirePassword?: boolean
   passwordHint?: string
-  run: (password: string) => Promise<void>
+  /** Single-line text input mode (rename prompts etc.); its value is passed
+   *  to `run(password, input)`. Empty/whitespace input disables confirm. */
+  input?: boolean
+  inputValue?: string
+  inputLabel?: string
+  run: (password: string, input: string) => Promise<void>
 }
 
 export function useConfirmModal() {
@@ -46,13 +51,13 @@ export function useConfirmModal() {
     if (!v && !busy.value) request.value = null
   }
 
-  async function onConfirm(password: string) {
+  async function onConfirm(password: string, input: string) {
     const req = request.value
     if (!req || busy.value) return
     busy.value = true
     error.value = ''
     try {
-      await req.run(password)
+      await req.run(password, input)
       request.value = null
     } catch (e: any) {
       error.value =
@@ -82,6 +87,9 @@ export function useConfirmModal() {
         danger: r?.danger ?? false,
         requirePassword: r?.requirePassword ?? false,
         ...(r?.passwordHint ? { passwordHint: r.passwordHint } : {}),
+        input: r?.input ?? false,
+        inputValue: r?.inputValue ?? '',
+        inputLabel: r?.inputLabel ?? 'Value',
         busy: busy.value,
         error: error.value,
       }

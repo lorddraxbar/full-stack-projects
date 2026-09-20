@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRole } from '@/composables/useRole'
 import {
   useGetDocuments, useDeleteDocument, useUploadDocument, useDownloadDocument, useGetProjects,
@@ -7,6 +7,7 @@ import {
 } from '@/services/api'
 import { useRetention } from '@/composables/useRetention'
 import DocumentPreviewModal from '@/components/DocumentPreviewModal.vue'
+import { toast } from '@/composables/useToast'
 import RequestDeletionModal from '@/components/RequestDeletionModal.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 import { useConfirmModal } from '@/composables/useConfirmModal'
@@ -209,7 +210,7 @@ async function downloadDocument(doc: DocRow) {
     a.remove()
     URL.revokeObjectURL(url)
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to download document')
+    toast.error(e?.response?.data?.message || 'Failed to download document')
   }
 }
 
@@ -229,15 +230,6 @@ function requestDeletion(doc: DocRow) {
   requestDoc.value = { id: doc.id, title: doc.title }
   requestOpen.value = true
 }
-
-const flash = ref<{ type: 'success' | 'error'; text: string } | null>(null)
-let flashTimer: ReturnType<typeof setTimeout> | null = null
-function showFlash(type: 'success' | 'error', text: string) {
-  flash.value = { type, text }
-  if (flashTimer) clearTimeout(flashTimer)
-  flashTimer = setTimeout(() => (flash.value = null), 6000)
-}
-onBeforeUnmount(() => { if (flashTimer) clearTimeout(flashTimer) })
 
 const confirm = useConfirmModal()
 
@@ -296,7 +288,7 @@ async function confirmPassword() {
       await useDeleteDocumentPermanently(docId, passwordInput.value)
     } else {
       const res: any = await useEmptyTrash(passwordInput.value)
-      alert(`Trash emptied — ${res?.purged ?? 0} document(s) permanently deleted.`)
+      toast.success(`Trash emptied — ${res?.purged ?? 0} document(s) permanently deleted.`)
     }
     passwordModal.value.open = false
     await loadTrash()
@@ -337,7 +329,7 @@ async function downloadTrashDoc(doc: any) {
     a.remove()
     URL.revokeObjectURL(url)
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to download document')
+    toast.error(e?.response?.data?.message || 'Failed to download document')
   }
 }
 
@@ -350,15 +342,6 @@ onMounted(async () => {
 
 <template>
   <div>
-    <div
-      v-if="flash"
-      :class="[
-        'mb-4 p-3 rounded-lg text-sm',
-        flash.type === 'success' ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-700',
-      ]"
-    >
-      {{ flash.text }}
-    </div>
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
       <div>
         <h1 class="text-2xl font-bold text-gray-900">Documents</h1>
@@ -650,7 +633,7 @@ onMounted(async () => {
     <RequestDeletionModal
       v-model:open="requestOpen"
       :doc="requestDoc"
-      @requested="(d) => showFlash('success', `Request sent — SECPhils will review \u201c${d.title}\u201d and remove it if appropriate.`)"
+      @requested="(d) => toast.success(`Request sent — SECPhils will review \u201c${d.title}\u201d and remove it if appropriate.`)"
     />
 
     <!-- Upload Modal -->

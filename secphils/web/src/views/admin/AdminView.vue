@@ -8,6 +8,7 @@ import { applyBrandTheme } from '../../composables/useBrandTheme'
 import Pagination from '../../components/Pagination.vue'
 import ConfirmModal from '../../components/ConfirmModal.vue'
 import { useConfirmModal } from '../../composables/useConfirmModal'
+import { toast } from '../../composables/useToast'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 
 const authStore = useAuthStore()
@@ -205,7 +206,7 @@ const resumeCompany = async (c: ClientCompany) => {
     await useResumeCompany(c.id)
     await loadCompanies()
   } catch (err: any) {
-    alert(err.response?.data?.message || 'Failed to resume company')
+    toast.error(err.response?.data?.message || 'Failed to resume company')
   }
 }
 const companyHardDeleteTarget = ref<ClientCompany | null>(null)
@@ -315,9 +316,9 @@ const userRowActions = (user: PortalUser): RowAction[] => {
 const resendInvite = async (user: PortalUser) => {
   try {
     const data = await useResendInvite(user.id)
-    alert(data.message || 'Invite link re-sent')
+    toast.success(data.message || 'Invite link re-sent')
   } catch (err: any) {
-    alert(err.response?.data?.message || 'Failed to resend invite')
+    toast.error(err.response?.data?.message || 'Failed to resend invite')
   }
 }
 
@@ -326,7 +327,7 @@ const deactivateUser = async (user: PortalUser) => {
     await useDeactivateUser(user.id)
     await loadUsers()
   } catch (err: any) {
-    alert(err.response?.data?.message || 'Failed to deactivate user')
+    toast.error(err.response?.data?.message || 'Failed to deactivate user')
   }
 }
 
@@ -335,7 +336,7 @@ const activateUser = async (user: PortalUser) => {
     await useActivateUser(user.id)
     await loadUsers()
   } catch (err: any) {
-    alert(err.response?.data?.message || 'Failed to activate user')
+    toast.error(err.response?.data?.message || 'Failed to activate user')
   }
 }
 
@@ -727,7 +728,7 @@ const archiveService = async (s: ServiceItem) => {
     await useDeactivateService(s.id)
     await loadServices()
   } catch (err: any) {
-    alert(err.response?.data?.message || 'Failed to archive service')
+    toast.error(err.response?.data?.message || 'Failed to archive service')
   }
 }
 const restoreService = async (s: ServiceItem) => {
@@ -735,7 +736,7 @@ const restoreService = async (s: ServiceItem) => {
     await useActivateService(s.id)
     await loadServices()
   } catch (err: any) {
-    alert(err.response?.data?.message || 'Failed to restore service')
+    toast.error(err.response?.data?.message || 'Failed to restore service')
   }
 }
 
@@ -849,7 +850,7 @@ const deleteCategory = async () => {
     categoryDeleteTarget.value = null
     await loadServiceCategories()
   } catch (err: any) {
-    alert(err.response?.data?.message || 'Failed to delete category')
+    toast.error(err.response?.data?.message || 'Failed to delete category')
   }
 }
 const categoryRowActions = (c: ServiceCategoryItem): RowAction[] => {
@@ -860,7 +861,7 @@ const categoryRowActions = (c: ServiceCategoryItem): RowAction[] => {
     color: 'text-red-600 hover:text-red-700 hover:bg-red-50',
     onClick: () => {
       if ((c.serviceCount ?? 0) > 0) {
-        alert(`Cannot delete "${c.name}": it still has ${c.serviceCount} service(s). Move or delete those first.`)
+        toast.info(`Cannot delete "${c.name}": it still has ${c.serviceCount} service(s). Move or delete those first.`)
       } else {
         categoryDeleteTarget.value = c
       }
@@ -935,7 +936,7 @@ const addDropdownValue = async (category: DropdownCategoryItem, value: string) =
     await loadDropdowns()
     invalidateAllDropdowns()
   } catch (e) {
-    alert('Failed to add value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
+    toast.error('Failed to add value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
   }
 }
 const removeDropdownValue = async (_category: DropdownCategoryItem, dv: DropdownValueItem) => {
@@ -944,23 +945,31 @@ const removeDropdownValue = async (_category: DropdownCategoryItem, dv: Dropdown
     await loadDropdowns()
     invalidateAllDropdowns()
   } catch (e) {
-    alert('Failed to delete value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
+    toast.error('Failed to delete value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
   }
 }
 // Renames the DISPLAY LABEL — the stored code is load-bearing (projects,
 // announcements and the auth layer key on it), so the panel only ever offers
 // the label surface. Locked codes reject even that? No: label edits are always
 // safe; the server refuses code edits and deletes on locked values.
-const renameDropdownValue = async (v: DropdownValueItem) => {
-  const label = prompt('Rename label (the stored code stays unchanged)', v.displayLabel || v.value)?.trim()
-  if (!label) return
-  try {
-    await useUpdateDropdownValue(v.id, { displayLabel: label })
-    await loadDropdowns()
-    invalidateAllDropdowns()
-  } catch (e) {
-    alert('Failed to rename value: ' + ((e as any)?.response?.data?.message || (e as Error).message))
-  }
+function renameDropdownValue(v: DropdownValueItem) {
+  confirm.ask({
+    title: 'Rename label',
+    message: 'Only the display label changes — the stored code stays unchanged.',
+    confirmLabel: 'Rename',
+    input: true,
+    inputValue: v.displayLabel || v.value,
+    inputLabel: 'Display label',
+    run: async (_pw: string, label: string) => {
+      try {
+        await useUpdateDropdownValue(v.id, { displayLabel: label })
+        await loadDropdowns()
+        invalidateAllDropdowns()
+      } catch (e: any) {
+        throw new Error(e?.response?.data?.message || e?.message || 'Failed to rename value')
+      }
+    },
+  })
 }
 
 // ---------- System Settings (real API) ----------

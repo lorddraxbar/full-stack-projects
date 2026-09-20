@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRole } from '@/composables/useRole'
 import { useGetReviews, useSubmitReview, useUpdateReviewStatus, useGetProjects, useGetUsers } from '@/services/api'
 import Pagination from '@/components/Pagination.vue'
+import { toast } from '@/composables/useToast'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -186,7 +187,7 @@ async function setStatus(id: number, status: string) {
     await load()
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } }; message?: string }
-    alert(err.response?.data?.message || err.message || 'Failed to update review status')
+    toast.error(err.response?.data?.message || err.message || 'Failed to update review status')
   }
 }
 </script>

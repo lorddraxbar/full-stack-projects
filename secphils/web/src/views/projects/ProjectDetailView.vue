@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRole } from '@/composables/useRole'
 import RowActionsMenu from '@/components/RowActionsMenu.vue'
@@ -7,6 +7,7 @@ import BackToListButton from '@/components/BackToListButton.vue'
 import DocumentPreviewModal from '@/components/DocumentPreviewModal.vue'
 import RequestDeletionModal from '@/components/RequestDeletionModal.vue'
 import TrashMessageModal from '@/components/TrashMessageModal.vue'
+import { toast } from '@/composables/useToast'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 import { useConfirmModal } from '@/composables/useConfirmModal'
 import { useRetention } from '@/composables/useRetention'
@@ -422,14 +423,7 @@ function requestDeletion(doc: any) {
   requestDoc.value = { id: doc.id, title: doc.title }
   requestOpen.value = true
 }
-const delFlash = ref('')
-let delFlashTimer: ReturnType<typeof setTimeout> | null = null
-function showDelFlash(text: string) {
-  delFlash.value = text
-  if (delFlashTimer) clearTimeout(delFlashTimer)
-  delFlashTimer = setTimeout(() => (delFlash.value = ''), 6000)
-}
-onBeforeUnmount(() => { if (delFlashTimer) clearTimeout(delFlashTimer) })
+
 function previewAttachment(msg: any) {
   previewDoc.value = { kind: 'message', id: msg.id, title: msg.attachmentFileName || 'Attachment', fileName: msg.attachmentFileName || '' }
   previewOpen.value = true
@@ -2000,7 +1994,7 @@ async function saveProductionEdit() {
     <RequestDeletionModal
       v-model:open="requestOpen"
       :doc="requestDoc"
-      @requested="(d) => showDelFlash(`Request sent \u2014 SECPhils will review \u201c${d.title}\u201d and remove it if appropriate.`)"
+      @requested="(d) => toast.success(`Request sent \u2014 SECPhils will review \u201c${d.title}\u201d and remove it if appropriate.`)"
     />
 
     <!-- ================= STAFF REMOVE MESSAGE DIALOG (erasure path) ================= -->

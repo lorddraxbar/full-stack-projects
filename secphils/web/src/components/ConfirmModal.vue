@@ -28,6 +28,12 @@ const props = withDefaults(defineProps<{
   error?: string
   requirePassword?: boolean
   passwordHint?: string
+  /** Single-line text input mode (renames, short required text — the
+   *  replacement for native prompt()). Prefilled with inputValue; its value
+   *  arrives as the confirm event's second argument and run()'s second. */
+  input?: boolean
+  inputValue?: string
+  inputLabel?: string
 }>(), {
   message: '',
   confirmLabel: 'Confirm',
@@ -37,22 +43,28 @@ const props = withDefaults(defineProps<{
   error: '',
   requirePassword: false,
   passwordHint: 'Your password confirms this action is really yours.',
+  input: false,
+  inputValue: '',
+  inputLabel: 'Value',
 })
 
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
-  (e: 'confirm', password: string): void
+  (e: 'confirm', password: string, input: string): void
 }>()
 
 const password = ref('')
-watch(() => props.open, (v) => { if (v) password.value = '' })
+const inputValue = ref('')
+watch(() => props.open, (v) => { if (v) { password.value = ''; inputValue.value = props.inputValue || '' } })
 
 const confirmDisabled = computed(
-  () => props.busy || (props.requirePassword && password.value.length === 0))
+  () => props.busy
+    || (props.requirePassword && password.value.length === 0)
+    || (props.input && inputValue.value.trim().length === 0))
 
 function submit() {
   if (!props.open || confirmDisabled.value) return
-  emit('confirm', password.value)
+  emit('confirm', password.value, props.input ? inputValue.value.trim() : '')
 }
 
 function onKey(e: KeyboardEvent) {
@@ -106,6 +118,18 @@ onBeforeUnmount(() => {
           @keyup.enter="submit"
         />
         <p class="mt-1 text-xs text-gray-500">{{ passwordHint }}</p>
+      </div>
+      <div v-if="input" class="mb-1">
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          {{ inputLabel }} <span class="text-red-500">*</span>
+        </label>
+        <input
+          v-model="inputValue"
+          type="text"
+          autocomplete="off"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          @keyup.enter="submit"
+        />
       </div>
       <p v-if="error" class="mt-3 text-sm text-red-600">{{ error }}</p>
       <div class="flex justify-end gap-3 mt-5">

@@ -7,6 +7,7 @@ import {
 import Pagination from '@/components/Pagination.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 import { useConfirmModal } from '@/composables/useConfirmModal'
+import { toast } from '@/composables/useToast'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -273,7 +274,7 @@ async function togglePublish(a: Announcement) {
     await load()
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } }; message?: string }
-    alert(err.response?.data?.message || err.message || 'Failed to update announcement')
+    toast.error(err.response?.data?.message || err.message || 'Failed to update announcement')
   }
 }
 

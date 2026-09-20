@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import QRCode from 'qrcode'
 import { useRole } from '@/composables/useRole'
+import { toast } from '@/composables/useToast'
 import { useRetention } from '@/composables/useRetention'
 import {
   useGetMe,
@@ -27,13 +28,8 @@ const activeTab = ref('profile')
 const loading = ref(true)
 
 // ---------- Feedback ----------
-const notice = ref<{ type: 'success' | 'error'; text: string } | null>(null)
-let noticeTimer: ReturnType<typeof setTimeout> | null = null
-const flash = (type: 'success' | 'error', text: string) => {
-  notice.value = { type, text }
-  if (noticeTimer) clearTimeout(noticeTimer)
-  noticeTimer = setTimeout(() => (notice.value = null), 4000)
-}
+// Portal-wide toast standard (composables/useToast.ts).
+
 
 // ---------- Profile (all roles) ----------
 const profile = ref({
@@ -74,9 +70,9 @@ async function saveProfile() {
       phone: profile.value.phone,
     })
     localStorage.setItem('userName', profileFullName.value)
-    flash('success', 'Profile updated successfully')
+    toast.success('Profile updated successfully')
   } catch (e: any) {
-    flash('error', e?.response?.data?.message ?? 'Failed to save profile')
+    toast.error(e?.response?.data?.message ?? 'Failed to save profile')
   } finally {
     savingProfile.value = false
   }
@@ -86,7 +82,7 @@ function onAvatarSelected(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
   if (file.size > 2 * 1024 * 1024) {
-    flash('error', 'Image must be 2MB or smaller')
+    toast.error('Image must be 2MB or smaller')
     return
   }
   const reader = new FileReader()
@@ -94,9 +90,9 @@ function onAvatarSelected(e: Event) {
     profile.value.avatar = String(reader.result)
     try {
       await useUpdateMe({ avatar: profile.value.avatar })
-      flash('success', 'Avatar updated')
+      toast.success('Avatar updated')
     } catch (err: any) {
-      flash('error', err?.response?.data?.message ?? 'Failed to update avatar')
+      toast.error(err?.response?.data?.message ?? 'Failed to update avatar')
     }
   }
   reader.readAsDataURL(file)
@@ -132,9 +128,9 @@ async function saveCompany() {
       location: company.value.address,
       contactDetails: company.value.contactDetails,
     })
-    flash('success', 'Company profile saved')
+    toast.success('Company profile saved')
   } catch (e: any) {
-    flash('error', e?.response?.data?.message ?? 'Failed to save company profile')
+    toast.error(e?.response?.data?.message ?? 'Failed to save company profile')
   }
 }
 
@@ -177,9 +173,9 @@ async function removeMember() {
     await useRemoveTeamMember(m.id)
     memberToRemove.value = null
     await loadTeam()
-    flash('success', `${m.name}'s portal access has been removed.`)
+    toast.success(`${m.name}'s portal access has been removed.`)
   } catch (e: any) {
-    flash('error', e?.response?.data?.message ?? 'Failed to remove the team member')
+    toast.error(e?.response?.data?.message ?? 'Failed to remove the team member')
   } finally {
     removingMember.value = false
   }
@@ -195,7 +191,7 @@ async function loadTeam() {
 
 async function inviteMember() {
   if (!inviteForm.value.email.trim()) {
-    flash('error', 'Please enter an email address.')
+    toast.error('Please enter an email address.')
     return
   }
   inviting.value = true
@@ -208,9 +204,9 @@ async function inviteMember() {
     inviteForm.value = { name: '', email: '', phone: '' }
     showInviteModal.value = false
     await loadTeam()
-    flash('success', 'Invitation sent. The team member will receive an email with an account setup link.')
+    toast.success('Invitation sent. The team member will receive an email with an account setup link.')
   } catch (e: any) {
-    flash('error', e?.response?.data?.message ?? 'Failed to send invitation')
+    toast.error(e?.response?.data?.message ?? 'Failed to send invitation')
   } finally {
     inviting.value = false
   }
@@ -233,9 +229,9 @@ async function saveNotifications() {
       email: notificationPrefs.value.email,
       inApp: notificationPrefs.value.inApp,
     })
-    flash('success', 'Notification preferences saved')
+    toast.success('Notification preferences saved')
   } catch (e: any) {
-    flash('error', e?.response?.data?.message ?? 'Failed to save preferences')
+    toast.error(e?.response?.data?.message ?? 'Failed to save preferences')
   }
 }
 
@@ -245,20 +241,20 @@ const changingPassword = ref(false)
 
 async function changePassword() {
   if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
-    flash('error', 'New passwords do not match')
+    toast.error('New passwords do not match')
     return
   }
   if (passwordForm.value.newPassword.length < 8) {
-    flash('error', 'Password must be at least 8 characters')
+    toast.error('Password must be at least 8 characters')
     return
   }
   changingPassword.value = true
   try {
     await useChangePassword(passwordForm.value.currentPassword, passwordForm.value.newPassword)
     passwordForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' }
-    flash('success', 'Password changed successfully')
+    toast.success('Password changed successfully')
   } catch (e: any) {
-    flash('error', e?.response?.data?.message ?? 'Failed to change password')
+    toast.error(e?.response?.data?.message ?? 'Failed to change password')
   } finally {
     changingPassword.value = false
   }
@@ -311,7 +307,7 @@ async function confirm2faEnable() {
     twoFactorSecret.value = ''
     twoFactorOtpauthUri.value = ''
     twoFactorCode.value = ''
-    flash('success', 'Two-factor authentication enabled')
+    toast.success('Two-factor authentication enabled')
   } catch (e: any) {
     twoFactorError.value = e?.response?.data?.message ?? 'Invalid verification code'
   } finally {
@@ -331,7 +327,7 @@ async function confirm2faDisable() {
     profile.value.twoFactorEnabled = false
     show2faDisable.value = false
     twoFactorCode.value = ''
-    flash('success', 'Two-factor authentication disabled')
+    toast.success('Two-factor authentication disabled')
   } catch (e: any) {
     twoFactorError.value = e?.response?.data?.message ?? 'Invalid verification code'
   } finally {
@@ -422,15 +418,6 @@ onMounted(async () => {
       <p class="text-gray-600 mt-1">{{ subheading }}</p>
     </div>
 
-    <div
-      v-if="notice"
-      :class="[
-        'mb-6 p-3 rounded-lg text-sm',
-        notice.type === 'success' ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-700',
-      ]"
-    >
-      {{ notice.text }}
-    </div>
 
     <div v-if="loading" class="py-16 text-center text-gray-500">Loading settings…</div>
 
