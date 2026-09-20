@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useUserName } from '@/composables/useUserName'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || '')
@@ -19,7 +20,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('accessToken')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('userRole')
-    localStorage.removeItem('userName')
+    useUserName().clearName()
   }
 
   function updateUser(updates: Record<string, unknown>) {

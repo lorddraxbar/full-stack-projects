@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGetSsoStatus, useGoogleSsoAuthorize } from '@/services/api'
 import { useRole } from '@/composables/useRole'
+import { useUserName } from '@/composables/useUserName'
 
 const router = useRouter()
 const { setRole } = useRole()
@@ -44,7 +45,7 @@ function storeSession(data: any) {
   localStorage.setItem('accessToken', data.accessToken)
   localStorage.setItem('refreshToken', data.refreshToken)
   setRole(data.user?.role || 'CLIENT')
-  localStorage.setItem('userName', data.user?.fullName || 'User')
+  useUserName().setName(data.user?.fullName || 'User')
   if (data.user?.id) localStorage.setItem('userId', String(data.user.id))
   // Admin-configurable brand + app title (echoed on every login/SSO path) so
   // the drawer wordmark and document.title can render them without a fetch.

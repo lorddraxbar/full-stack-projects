@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { useRole } from '@/composables/useRole'
+import { useUserName } from '@/composables/useUserName'
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -29,7 +30,7 @@ function tryRefresh(): Promise<boolean> {
         localStorage.setItem('accessToken', data.accessToken)
         localStorage.setItem('refreshToken', data.refreshToken)
         if (data.user?.role) useRole().setRole(data.user.role)
-        if (data.user?.fullName) localStorage.setItem('userName', data.user.fullName)
+        if (data.user?.fullName) useUserName().setName(data.user.fullName)
         if (data.user?.id != null) localStorage.setItem('userId', String(data.user.id))
         return true
       } catch {
@@ -46,7 +47,7 @@ function clearSession() {
   localStorage.removeItem('accessToken')
   localStorage.removeItem('refreshToken')
   localStorage.removeItem('userRole')
-  localStorage.removeItem('userName')
+  useUserName().clearName()
   localStorage.removeItem('userId')
   if (!window.location.pathname.startsWith('/auth/login')) {
     window.location.href = '/auth/login'

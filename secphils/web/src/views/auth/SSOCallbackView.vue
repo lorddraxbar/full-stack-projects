@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGoogleSsoCallback } from '@/services/api'
 import { useRole } from '@/composables/useRole'
+import { useUserName } from '@/composables/useUserName'
 
 const router = useRouter()
 const { setRole } = useRole()
@@ -15,7 +16,7 @@ function storeSession(data: any) {
   localStorage.setItem('accessToken', data.accessToken)
   localStorage.setItem('refreshToken', data.refreshToken)
   setRole(data.user?.role || 'CLIENT')
-  localStorage.setItem('userName', data.user?.fullName || 'User')
+  useUserName().setName(data.user?.fullName || 'User')
   if (data.user?.id) localStorage.setItem('userId', String(data.user.id))
   if (data.brand) localStorage.setItem('brandName', data.brand)
   if (data.portalName) localStorage.setItem('portalName', data.portalName)

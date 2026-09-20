@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useRole } from '../composables/useRole'
+import { useUserName } from '../composables/useUserName'
 import { useBrand } from '../composables/useBrand'
 import { useGetNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, useMarkSectionRead } from '../services/api'
 
@@ -130,8 +131,8 @@ async function markAllNotifsRead() {
 
 let notifTimer: number | null = null
 
-const userName = computed(() => localStorage.getItem('userName') || 'User')
-const userInitial = computed(() => userName.value.charAt(0))
+// reactive (useUserName): renaming yourself on Settings updates the chip live
+const { userName, userInitial } = useUserName()
 
 const MOBILE_BREAKPOINT = 768
 
@@ -193,7 +194,7 @@ const logout = () => {
   setRole(null)
   localStorage.removeItem('accessToken')
   localStorage.removeItem('refreshToken')
-  localStorage.removeItem('userName')
+  useUserName().clearName()
   localStorage.removeItem('userId')
   router.push('/auth/login')
 }

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import QRCode from 'qrcode'
 import { useRole } from '@/composables/useRole'
+import { useUserName } from '@/composables/useUserName'
 import { toast } from '@/composables/useToast'
 import { useRetention } from '@/composables/useRetention'
 import {
@@ -69,7 +70,7 @@ async function saveProfile() {
       email: profile.value.email,
       phone: profile.value.phone,
     })
-    localStorage.setItem('userName', profileFullName.value)
+    useUserName().setName(profileFullName.value)
     toast.success('Profile updated successfully')
   } catch (e: any) {
     toast.error(e?.response?.data?.message ?? 'Failed to save profile')

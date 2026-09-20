@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 /**
  * Shared pagination footer for every list surface (projects, documents,
@@ -11,6 +11,14 @@ import { computed } from 'vue'
  * as there is at least one row; on a single page the Prev/Next buttons are
  * present but disabled, so every list shows the same footer (consistency over
  * necessity). `total > pageSize` is where the nav actually does something.
+ *
+ * SELF-CLAMP (portal-wide rule): when the row count shrinks under the current
+ * page — deleting the last row on page 2+, or an empty filter — the component
+ * writes the page back to the last valid one. Without this, a delete on the
+ * final row of a trailing page leaves the list showing a phantom-empty page
+ * ("nothing found" while rows exist) on EVERY list surface that pages. The
+ * clamp lives here, at the single choke point all lists share, instead of
+ * ten copies of a length-watcher.
  */
 const props = defineProps<{
   /** 1-based current page. */
@@ -28,6 +36,13 @@ const emit = defineEmits<{
 }>()
 
 const totalPages = computed(() => Math.max(1, Math.ceil(props.total / props.pageSize)))
+
+// Clamp only when there ARE rows — at total 0 the component renders nothing,
+// and resetting the page of an empty list would fight a caller that
+// intentionally restores a saved page position.
+watch(totalPages, (max) => {
+  if (props.total > 0 && props.page > max) emit('update:page', max)
+}, { immediate: true })
 const start = computed(() => (props.total === 0 ? 0 : (props.page - 1) * props.pageSize + 1))
 const end = computed(() => Math.min(props.page * props.pageSize, props.total))
 const canPrev = computed(() => props.page > 1)
