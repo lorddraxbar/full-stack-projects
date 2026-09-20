@@ -8,6 +8,8 @@ import {
 import { useRetention } from '@/composables/useRetention'
 import DocumentPreviewModal from '@/components/DocumentPreviewModal.vue'
 import RequestDeletionModal from '@/components/RequestDeletionModal.vue'
+import ConfirmModal from '@/components/ConfirmModal.vue'
+import { useConfirmModal } from '@/composables/useConfirmModal'
 import Pagination from '@/components/Pagination.vue'
 import {
   fileTypeLabel, FILE_TYPE_LABELS, FILE_TYPE_COLORS,
@@ -237,15 +239,24 @@ function showFlash(type: 'success' | 'error', text: string) {
 }
 onBeforeUnmount(() => { if (flashTimer) clearTimeout(flashTimer) })
 
+const confirm = useConfirmModal()
+
 async function removeDocument(doc: DocRow) {
-  if (!confirm(`Move "${doc.title}" to the trash? It will be permanently deleted after ${retentionDays.value} days unless restored earlier.`)) return
-  try {
-    await useDeleteDocument(doc.id)
-    await loadDocuments()
-    await loadTrash()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to move document to the trash')
-  }
+  confirm.ask({
+    title: 'Move this document to the trash?',
+    message: `“${doc.title}” will be permanently deleted after ${retentionDays.value} days unless restored earlier.`,
+    confirmLabel: 'Move to Trash',
+    danger: true,
+    run: async () => {
+      try {
+        await useDeleteDocument(doc.id)
+        await loadDocuments()
+        await loadTrash()
+      } catch (e: any) {
+        throw new Error(e?.response?.data?.message || 'Failed to move document to the trash')
+      }
+    },
+  })
 }
 
 // ---------- Trash ----------
@@ -297,15 +308,21 @@ async function confirmPassword() {
   }
 }
 
-async function restoreDoc(doc: any) {
-  if (!confirm(`Restore "${doc.title}"?`)) return
-  try {
-    await useRestoreDocument(doc.id)
-    await loadTrash()
-    await loadDocuments()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to restore document')
-  }
+function restoreDoc(doc: any) {
+  confirm.ask({
+    title: 'Restore this document?',
+    message: `“${doc.title}” will return to its project where it was before being trashed.`,
+    confirmLabel: 'Restore Document',
+    run: async () => {
+      try {
+        await useRestoreDocument(doc.id)
+        await loadTrash()
+        await loadDocuments()
+      } catch (e: any) {
+        throw new Error(e?.response?.data?.message || 'Failed to restore document')
+      }
+    },
+  })
 }
 
 async function downloadTrashDoc(doc: any) {
@@ -621,6 +638,13 @@ onMounted(async () => {
 
     <!-- Document preview (shared modal — same surface as the project view) -->
     <DocumentPreviewModal v-model:open="previewOpen" :doc="previewDoc" />
+
+    <!-- Shared confirm dialog (trash / restore) -->
+    <ConfirmModal
+      v-bind="confirm.props"
+      @update:open="confirm.onOpenChange"
+      @confirm="confirm.onConfirm"
+    />
 
     <!-- Client: request deletion (shared modal — same surface as the project view) -->
     <RequestDeletionModal

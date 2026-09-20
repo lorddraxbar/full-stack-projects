@@ -5,6 +5,8 @@ import {
   useGetAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement, useGetProjects, useGetCompanies,
 } from '@/services/api'
 import Pagination from '@/components/Pagination.vue'
+import ConfirmModal from '@/components/ConfirmModal.vue'
+import { useConfirmModal } from '@/composables/useConfirmModal'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -275,15 +277,23 @@ async function togglePublish(a: Announcement) {
   }
 }
 
-async function remove(a: Announcement) {
-  if (!confirm(`Delete "${a.title}"? This cannot be undone.`)) return
-  try {
-    await useDeleteAnnouncement(a.id)
-    await load()
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } }; message?: string }
-    alert(err.response?.data?.message || err.message || 'Failed to delete announcement')
-  }
+const confirm = useConfirmModal()
+function remove(a: Announcement) {
+  confirm.ask({
+    title: 'Delete this announcement?',
+    message: `“${a.title}” will be deleted for everyone who can see it. This cannot be undone.`,
+    confirmLabel: 'Delete Announcement',
+    danger: true,
+    run: async () => {
+      try {
+        await useDeleteAnnouncement(a.id)
+        await load()
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } }; message?: string }
+        throw new Error(err.response?.data?.message || err.message || 'Failed to delete announcement')
+      }
+    },
+  })
 }
 
 /** Staff may delete only their own announcements (admin: any) — mirrors the backend rule. */
@@ -410,6 +420,13 @@ function categoryColor(c: string) {
     <div v-if="loading" class="bg-white rounded-lg shadow p-12 text-center">
       <p class="text-gray-500">Loading announcements…</p>
     </div>
+
+    <!-- Shared confirm dialog (delete announcement) -->
+    <ConfirmModal
+      v-bind="confirm.props"
+      @update:open="confirm.onOpenChange"
+      @confirm="confirm.onConfirm"
+    />
 
     <!-- Create / edit announcement dialog -->
     <Dialog v-model:open="showForm">

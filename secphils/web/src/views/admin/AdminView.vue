@@ -6,9 +6,12 @@ import { useRetention } from '../../composables/useRetention'
 import { invalidateDropdownOptions } from '../../composables/useDropdownOptions'
 import { applyBrandTheme } from '../../composables/useBrandTheme'
 import Pagination from '../../components/Pagination.vue'
+import ConfirmModal from '../../components/ConfirmModal.vue'
+import { useConfirmModal } from '../../composables/useConfirmModal'
 import RowActionsMenu, { type RowAction } from '../../components/RowActionsMenu.vue'
 
 const authStore = useAuthStore()
+const confirm = useConfirmModal()
 // Live retention window (admin-configurable, default 7) — drives the
 // eligibility hints in the user/service hard-delete modals.
 const { retentionDays } = useRetention()
@@ -181,14 +184,21 @@ const clientRowActions = (c: ClientCompany): RowAction[] => {
   return actions
 }
 
-const pauseCompany = async (c: ClientCompany) => {
-  if (!confirm(`Pause ${c.name}? Their team members will not be able to sign in until you resume the company. Projects and history stay intact.`)) return
-  try {
-    await usePauseCompany(c.id)
-    await loadCompanies()
-  } catch (err: any) {
-    alert(err.response?.data?.message || 'Failed to pause company')
-  }
+const pauseCompany = (c: ClientCompany) => {
+  confirm.ask({
+    title: `Pause ${c.name}?`,
+    message: 'Their team members will not be able to sign in until you resume the company. Projects and history stay intact.',
+    confirmLabel: 'Pause Company',
+    danger: true,
+    run: async () => {
+      try {
+        await usePauseCompany(c.id)
+        await loadCompanies()
+      } catch (err: any) {
+        throw new Error(err?.response?.data?.message || 'Failed to pause company')
+      }
+    },
+  })
 }
 const resumeCompany = async (c: ClientCompany) => {
   try {
@@ -3030,6 +3040,13 @@ const isActiveTab = (tab: string) => activeTab.value === tab
         />
       </div>
     </div>
+
+    <!-- Shared confirm dialog (pause company, etc.) -->
+    <ConfirmModal
+      v-bind="confirm.props"
+      @update:open="confirm.onOpenChange"
+      @confirm="confirm.onConfirm"
+    />
 
     <!-- Hard delete confirmation modal -->
     <div v-if="hardDeleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

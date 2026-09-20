@@ -7,6 +7,9 @@ import BackToListButton from '@/components/BackToListButton.vue'
 import DocumentPreviewModal from '@/components/DocumentPreviewModal.vue'
 import RequestDeletionModal from '@/components/RequestDeletionModal.vue'
 import TrashMessageModal from '@/components/TrashMessageModal.vue'
+import ConfirmModal from '@/components/ConfirmModal.vue'
+import { useConfirmModal } from '@/composables/useConfirmModal'
+import { useRetention } from '@/composables/useRetention'
 import {
   useGetMe, useGetProject, useGetCompany,
   useGetDocuments, useDeleteDocument, useUploadDocument,
@@ -180,49 +183,76 @@ onMounted(load)
 const router = useRouter()
 const lifecycleBusy = ref(false)
 const archived = computed(() => project.value?.status === 'ARCHIVED')
+const confirm = useConfirmModal()
+const { retentionDays } = useRetention()
 
-async function archiveProject() {
-  if (!confirm('Archive this project? It will be hidden and its files moved into the archive. You can restore it within the grace period.')) return
-  lifecycleBusy.value = true
-  saveError.value = ''
-  try {
-    await useArchiveProject(projectId.value)
-    await load()
-  } catch (err: any) {
-    saveError.value = err?.response?.data?.message || 'Failed to archive project'
-  } finally {
-    lifecycleBusy.value = false
-  }
+function archiveProject() {
+  confirm.ask({
+    title: 'Archive this project?',
+    message: 'It will be hidden and its files moved into the archive. You can restore it within the retention window.',
+    confirmLabel: 'Archive Project',
+    run: async () => {
+      lifecycleBusy.value = true
+      saveError.value = ''
+      try {
+        await useArchiveProject(projectId.value)
+        await load()
+      } catch (err: any) {
+        throw new Error(err?.response?.data?.message || 'Failed to archive project')
+      } finally {
+        lifecycleBusy.value = false
+      }
+    },
+  })
 }
 
-async function restoreProject() {
-  if (!confirm('Restore this archived project? It will return to its previous status.')) return
-  lifecycleBusy.value = true
-  saveError.value = ''
-  try {
-    await useRestoreProject(projectId.value)
-    await load()
-  } catch (err: any) {
-    saveError.value = err?.response?.data?.message || 'Failed to restore project'
-  } finally {
-    lifecycleBusy.value = false
-  }
+function restoreProject() {
+  confirm.ask({
+    title: 'Restore this archived project?',
+    message: 'It will return to its previous status.',
+    confirmLabel: 'Restore Project',
+    run: async () => {
+      lifecycleBusy.value = true
+      saveError.value = ''
+      try {
+        await useRestoreProject(projectId.value)
+        await load()
+      } catch (err: any) {
+        throw new Error(err?.response?.data?.message || 'Failed to restore project')
+      } finally {
+        lifecycleBusy.value = false
+      }
+    },
+  })
 }
 
-async function hardDeleteProject() {
-  if (!confirm('Permanently delete this project? All data and files will be permanently removed. This cannot be undone.')) return
-  // Admins must supply their password when the retention window hasn't elapsed.
-  const password = window.prompt('Enter your password to permanently delete this project:')
-  if (password === null) return
-  lifecycleBusy.value = true
-  saveError.value = ''
-  try {
-    await useHardDeleteProject(projectId.value, password)
-    router.push('/projects')
-  } catch (err: any) {
-    saveError.value = err?.response?.data?.message || 'Failed to delete project'
-    lifecycleBusy.value = false
-  }
+// Mirrors the backend rule (ProjectArchiveService.hardDelete): a password is
+// required only while the retention window is still open.
+const hardDeleteNeedsPassword = computed(() => {
+  const d = project.value?.deleteAt
+  return !d || new Date(d).getTime() > Date.now()
+})
+
+function hardDeleteProject() {
+  confirm.ask({
+    title: 'Permanently delete this project?',
+    message: 'All data and files will be permanently removed. This cannot be undone.',
+    confirmLabel: 'Permanently Delete',
+    danger: true,
+    requirePassword: hardDeleteNeedsPassword.value,
+    passwordHint: `The ${retentionDays.value}-day archive window hasn't elapsed — your password confirms this is really you.`,
+    run: async (password: string) => {
+      lifecycleBusy.value = true
+      saveError.value = ''
+      try {
+        await useHardDeleteProject(projectId.value, password || undefined)
+        router.push('/projects')
+      } catch (err: any) {
+        lifecycleBusy.value = false
+        throw new Error(err?.response?.data?.message || 'Failed to delete project')
+      }
+    },
+  })
 }
 
 // ---------- Messages ----------
@@ -347,14 +377,21 @@ async function submitDocument() {
   }
 }
 
-async function deleteDocument(id: number) {
-  if (!confirm('Delete this document?')) return
-  try {
-    await useDeleteDocument(id)
-    documents.value = await useGetDocuments({ projectId: projectId.value })
-  } catch (err: any) {
-    saveError.value = err?.response?.data?.message || 'Failed to delete document'
-  }
+function deleteDocument(doc: { id: number; title: string }) {
+  confirm.ask({
+    title: 'Move this document to the trash?',
+    message: `“${doc.title}” will be permanently deleted after ${retentionDays.value} days unless restored earlier.`,
+    confirmLabel: 'Move to Trash',
+    danger: true,
+    run: async () => {
+      try {
+        await useDeleteDocument(doc.id)
+        documents.value = await useGetDocuments({ projectId: projectId.value })
+      } catch (err: any) {
+        throw new Error(err?.response?.data?.message || 'Failed to delete document')
+      }
+    },
+  })
 }
 
 // ---------- Client: submit a requested document ----------
@@ -524,37 +561,43 @@ const isAuthorizedRep = computed(() => {
     Number(company.value.authorizedRepId) === Number(me.value.id)
 })
 const completing = ref(false)
-async function markCompleted() {
+function markCompleted() {
   if (!project.value) return
-  if (!confirm('Mark this project as completed? The SECPhils team will be notified and it will appear in the reviews list.')) return
-  completing.value = true
-  saveError.value = ''
-  try {
-    const updated = await useUpdateProject(projectId.value, {
-      companyId: project.value.companyId,
-      serviceId: project.value.serviceId ?? null,
-      name: project.value.name,
-      notes: project.value.notes ?? null,
-      objectives: project.value.objectives ?? null,
-      deliverables: project.value.deliverables ?? null,
-      address: project.value.address ?? null,
-      status: 'COMPLETED',
-      totalCost: project.value.totalCost ?? null,
-      rawMaterials: project.value.rawMaterials ?? null,
-      productionOutput: project.value.productionOutput ?? null,
-      wasteManagement: project.value.wasteManagement ?? null,
-      wasteMaterials: project.value.wasteMaterials ?? null,
-      manufacturingProcedure: project.value.manufacturingProcedure ?? null,
-      checklistNa: project.value.checklistNa ?? '{}',
-      productionFlowchartUrl: project.value.productionFlowchartUrl ?? null,
-      progress: project.value.progress ?? 0,
-    })
-    project.value = updated
-  } catch (err: any) {
-    saveError.value = err?.response?.data?.message || 'Failed to mark the project complete'
-  } finally {
-    completing.value = false
-  }
+  confirm.ask({
+    title: 'Mark this project as completed?',
+    message: 'The SECPhils team will be notified and it will appear in the reviews list.',
+    confirmLabel: 'Mark Completed',
+    run: async () => {
+      completing.value = true
+      saveError.value = ''
+      try {
+        const updated = await useUpdateProject(projectId.value, {
+          companyId: project.value!.companyId,
+          serviceId: project.value!.serviceId ?? null,
+          name: project.value!.name,
+          notes: project.value!.notes ?? null,
+          objectives: project.value!.objectives ?? null,
+          deliverables: project.value!.deliverables ?? null,
+          address: project.value!.address ?? null,
+          status: 'COMPLETED',
+          totalCost: project.value!.totalCost ?? null,
+          rawMaterials: project.value!.rawMaterials ?? null,
+          productionOutput: project.value!.productionOutput ?? null,
+          wasteManagement: project.value!.wasteManagement ?? null,
+          wasteMaterials: project.value!.wasteMaterials ?? null,
+          manufacturingProcedure: project.value!.manufacturingProcedure ?? null,
+          checklistNa: project.value!.checklistNa ?? '{}',
+          productionFlowchartUrl: project.value!.productionFlowchartUrl ?? null,
+          progress: project.value!.progress ?? 0,
+        })
+        project.value = updated
+      } catch (err: any) {
+        throw new Error(err?.response?.data?.message || 'Failed to mark the project complete')
+      } finally {
+        completing.value = false
+      }
+    },
+  })
 }
 
 // ---------- Production details editor ----------
@@ -1660,7 +1703,7 @@ async function saveProductionEdit() {
                     <i class="fas fa-eye mr-1" />Preview
                   </button>
                   <RowActionsMenu v-if="!isClient" :actions="[
-                    { label: 'Delete', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => deleteDocument(doc.id) }
+                    { label: 'Delete', color: 'text-red-600 hover:text-red-700 hover:bg-red-50', onClick: () => deleteDocument(doc) }
                   ]" />
                   <button
                     v-else-if="doc.fileUrl"
@@ -1945,6 +1988,13 @@ async function saveProductionEdit() {
 
     <!-- ================= DOCUMENT PREVIEW ================= -->
     <DocumentPreviewModal v-model:open="previewOpen" :doc="previewDoc" />
+
+    <!-- ================= SHARED CONFIRM DIALOG ================= -->
+    <ConfirmModal
+      v-bind="confirm.props"
+      @update:open="confirm.onOpenChange"
+      @confirm="confirm.onConfirm"
+    />
 
     <!-- ================= CLIENT REQUEST DELETION DIALOG ================= -->
     <RequestDeletionModal
