@@ -232,9 +232,9 @@ export async function useRestoreProject(id: number) {
 }
 
 /**
- * Permanently delete an archived project (admin only).
- * Pass the admin's password when the retention window (admin-configurable,
- * default 7 days) hasn't elapsed.
+ * Permanently delete a project (provider staff: ADMIN or USER).
+ * Portal standard: delete immediately with your account password, or
+ * archive and wait out the retention window for a passwordless delete.
  */
 export async function useHardDeleteProject(id: number, password?: string) {
   const response = await api.delete(`/projects/${id}/hard`, password ? { data: { password } } : {})

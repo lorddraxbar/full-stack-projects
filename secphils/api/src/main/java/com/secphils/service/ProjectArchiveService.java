@@ -156,8 +156,14 @@ public class ProjectArchiveService {
 
     @Transactional
     public void hardDelete(AuthUser actor, Long id, String password) {
-        if (!actor.isAdmin()) {
-            throw ApiException.forbidden("Only admins can permanently delete projects");
+        // Provider-side (ADMIN *or* staff USER) — the portal deletion standard
+        // applies to every provider role: immediate delete with your own
+        // password, or archive-and-wait for a passwordless delete. Clients
+        // are rejected by loadManaged. (Was ADMIN-only; widened 2026-09-22
+        // per Jaybar — mirrors the archive/restore/trash surfaces, which
+        // staff has always managed.)
+        if (!actor.isUserOrAdmin()) {
+            throw ApiException.forbidden("Only provider staff can permanently delete projects");
         }
         Project p = loadManaged(actor, id);
         // No archived-first gate: live projects delete immediately WITH the

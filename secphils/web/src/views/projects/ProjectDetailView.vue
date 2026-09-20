@@ -1970,7 +1970,7 @@ async function saveProductionEdit() {
               {{ lifecycleBusy ? 'Working…' : 'Restore Project' }}
             </button>
             <button
-              v-if="isAdmin"
+              v-if="!isClient"
               @click="hardDeleteProject"
               :disabled="lifecycleBusy"
               class="px-4 py-2 border border-red-300 text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium disabled:opacity-50"
