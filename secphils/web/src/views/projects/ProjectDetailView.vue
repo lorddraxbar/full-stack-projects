@@ -1965,15 +1965,18 @@ async function saveProductionEdit() {
               {{ lifecycleBusy ? 'Working…' : 'Restore Project' }}
             </button>
             <button
-              v-if="isAdmin"
+              v-if="isAdmin && archived"
               @click="hardDeleteProject"
               :disabled="lifecycleBusy"
               class="px-4 py-2 border border-red-300 text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium disabled:opacity-50"
             >
               {{ lifecycleBusy ? 'Working…' : 'Permanently Delete' }}
             </button>
-            <p class="text-xs text-gray-500">
+            <p v-if="archived" class="text-xs text-gray-500">
               Permanent deletion requires your password inside the retention window.
+            </p>
+            <p v-else class="text-xs text-gray-500">
+              Archive this project first — permanent deletion only applies to archived projects.
             </p>
           </div>
         </div>
