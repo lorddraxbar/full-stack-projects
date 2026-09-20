@@ -227,8 +227,11 @@ function restoreProject() {
   })
 }
 
-// Mirrors the backend rule (ProjectArchiveService.hardDelete): a password is
-// required only while the retention window is still open.
+// Mirrors the backend rule (ProjectArchiveService.hardDelete): the password
+// gates every immediate deletion — live projects (no delete_at) AND archived
+// projects still inside the retention window. Archived past the window
+// deletes passwordless. Portal standard: archive-and-wait OR
+// delete-immediately-with-password; archive-first was never required.
 const hardDeleteNeedsPassword = computed(() => {
   const d = project.value?.deleteAt
   return !d || new Date(d).getTime() > Date.now()
@@ -241,7 +244,9 @@ function hardDeleteProject() {
     confirmLabel: 'Permanently Delete',
     danger: true,
     requirePassword: hardDeleteNeedsPassword.value,
-    passwordHint: `The ${retentionDays.value}-day archive window hasn't elapsed — your password confirms this is really you.`,
+    passwordHint: archived.value
+      ? `The ${retentionDays.value}-day archive window hasn't elapsed — your password confirms this is really you.`
+      : 'Your password confirms you want this deleted immediately, without the archive waiting period.',
     run: async (password: string) => {
       lifecycleBusy.value = true
       saveError.value = ''
@@ -1965,18 +1970,17 @@ async function saveProductionEdit() {
               {{ lifecycleBusy ? 'Working…' : 'Restore Project' }}
             </button>
             <button
-              v-if="isAdmin && archived"
+              v-if="isAdmin"
               @click="hardDeleteProject"
               :disabled="lifecycleBusy"
               class="px-4 py-2 border border-red-300 text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium disabled:opacity-50"
             >
               {{ lifecycleBusy ? 'Working…' : 'Permanently Delete' }}
             </button>
-            <p v-if="archived" class="text-xs text-gray-500">
-              Permanent deletion requires your password inside the retention window.
-            </p>
-            <p v-else class="text-xs text-gray-500">
-              Archive this project first — permanent deletion only applies to archived projects.
+            <p class="text-xs text-gray-500">
+              {{ archived
+                ? 'Permanent deletion requires your password inside the retention window.'
+                : 'Delete now with your password, or archive to delete without one after the window.' }}
             </p>
           </div>
         </div>

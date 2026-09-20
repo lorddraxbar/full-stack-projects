@@ -44,9 +44,13 @@ import java.util.Map;
  *              metadata, and notifies the company members.
  *
  *  hardDelete: permanent removal (DB rows + S3 objects). Only admins.
- *              Allowed once delete_at has passed; before the window closes
- *              the requesting admin must re-authenticate with their
- *              account password.
+ *              The portal-wide deletion standard: an admin may delete
+ *              IMMEDIATELY by re-authenticating with their account
+ *              password (live or archived-inside-window projects), or
+ *              wait out the archive retention window — once delete_at has
+ *              passed, no password is required. Archive-first was never
+ *              the rule; the archive path exists for the no-password
+ *              route (mirrors Users/Services hard delete).
  */
 @Service
 public class ProjectArchiveService {
@@ -156,26 +160,27 @@ public class ProjectArchiveService {
             throw ApiException.forbidden("Only admins can permanently delete projects");
         }
         Project p = loadManaged(actor, id);
-        if (!isArchived(p)) {
-            throw ApiException.badRequest("Only archived projects can be deleted");
-        }
+        // No archived-first gate: live projects delete immediately WITH the
+        // password below (windowPassed is false there — delete_at is null).
+        // Archived past the window deletes passwordless. (The old
+        // "Only archived projects can be deleted" 400 dead-ended the UI's
+        // password override on live projects — Jaybar-corrected 2026-09-22:
+        // the portal standard is archive-then-wait OR immediate-with-password.)
 
         boolean windowPassed = p.getDeleteAt() != null && !LocalDateTime.now().isBefore(p.getDeleteAt());
         if (!windowPassed) {
-            // Force-delete before the window: re-authenticate with the
-            // admin's account password.
+            // Immediate delete (live, or archived inside the window):
+            // re-authenticate with the admin's account password.
             int windowDays = retention.getDays();
             User actorUser = users.findById(actor.id())
                     .orElseThrow(() -> ApiException.notFound("User"));
             String hash = actorUser.getPasswordHash();
             if (hash == null || hash.isBlank()) {
-                throw ApiException.forbidden("The " + windowDays
-                        + "-day archive window hasn't elapsed and this account has no password on file, "
-                        + "so it cannot force an early deletion.");
+                throw ApiException.forbidden("This account has no password on file, "
+                        + "so it cannot force an immediate deletion.");
             }
             if (password == null || password.isBlank() || !passwordEncoder.matches(password, hash)) {
-                throw ApiException.forbidden("The " + windowDays
-                        + "-day archive window hasn't elapsed. Provide your account password to delete immediately.");
+                throw ApiException.forbidden(windowPassedReason(windowDays, isArchived(p)));
             }
         }
 
@@ -191,6 +196,13 @@ public class ProjectArchiveService {
 
     private boolean isArchived(Project p) {
         return p.getArchivedAt() != null || ARCHIVED.equals(p.getStatus());
+    }
+
+    /** Password-gate verdict wording (immediate-delete path). */
+    private String windowPassedReason(int windowDays, boolean archived) {
+        return archived
+                ? "The " + windowDays + "-day archive window hasn't elapsed. Provide your account password to delete immediately."
+                : "Provide your account password to delete this project immediately.";
     }
 
     /** Staff (USER/ADMIN) may manage any project; clients never. Non-admins
