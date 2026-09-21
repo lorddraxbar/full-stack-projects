@@ -2,6 +2,7 @@ package com.secphils.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.secphils.dto.SmtpConfig;
+import com.secphils.security.AuthUser;
 import com.secphils.entity.SystemSettings;
 import com.secphils.entity.User;
 import com.secphils.repository.SystemSettingsRepository;
@@ -15,8 +16,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.util.Properties;
 
 /**
@@ -55,6 +58,8 @@ public class MailService {
     private final EmailSuppressionService suppressions;
     private final UserRepository userRepository;
     private final NotificationPrefs prefs;
+    private final com.secphils.common.AuditService auditService;
+    private final Duration inviteTtl;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.invite.base-url}")
@@ -66,7 +71,9 @@ public class MailService {
                        EmailTemplateService templateService,
                        EmailSuppressionService suppressions,
                        UserRepository userRepository,
-                       NotificationPrefs prefs) {
+                       NotificationPrefs prefs,
+                       com.secphils.common.AuditService auditService,
+                       @Value("${app.invite.token-ttl:24h}") Duration inviteTtl) {
         this.envSender = (JavaMailSenderImpl) mailSender;
         this.envFrom = fromAddress;
         this.settingsRepository = settingsRepository;
@@ -74,6 +81,8 @@ public class MailService {
         this.suppressions = suppressions;
         this.userRepository = userRepository;
         this.prefs = prefs;
+        this.auditService = auditService;
+        this.inviteTtl = inviteTtl;
     }
 
     /** The DB config if usable, else null (caller falls back to env). A
@@ -130,20 +139,15 @@ public class MailService {
     }
 
     /**
-     * Fire-and-forget notification send (AsyncConfig mailExecutor).
-     *
-     * Portal-wide rule: notification mail NEVER runs on the request thread.
-     * Each send carries a 10s SMTP connect timeout; a fan-out of N recipients
-     * against a slow relay would freeze the creating request for N*10s while
-     * the UI waits on a response that has nothing to do with the mail. The
-     * in-app Notification row is still written synchronously by callers
-     * (inside their transaction); only the SMTP delivery detaches.
-     *
-     * The message payload must be fully built by the caller — strings only.
-     * Never use this for sends whose RESULT is shown to the caller (SMTP
-     * test, invite verdict): those have their own synchronous paths.
+     * Async delivery inside its OWN transaction: the SMTP send can run for
+     * seconds after the caller's response is written, and without a
+     * transaction of its own its lazy loads (recipient preferences,
+     * unsubscribe token mint) hit a closed session when it runs after an
+     * HTTP request's OSIV window. REQUIRES_NEW keeps it independent of
+     * whatever scope it lands in.
      */
     @Async("mailExecutor")
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void sendHtmlAsync(String to, String subject, String htmlBody, String link,
                               String replyTo, String category, User recipient) {
         sendHtml(to, subject, htmlBody, link, replyTo, category, recipient);
@@ -151,8 +155,70 @@ public class MailService {
 
     /** 4-arg async door, mirroring the sync overload (no Reply-To/category). */
     @Async("mailExecutor")
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void sendHtmlAsync(String to, String subject, String htmlBody, String link) {
         sendHtml(to, subject, htmlBody, link, null, null, null);
+    }
+
+    /**
+     * Portal rule: an obligation email (review/approve, rep assignment) is
+     * only honest when its recipient can ACT on it. An authorized rep may be
+     * a fully registered user or merely a staff-created placeholder row that
+     * never became an account — no password AND never signed in. Such a rep
+     * hitting a portal link bounces off a sign-in they cannot pass (exactly
+     * Jaybar's 2026-09-21 repro). True = can sign in (password set, or has
+     * signed in via SSO at least once).
+     */
+    public boolean hasPortalAccount(User rep) {
+        return rep != null && (rep.getPasswordHash() != null || rep.getLastLogin() != null);
+    }
+
+    /**
+     * Rep-account gate: when a notification wants to send an obligation
+     * email to a rep WITHOUT an account, send them the branded SET-PASSWORD
+     * invitation instead (same token machinery + audit trail as the team
+     * invite path). Id-based on purpose: safe to call from the mail threads
+     * — the rep row is re-read fresh, never a cross-thread entity reference.
+     *
+     * Runs on the mail executor in its own transaction; re-checks the
+     * account state after loading (someone may have set a password between
+     * the caller's check and our send). A pending-but-live invite token is
+     * honored: no second spam invite while one waits — the earlier link and
+     * the newer one lead to the same page anyway. Never throws: mail
+     * transport failures are logged by sendHtml, and a failed invite must
+     * not undo the caller's save.
+     */
+    @Async("mailExecutor")
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void ensureAccountInvited(Long actorId, Long repId, String companyName, String auditAction) {
+        try {
+            User rep = userRepository.findById(repId).orElse(null);
+            if (rep == null || hasPortalAccount(rep)) return;
+            boolean pendingInvite = rep.getPasswordResetToken() != null
+                    && rep.getPasswordResetExpiresAt() != null
+                    && rep.getPasswordResetExpiresAt().isAfter(java.time.LocalDateTime.now());
+            if (pendingInvite) {
+                log.info("Rep {} already has a live invite — no duplicate sent ({})", repId, auditAction);
+                return;
+            }
+            String token = inviteToken();
+            rep.setPasswordResetToken(token);
+            rep.setPasswordResetExpiresAt(java.time.LocalDateTime.now().plus(inviteTtl));
+            rep.setPasswordResetRequestedAt(java.time.LocalDateTime.now());
+            userRepository.save(rep);
+            String link = resolveBaseUrl(null) + "/auth/set-password?token=" + token;
+            String inviter = actorId == null ? "A member"
+                    : userRepository.findById(actorId)
+                            .map(com.secphils.policy.DisplayNamePolicy::nameFor).orElse("A member");
+            sendHtml(rep.getEmail(), inviteSubject(companyName),
+                    inviteEmail(rep.getFirstName(), rep.getFullName(), link, inviter, companyName), link);
+            AuthUser actor = actorId == null ? null : userRepository.findById(actorId)
+                    .map(u -> new AuthUser(u.getId(), u.getEmail(), u.getRole(), u.getCompanyId())).orElse(null);
+            auditService.audit(actor, auditAction, "User", repId,
+                    "Auto-invite (rep has no portal account) — email: " + rep.getEmail(), null);
+        } catch (Exception e) {
+            log.warn("ensureAccountInvited(rep={}) failed: {}", repId, e.getMessage());
+        }
     }
 
     /**
@@ -231,6 +297,16 @@ public class MailService {
             if (origin != null && !origin.isBlank()) return origin.replaceAll("/+$", "");
         }
         return envBaseUrl.replaceAll("/+$", "");
+    }
+
+    /** One-time invite/set-password token (32 random bytes, hex) — same
+     *  shape the controller invite paths mint, shared here for the gate. */
+    private String inviteToken() {
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) sb.append(String.format("%02x", b));
+        return sb.toString();
     }
 
     /** Stable per-user unsubscribe token (V40), minted on first use. */

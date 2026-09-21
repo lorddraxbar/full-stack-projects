@@ -78,18 +78,25 @@ public class ProjectNotificationService {
     public void onProjectCreated(Project project, Long actorId) {
         String link = projectDetailLink(project.getId());
         String repName = displayName(project.getCompany().getAuthorizedRep());
-        // 1) The customer's authorized rep: review + complete the project.
+        // 1) The customer's authorized rep: review + complete the project —
+        // BUT ONLY IF they can act on it. A rep row that never became an
+        // account (no password, no sign-in) cannot open the portal; sending
+        // them "review & approve" is the dead-end sign-in wall Jaybar caught
+        // on 2026-09-21. The in-app bell row still records the event, but the
+        // EMAIL becomes an account-setup invitation instead of an obligation
+        // notice (portal rule, mirrors the rep-reassignment gate).
+        User rep = project.getCompany().getAuthorizedRep();
         String repSubject = templateService.subject(EmailTemplateService.PROJECT_CREATED_REP, Map.of(
                 "company", companyName(project), "project", projectName(project)));
-        deliver(project, project.getCompany().getAuthorizedRep(), actorId, KEY_CREATED,
+        deliver(project, rep, actorId, KEY_CREATED,
                 "New project submitted — " + project.getName(),
                 repSubject,
                 templateCard(EmailTemplateService.PROJECT_CREATED_REP, Map.of(
-                        "name", firstName(project.getCompany().getAuthorizedRep()),
+                        "name", firstName(rep),
                         "company", companyName(project),
                         "project", projectName(project)),
                         link),
-                link, "NEW_PROJECT");
+                link, "NEW_PROJECT", true);
         // 2) Provider side: every other active staff user.
         String staffSubject = templateService.subject(EmailTemplateService.PROJECT_CREATED_STAFF, Map.of(
                 "company", companyName(project), "project", projectName(project)));
@@ -119,6 +126,8 @@ public class ProjectNotificationService {
                 "company", companyName(project),
                 "statusLabel", label);
         String subject = templateService.subject(EmailTemplateService.PROJECT_STATUS_REP, vars);
+        // Same rep-account gate as onProjectCreated: no account -> invite, not
+        // an obligation notice they cannot open.
         deliver(project, project.getCompany().getAuthorizedRep(), actorId, KEY_STATUS,
                 "Project " + label + " — " + project.getName(),
                 subject,
@@ -128,7 +137,7 @@ public class ProjectNotificationService {
                                 "company", companyName(project),
                                 "statusLabel", label),
                         link),
-                link, "PROJECT_STATUS");
+                link, "PROJECT_STATUS", true);
         for (User u : activeProviderUsers(project.getCompany())) {
             if (u.getId().equals(actorId)) continue;
             deliver(project, u, actorId, KEY_STATUS,
@@ -167,6 +176,16 @@ public class ProjectNotificationService {
     private void deliver(Project project, User recipient, Long skipIfSameId, String prefKey,
                          String notifTitle, String emailSubject, String emailHtml,
                          String link, String notifType) {
+        deliver(project, recipient, skipIfSameId, prefKey, notifTitle, emailSubject, emailHtml,
+                link, notifType, false);
+    }
+
+    /** {@code repEmailGate}: this mail targets the authorized rep — when they
+     *  have no portal account, the obligation email is replaced by the
+     *  account-setup invitation (the notice would be unactionable). */
+    private void deliver(Project project, User recipient, Long skipIfSameId, String prefKey,
+                         String notifTitle, String emailSubject, String emailHtml,
+                         String link, String notifType, boolean repEmailGate) {
         if (recipient == null || recipient.getId().equals(skipIfSameId)) return;
         NotificationPreference pref = preferences.findByUserId(recipient.getId()).orElse(null);
         if (prefAllows(pref == null ? null : pref.getInApp(), prefKey)) {
@@ -186,7 +205,12 @@ public class ProjectNotificationService {
         if (prefAllows(pref == null ? null : pref.getEmail(), prefKey)
                 && recipient.getEmail() != null && !recipient.getEmail().isBlank()) {
             try {
-                mail.sendHtmlAsync(recipient.getEmail(), emailSubject, emailHtml, link, null, prefKey, recipient);
+                if (repEmailGate && !mail.hasPortalAccount(recipient)) {
+                    mail.ensureAccountInvited(skipIfSameId, recipient.getId(), companyName(project),
+                            "REP_AUTOINVITE");
+                } else {
+                    mail.sendHtmlAsync(recipient.getEmail(), emailSubject, emailHtml, link, null, prefKey, recipient);
+                }
             } catch (Exception e) {
                 log.warn("Project notification email to {} failed: {}", recipient.getEmail(), e.getMessage());
             }

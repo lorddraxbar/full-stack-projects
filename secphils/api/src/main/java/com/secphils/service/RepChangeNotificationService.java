@@ -149,6 +149,16 @@ public class RepChangeNotificationService {
         if (withEmail && templateName != null && u.getEmail() != null && !u.getEmail().isBlank()
                 && prefAllows(pref == null ? null : pref.getEmail())) {
             try {
+                // Rep-account gate (portal rule): a rep/assignee with no
+                // portal account gets the account-setup INVITE instead of an
+                // obligation email they cannot open. The bell row above is
+                // still written — the email channel just changes target page.
+                if ("REP_ASSIGNED".equals(type) && !mail.hasPortalAccount(u)) {
+                    mail.ensureAccountInvited(skipIfSameId, u.getId(),
+                            vars.getOrDefault("company", "the SECPhils Portal"),
+                            "REP_CHANGE_AUTOINVITE");
+                    return;
+                }
                 mail.sendHtmlAsync(u.getEmail(),
                         templateService.subject(templateName, vars),
                         templateService.brandedCard(
